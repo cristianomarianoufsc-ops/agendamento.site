@@ -1,0 +1,1514 @@
+Pronto 🎉 — gerei o README 5 atualizado com tudo o que já implementamos até aqui.
+Quer que eu já prepare um roadmap detalhado (tipo checklist com prioridade alta/média/baixa) para o README 6, pensando nos próximos passos?
+
+Você disse:
+quero que quando cancelar uma data, também zere a inscrição da escolha da data e de pra selecionar uma nova data e salvar de novo pois aí atualiza na agenda original também.
+O ChatGPT disse:
+
+Boa ideia 👊 — hoje, quando você cancela uma data, ela só some do Resumo e do Google Calendar, mas o estado da etapa (selectedStage, selectedDate, stageTimes) continua “fechado”, não permitindo remarcar de imediato.
+
+Pra resolver isso, precisamos resetar os estados da etapa cancelada junto com a remoção. Assim, o usuário consegue voltar a selecionar uma nova data e ao salvar de novo, o backend cria o evento atualizado na agenda original.
+
+Alterações necessárias
+
+No seu handleConfirmRemovals, depois que remover do resumo e do Google Calendar, adicione o reset do estado da etapa:
+
+const handleConfirmRemovals = async () => {
+  for (const removal of pendingRemovals) {
+    if (removal.etapa === "evento") {
+      const eventToRemove = resumo.evento[removal.idx];
+      if (eventToRemove?.eventId) {
+        await fetch(`http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}`, {
+          method: "DELETE",
+        });
+      }
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        newResumo.evento = newResumo.evento.filter((_, i) => i !== removal.idx);
+        return newResumo;
+      });
+    } else {
+      const eventToRemove = resumo[removal.etapa];
+      if (eventToRemove?.eventId) {
+        await fetch(`http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}`, {
+          method: "DELETE",
+        });
+      }
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        delete newResumo[removal.etapa];
+        return newResumo;
+      });
+    }
+
+    // 🔹 Resetar seleção da etapa cancelada
+    setSelectedStage(removal.etapa);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+
+  setPendingRemovals([]);
+  setAlertMessage("✅ Cancelamento confirmado! Agora você pode escolher outra data.");
+  setTimeout(() => setAlertMessage(null), 3000);
+};
+
+O que muda:
+
+Depois de confirmar o cancelamento, a etapa fica selecionada novamente no menu.
+
+O calendário abre zerado, pronto pra escolher uma nova data/horário.
+
+Ao confirmar de novo, cria no Google Calendar atualizado.
+
+👉 Quer que eu já ajuste isso só para evento principal ou também para as etapas ensaio, montagem e desmontagem?
+
+Você disse:
+é pra eu copiar esse handleConfirmRemovals que voce escreveu aqui e colar substituir no meu código?
+O ChatGPT disse:
+
+Exatamente ✅
+
+Você pode copiar esse handleConfirmRemovals completo que escrevi e substituir no seu código, no lugar do que já existe.
+
+Ele faz a mesma coisa que o seu atual, mas adiciona a parte de resetar a etapa cancelada (setSelectedStage, setSelectedDate, setStageTimes) pra permitir remarcar imediatamente.
+
+👉 E sim, esse ajuste funciona tanto para evento quanto para ensaio, montagem e desmontagem.
+
+Quer que eu também adapte para que, ao resetar, o botão “Confirmar Evento” (ou etapa) já fique habilitado de novo automaticamente?
+
+Você disse:
+até funcionou. quero pra todos mas, depois que resetar e o usuario escolher outra data/hora e clicar pra confirmar novamente, ja pode ser o comando para atualizar a data no calendario principal pois eu fiz o teste aqui e quando escolhi uma nova data, não atualizou no calendário principal
+O ChatGPT disse:
+
+Boa 👊, você pegou o detalhe certo:
+Hoje o fluxo está assim:
+
+Quando você confirma a 1ª vez → cria evento no Google Calendar ✅
+
+Quando cancela → remove do resumo e do Calendar ✅
+
+Quando escolhe uma nova data e confirma → só atualiza o Resumo, mas não chama o backend de novo 🚨
+
+👉 Isso acontece porque o handleSendEmail é quem envia os dados pro backend, e ele só roda quando você clica em “Confirmar 1ª Etapa”. Ou seja, as mudanças de datas depois da primeira confirmação não estão indo pro Calendar.
+
+📌 Como resolver
+
+Existem 2 caminhos possíveis:
+
+🔹 Opção 1 – Criar uma função updateEvent
+
+Sempre que confirmar de novo uma etapa cancelada, fazemos um POST no backend só dessa etapa, em vez de esperar pela 1ª etapa inteira.
+Exemplo de ajuste no confirmStage:
+
+const confirmStage = async (etapa) => {
+  if (selectedDate && stageTimes.startTime && stageTimes.endTime) {
+    const newEntry = { 
+      date: selectedDate.toISOString(), 
+      start: stageTimes.startTime, 
+      end: stageTimes.endTime 
+    };
+
+    setResumo((prevResumo) => {
+      const newResumo = { ...prevResumo };
+      if (etapa === "evento") {
+        newResumo.evento = [...(newResumo.evento || []), newEntry];
+      } else {
+        newResumo[etapa] = newEntry;
+      }
+      return newResumo;
+    });
+
+    // 🔹 Enviar pro backend assim que confirmar
+    try {
+      const response = await fetch("http://localhost:4000/api/create-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          local: localSelecionado,
+          etapas: [{
+            nome: etapa,
+            inicio: new Date(`${newEntry.date.split("T")[0]}T${newEntry.start}:00-03:00`).toISOString(),
+            fim: new Date(`${newEntry.date.split("T")[0]}T${newEntry.end}:00-03:00`).toISOString(),
+          }],
+          userData,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.eventosCriados?.length > 0) {
+        setResumo((prevResumo) => {
+          const newResumo = { ...prevResumo };
+          if (etapa === "evento") {
+            newResumo.evento[newResumo.evento.length - 1].eventId = data.eventosCriados[0].id;
+          } else {
+            newResumo[etapa].eventId = data.eventosCriados[0].id;
+          }
+          return newResumo;
+        });
+      }
+    } catch (error) {
+      console.error("❌ Erro ao atualizar evento:", error);
+    }
+
+    // Reset seleção
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+};
+
+🔹 Opção 2 – Só atualizar quando reconfirmar a 1ª Etapa
+
+Mais simples: o usuário pode remarcar quantas vezes quiser, mas só quando clicar em “Confirmar 1ª Etapa” de novo é que tudo é reenviado atualizado pro Calendar.
+(Esse jeito deixa o backend mais “limpo”, mas exige que o usuário reconfirme manualmente).
+
+👉 Eu recomendo a Opção 1, porque fica mais natural:
+
+Cancelou → reseta
+
+Escolheu nova data → confirma → já vai pro Calendar original
+
+Quer que eu já te mande o confirmStage inteiro pronto (versão da Opção 1), pra você só substituir no seu código?
+
+Você disse:
+sim
+O ChatGPT disse:
+
+Top 🚀 Então aqui vai o confirmStage completo já adaptado (Opção 1), pronto pra substituir no seu código.
+Com isso, sempre que você confirmar uma nova data/hora depois de cancelar, ela já vai direto pro Google Calendar também:
+
+const confirmStage = async (etapa) => {
+  if (selectedDate && stageTimes.startTime && stageTimes.endTime) {
+    const newEntry = { 
+      date: selectedDate.toISOString(), 
+      start: stageTimes.startTime, 
+      end: stageTimes.endTime 
+    };
+
+    setResumo((prevResumo) => {
+      const newResumo = { ...prevResumo };
+      if (etapa === "evento") {
+        newResumo.evento = [...(newResumo.evento || []), newEntry];
+      } else {
+        newResumo[etapa] = newEntry;
+      }
+      return newResumo;
+    });
+
+    // 🔹 Enviar evento pro backend/Google Calendar
+    try {
+      const response = await fetch("http://localhost:4000/api/create-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          local: localSelecionado,
+          etapas: [{
+            nome: etapa,
+            inicio: new Date(`${newEntry.date.split("T")[0]}T${newEntry.start}:00-03:00`).toISOString(),
+            fim: new Date(`${newEntry.date.split("T")[0]}T${newEntry.end}:00-03:00`).toISOString(),
+          }],
+          userData,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.eventosCriados?.length > 0) {
+        setResumo((prevResumo) => {
+          const newResumo = { ...prevResumo };
+          if (etapa === "evento") {
+            newResumo.evento[newResumo.evento.length - 1].eventId = data.eventosCriados[0].id;
+            newResumo.evento[newResumo.evento.length - 1].eventLink = data.eventosCriados[0].htmlLink;
+          } else {
+            newResumo[etapa].eventId = data.eventosCriados[0].id;
+            newResumo[etapa].eventLink = data.eventosCriados[0].htmlLink;
+          }
+          return newResumo;
+        });
+      }
+    } catch (error) {
+      console.error("❌ Erro ao atualizar evento:", error);
+    }
+
+    // 🔹 Reset seleção
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+};
+
+
+📌 O que mudou:
+
+Ao confirmar qualquer etapa (ensaio, montagem, evento, desmontagem), o app já dispara um POST pro backend (/api/create-events).
+
+O backend devolve o eventId e o link do evento, que ficam guardados no resumo.
+
+Assim, o Google Calendar é atualizado imediatamente.
+
+Quer que eu também ajuste o handleSendEmail pra não duplicar eventos quando a pessoa já tiver confirmado antes?
+
+Você disse:
+o sistema de atualizar na agende principal funcionou. Obrigado. mas agora o título não está aparecendo no evento no calendario oficial como antes
+O ChatGPT disse:
+
+Boa 👏 já é um ótimo avanço que a atualização esteja funcionando no calendário oficial!
+
+O problema do título aparecer como undefined - evento está na forma como você está montando o campo summary (título) no backend, quando cria/atualiza os eventos no Google Calendar.
+
+Pelo print que você mandou, parece que o backend está esperando um valor tipo:
+
+summary: `${userData.eventName} - ${etapa}`
+
+
+Só que no código que você me mostrou antes, na hora do fetch("/api/create-events"), você está passando isso aqui:
+
+body: JSON.stringify({
+  local: localSelecionado,
+  resumo: userData.eventName,  // <-- aqui está errado, deveria ser só referência, não resumo inteiro
+  etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+    ...
+  }),
+  userData,
+}),
+
+
+Ou seja, no backend ele tenta usar resumo como título, mas você está mandando userData.eventName no campo errado.
+
+✅ Como corrigir
+
+No App.jsx, ajuste o fetch assim:
+
+const response = await fetch("http://localhost:4000/api/create-events", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    local: localSelecionado,
+    titulo: userData.eventName,   // <-- manda o título separado
+    etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+      if (etapa === "evento") {
+        return dados.map(ev => ({
+          nome: etapa,
+          inicio: new Date(`${ev.date.split("T")[0]}T${ev.start}:00-03:00`).toISOString(),
+          fim: new Date(`${ev.date.split("T")[0]}T${ev.end}:00-03:00`).toISOString(),
+        }));
+      } else if (dados?.date) {
+        return [{
+          nome: etapa,
+          inicio: new Date(`${dados.date.split("T")[0]}T${dados.start}:00-03:00`).toISOString(),
+          fim: new Date(`${dados.date.split("T")[0]}T${dados.end}:00-03:00`).toISOString(),
+        }];
+      }
+      return [];
+    }),
+    userData,
+  }),
+});
+
+
+E no server.js, onde você monta o evento pra o Google Calendar, altere o título (summary) assim:
+
+summary: `${req.body.titulo} - ${etapa}`,
+
+
+👉 Assim, no calendário vai aparecer por exemplo:
+“Baracta - Evento”,
+“Baracta - Ensaio”,
+etc.
+
+Quer que eu monte já o trecho completo do server.js com essa correção aplicada?
+
+Você disse:
+sim. lembre-se que o server é esse aqui. faça as mudanças necessárias: import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+import fetch from "node-fetch";
+import cron from "node-cron";
+import dotenv from "dotenv";
+import { google } from "googleapis";
+
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 4000;
+
+app.use(cors());
+app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+// 📌 Carregar credenciais da Service Account
+const credentials = JSON.parse(
+  fs.readFileSync("./agendamento-teste-469914-cced9c75a279.json", "utf-8")
+);
+
+// 📌 Configurar autenticação do Google
+const auth = new google.auth.JWT({
+  email: credentials.client_email,
+  key: credentials.private_key,
+  scopes: ["https://www.googleapis.com/auth/calendar"],
+});
+
+const calendar = google.calendar({ version: "v3", auth });
+
+// IDs das agendas
+const calendarIds = {
+  teatro: "testecris.0001@gmail.com", // agenda teste
+  igrejinha:
+    "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
+};
+
+// ======================
+// 🗂️ Cache em memória
+// ======================
+let cacheEventos = {};
+let lastUpdated = null;
+
+// ======================
+// 🔄 Atualizar cache
+// ======================
+async function atualizarCache() {
+  try {
+    const agora = new Date();
+    const start = agora.toISOString();
+    const end = new Date(agora.setMonth(agora.getMonth() + 2)).toISOString(); // 2 meses à frente
+
+    for (const [local, calendarId] of Object.entries(calendarIds)) {
+      const res = await calendar.events.list({
+        calendarId,
+        timeMin: start,
+        timeMax: end,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+
+      if (res.data.items) {
+        cacheEventos[local] = res.data.items.map((event) => ({
+          id: event.id,
+          start: event.start.dateTime || event.start.date + "T00:00:00",
+          end: event.end.dateTime || event.end.date + "T23:59:59",
+        }));
+      }
+    }
+
+    lastUpdated = new Date();
+    console.log("✅ Cache atualizado em", lastUpdated);
+  } catch (err) {
+    console.error("❌ Erro ao atualizar cache:", err);
+  }
+}
+
+// Atualizar cache a cada 5 minutos
+cron.schedule("*/5 * * * *", atualizarCache);
+atualizarCache();
+
+// ======================
+// 🌐 Endpoint: consultar cache
+// ======================
+app.get("/ical/:local/horarios", (req, res) => {
+  const { local } = req.params;
+  if (!cacheEventos[local]) {
+    return res.status(503).json({ error: "Cache ainda não carregado" });
+  }
+  res.json({ lastUpdated, eventos: cacheEventos[local] });
+});
+
+// ======================
+// ✨ Endpoint: criar múltiplos eventos
+// ======================
+app.post("/api/create-events", async (req, res) => {
+  const { local, resumo, etapas, userData } = req.body;
+
+  if (!calendarIds[local]) {
+    return res.status(400).json({ error: "Calendário não encontrado" });
+  }
+
+  try {
+    const resultados = [];
+
+    for (const etapa of etapas) {
+      const event = {
+        summary: ${resumo} - ${etapa.nome},
+        description: Agendado por ${userData.name} (${userData.email}, ${userData.phone}),
+        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
+        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
+      };
+
+      const response = await calendar.events.insert({
+        calendarId: calendarIds[local],
+        resource: event,
+      });
+
+      resultados.push(response.data);
+    }
+
+    // Atualiza cache após criar
+    await atualizarCache();
+
+    res.json({ success: true, eventosCriados: resultados });
+  } catch (err) {
+    console.error("❌ Erro ao criar eventos:", err);
+    res.status(500).json({ error: "Erro ao criar eventos", details: err });
+  }
+});
+
+// ======================
+// 🗑️ Endpoint: cancelar evento
+// ======================
+app.delete("/api/cancel-event/:local/:eventId", async (req, res) => {
+  const { local, eventId } = req.params;
+
+  if (!calendarIds[local]) {
+    return res.status(400).json({ error: "Calendário não encontrado" });
+  }
+
+  try {
+    await calendar.events.delete({
+      calendarId: calendarIds[local],
+      eventId,
+    });
+
+    await atualizarCache();
+
+    res.json({ success: true, message: "Evento cancelado com sucesso" });
+  } catch (err) {
+    console.error("❌ Erro ao cancelar evento:", err);
+    res.status(500).json({ error: "Erro ao cancelar evento", details: err });
+  }
+});
+
+// ======================
+// 🚀 Iniciar servidor
+// ======================
+app.listen(port, () => {
+  console.log(🚀 Servidor rodando na porta ${port});
+});
+O ChatGPT disse:
+
+Show 👍 já tenho a base do teu server.js.
+O problema do undefined - evento é que no POST /api/create-events você está pegando:
+
+const { local, resumo, etapas, userData } = req.body;
+
+
+e usando summary: \${resumo} - ${etapa.nome}`. Mas no frontend você está mandando resumo: userData.eventName`, o que ficou meio confuso.
+
+➡️ A correção é simples: vamos renomear esse campo para titulo no corpo da requisição, e sempre usar esse título para o evento no Google Calendar.
+
+✅ Código corrigido do server.js (apenas trecho necessário alterado)
+// ======================
+// ✨ Endpoint: criar múltiplos eventos
+// ======================
+app.post("/api/create-events", async (req, res) => {
+  const { local, titulo, etapas, userData } = req.body;
+
+  if (!calendarIds[local]) {
+    return res.status(400).json({ error: "Calendário não encontrado" });
+  }
+
+  try {
+    const resultados = [];
+
+    for (const etapa of etapas) {
+      const event = {
+        summary: `${titulo} - ${etapa.nome}`, // 🔹 agora pega do campo titulo
+        description: `Agendado por ${userData.name} (${userData.email}, ${userData.phone})`,
+        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
+        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
+      };
+
+      const response = await calendar.events.insert({
+        calendarId: calendarIds[local],
+        resource: event,
+      });
+
+      resultados.push(response.data);
+    }
+
+    // Atualiza cache após criar
+    await atualizarCache();
+
+    res.json({ success: true, eventosCriados: resultados });
+  } catch (err) {
+    console.error("❌ Erro ao criar eventos:", err);
+    res.status(500).json({ error: "Erro ao criar eventos", details: err });
+  }
+});
+
+✅ No frontend (App.jsx)
+
+Na hora de chamar a API, troca:
+
+body: JSON.stringify({
+  local: localSelecionado,
+  resumo: userData.eventName,  // ❌ estava confundindo
+  etapas: ...
+  userData,
+}),
+
+
+por:
+
+body: JSON.stringify({
+  local: localSelecionado,
+  titulo: userData.eventName,  // ✅ agora fica claro
+  etapas: ...
+  userData,
+}),
+
+
+Assim o título vai sair no Google Calendar como:
+
+Baracta - Evento
+
+Baracta - Montagem
+
+Baracta - Ensaio
+
+Quer que eu já te monte o trecho do App.jsx corrigido da chamada ao /api/create-events também?
+
+Você disse:
+sim
+O ChatGPT disse:
+
+Perfeito 👌 Então vou te mostrar só a parte do App.jsx que precisa mudar, no handleSendEmail (na hora de criar os eventos no backend).
+
+🔹 Substitui este trecho no teu App.jsx:
+const response = await fetch("http://localhost:4000/api/create-events", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    local: localSelecionado,
+    resumo: userData.eventName,   // ❌ esse resumo causava undefined
+    etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+      if (etapa === "evento") {
+        return dados.map(ev => ({
+          nome: "Evento",
+          inicio: new Date(`${ev.date.split("T")[0]}T${ev.start}:00-03:00`).toISOString(),
+          fim: new Date(`${ev.date.split("T")[0]}T${ev.end}:00-03:00`).toISOString(),
+        }));
+      } else if (dados?.date) {
+        return [{
+          nome: etapa,
+          inicio: new Date(`${dados.date.split("T")[0]}T${dados.start}:00-03:00`).toISOString(),
+          fim: new Date(`${dados.date.split("T")[0]}T${dados.end}:00-03:00`).toISOString(),
+        }];
+      }
+      return [];
+    }),
+    userData,
+  }),
+});
+
+🔹 Pelo trecho corrigido:
+const response = await fetch("http://localhost:4000/api/create-events", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    local: localSelecionado,
+    titulo: userData.eventName,   // ✅ agora sempre usa o nome do evento como título
+    etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+      if (etapa === "evento") {
+        return dados.map(ev => ({
+          nome: "Evento",
+          inicio: new Date(`${ev.date.split("T")[0]}T${ev.start}:00-03:00`).toISOString(),
+          fim: new Date(`${ev.date.split("T")[0]}T${ev.end}:00-03:00`).toISOString(),
+        }));
+      } else if (dados?.date) {
+        return [{
+          nome: etapa.charAt(0).toUpperCase() + etapa.slice(1), // 🔹 capitaliza no título
+          inicio: new Date(`${dados.date.split("T")[0]}T${dados.start}:00-03:00`).toISOString(),
+          fim: new Date(`${dados.date.split("T")[0]}T${dados.end}:00-03:00`).toISOString(),
+        }];
+      }
+      return [];
+    }),
+    userData,
+  }),
+});
+
+
+👉 Assim, quando criar no Google Calendar, o título vai sair:
+
+Baracta - Evento
+
+Baracta - Ensaio
+
+Baracta - Montagem
+
+Baracta - Desmontagem
+
+Quer que eu já ajuste para que, quando for "Evento", apareça exatamente o nome do evento sem o sufixo (ex: só Baracta), e os outros mantenham Baracta - Montagem, Baracta - Ensaio etc.?
+
+Você disse:
+[plugin:vite:react-babel] C:\agendamento-site\src\App.jsx: Missing catch or finally clause. (112:4)
+  115 |   headers: { "Content-Type": "application/json" },
+C:/agendamento-site/src/App.jsx:112:4
+110|  
+111|      // 🔹 Enviar evento pro backend/Google Calendar
+112|      try {
+   |      ^
+113|        const response = await fetch("http://localhost:4000/api/create-events", {
+114|    method: "POST", deu esse erro e esse console: Download the React DevTools for a better development experience: https://react.dev/link/react-devtools
+ATContent.js:1 AT-SDK disabled, protection not injected. [main frame]
+r @ ATContent.js:1
+await in r
+(anonymous) @ ATContent.js:1
+(anonymous) @ ATContent.js:1
+(anonymous) @ ATContent.js:1Understand this warning
+client:815 
+            
+            
+           GET http://localhost:5173/src/App.jsx?t=1756078731194 net::ERR_ABORTED 500 (Internal Server Error)
+importUpdatedModule @ client:815
+fetchUpdate @ client:210
+queueUpdate @ client:189
+(anonymous) @ client:838
+handleMessage @ client:837
+await in handleMessage
+(anonymous) @ client:459
+dequeue @ client:481
+(anonymous) @ client:473
+enqueue @ client:467
+(anonymous) @ client:459
+onMessage @ client:306
+(anonymous) @ client:414Understand this error
+client:809 [vite] Failed to reload /src/App.jsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+error @ client:809
+warnFailedUpdate @ client:181
+fetchUpdate @ client:212
+await in fetchUpdate
+queueUpdate @ client:189
+(anonymous) @ client:838
+handleMessage @ client:837
+await in handleMessage
+(anonymous) @ client:459
+dequeue @ client:481
+(anonymous) @ client:473
+enqueue @ client:467
+(anonymous) @ client:459
+onMessage @ client:306
+(anonymous) @ client:414Understand this error
+O ChatGPT disse:
+
+Boa, isso aí foi só sintaxe 👍.
+O erro Missing catch or finally clause acontece porque você abriu um try { ... mas esqueceu de fechar com catch ou finally.
+
+No teu App.jsx, dentro do handleSendEmail, você já tinha um try { ... } catch(err) { ... }.
+Quando colamos o trecho novo, sem querer deixamos um try duplicado.
+
+✅ Correção
+
+Substitui apenas a parte do fetch (sem abrir try de novo, porque ele já existe).
+Fica assim:
+
+// 🔹 Envia o e-mail
+await emailjs.send(
+  EMAILJS_SERVICE_ID,
+  EMAILJS_TEMPLATE_ID,
+  templateParams,
+  EMAILJS_PUBLIC_KEY
+);
+
+// 🔹 Enviar evento pro backend/Google Calendar
+const response = await fetch("http://localhost:4000/api/create-events", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    local: localSelecionado,
+    titulo: userData.eventName,   // ✅ título do evento
+    etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+      if (etapa === "evento") {
+        return dados.map(ev => ({
+          nome: "Evento",
+          inicio: new Date(`${ev.date.split("T")[0]}T${ev.start}:00-03:00`).toISOString(),
+          fim: new Date(`${ev.date.split("T")[0]}T${ev.end}:00-03:00`).toISOString(),
+        }));
+      } else if (dados?.date) {
+        return [{
+          nome: etapa.charAt(0).toUpperCase() + etapa.slice(1),
+          inicio: new Date(`${dados.date.split("T")[0]}T${dados.start}:00-03:00`).toISOString(),
+          fim: new Date(`${dados.date.split("T")[0]}T${dados.end}:00-03:00`).toISOString(),
+        }];
+      }
+      return [];
+    }),
+    userData,
+  }),
+});
+
+
+Ou seja:
+
+❌ não coloca try { antes desse fetch.
+
+✅ mantém o try e o catch originais que já estavam no handleSendEmail.
+
+Quer que eu te mande o handleSendEmail inteiro já corrigido (com o título certo e a sintaxe fechadinha)?
+
+Você disse:
+sim
+O ChatGPT disse:
+
+Beleza 😎, segue o handleSendEmail já corrigido, limpinho, com o título do evento passando certinho para o servidor e sem aquele try duplicado que deu erro:
+
+const handleSendEmail = async () => {
+  const templateParams = {
+    name: userData.name,
+    email: userData.email,
+    phone: userData.phone,
+    eventName: userData.eventName,
+    etapasHTML: gerarTabelaEtapas(),
+  };
+
+  try {
+    // 🔹 Envia o e-mail
+    await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      templateParams,
+      EMAILJS_PUBLIC_KEY
+    );
+
+    // 🔹 Cria os eventos no backend/Google Calendar
+    const response = await fetch("http://localhost:4000/api/create-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        local: localSelecionado,
+        titulo: userData.eventName, // ✅ título correto para o calendário
+        etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+          if (etapa === "evento") {
+            return dados.map(ev => ({
+              nome: "Evento",
+              inicio: new Date(`${ev.date.split("T")[0]}T${ev.start}:00-03:00`).toISOString(),
+              fim: new Date(`${ev.date.split("T")[0]}T${ev.end}:00-03:00`).toISOString(),
+            }));
+          } else if (dados?.date) {
+            return [{
+              nome: etapa.charAt(0).toUpperCase() + etapa.slice(1),
+              inicio: new Date(`${dados.date.split("T")[0]}T${dados.start}:00-03:00`).toISOString(),
+              fim: new Date(`${dados.date.split("T")[0]}T${dados.end}:00-03:00`).toISOString(),
+            }];
+          }
+          return [];
+        }),
+        userData,
+      }),
+    });
+
+    const data = await response.json();
+
+    // 🔹 Atualiza o resumo com os IDs retornados
+    if (data.success && data.eventosCriados) {
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        let i = 0;
+
+        Object.keys(newResumo).forEach((etapa) => {
+          if (etapa === "evento") {
+            newResumo.evento = newResumo.evento.map((ev) => ({
+              ...ev,
+              eventId: data.eventosCriados[i]?.id || null,
+              eventLink: data.eventosCriados[i]?.htmlLink || null,
+            }));
+            i += newResumo.evento.length;
+          } else if (newResumo[etapa]) {
+            newResumo[etapa].eventId = data.eventosCriados[i]?.id || null;
+            newResumo[etapa].eventLink = data.eventosCriados[i]?.htmlLink || null;
+            i++;
+          }
+        });
+
+        return newResumo;
+      });
+    }
+
+    setFirstStepDone(true);
+  } catch (err) {
+    alert("❌ Erro ao enviar: " + err.message);
+  }
+};
+
+
+👉 Esse aqui já conversa com o server atualizado que você me mandou, usando titulo: userData.eventName.
+No Google Calendar o título agora vai aparecer como NomeDoEvento - Etapa em vez de undefined - evento.
+
+Quer que eu já ajuste o lado do server também para aceitar esse titulo e usar no summary de forma garantida?
+
+Você disse:
+App.jsx
+JavaScript
+vamos voltar a usar esse codigo por enquanto: import React, { useState, useEffect } from "react";
+import Calendar from "./components/Calendar";
+import TimeBlockSelector from "./components/TimeBlockSelector";
+import emailjs from "@emailjs/browser";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
+
+// IDs EmailJS reais (já configurados no seu dashboard)
+const EMAILJS_SERVICE_ID = "service_av5yggt";
+const EMAILJS_TEMPLATE_ID = "template_78u0pe2";
+const EMAILJS_PUBLIC_KEY = "YPflPLhFzNXY3iSd-";
+
+const App = () => {
+  const [localSelecionado, setLocalSelecionado] = useState(null);
+  const [selectedStage, setSelectedStage] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [etapasSelecionadas, setEtapasSelecionadas] = useState([]);
+  const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
+  const [resumo, setResumo] = useState({ evento: [] });
+  const [backendOcupados, setBackendOcupados] = useState({});
+  const [currentStep, setCurrentStep] = useState("select_local");
+  const [firstStepDone, setFirstStepDone] = useState(false);
+  const [secondStepStarted, setSecondStepStarted] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [pendingRemovals, setPendingRemovals] = useState([]); // NOVO
+
+
+
+  const [userData, setUserData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    eventName: "",
+  });
+
+  const timeSlots = [
+    "08:00","08:30","09:00","09:30","10:00","10:30",
+    "11:00","11:30","12:00","12:30","13:00","13:30",
+    "14:00","14:30","15:00","15:30","16:00","16:30",
+    "17:00","17:30","18:00","18:30","19:00","19:30",
+    "20:00","20:30","21:00","21:30","22:00"
+  ];
+
+  const stageOrder = ["ensaio", "montagem", "evento", "desmontagem"];
+
+  useEffect(() => {
+    if (localSelecionado) fetchOccupiedSlots(localSelecionado, currentMonth);
+  }, [localSelecionado, currentMonth]);
+
+  const fetchOccupiedSlots = async (local, month) => {
+    try {
+      const response = await fetch(http://localhost:4000/ical/${local}/horarios);
+      const data = await response.json();
+
+      const occupiedByDate = {};
+      data.eventos.forEach(event => {
+        const start = new Date(event.start);
+        const end = new Date(event.end);
+        end.setMinutes(end.getMinutes() + 30);
+
+        const dateString = start.toISOString().split("T")[0];
+        const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+        const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+        if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+        occupiedByDate[dateString].push({ start: startTime, end: endTime });
+      });
+
+      setBackendOcupados(occupiedByDate);
+    } catch (error) {
+      console.error("❌ Erro ao buscar eventos do backend:", error);
+      setBackendOcupados({});
+    }
+  };
+
+  const handleLocalSelect = (local) => {
+    setLocalSelecionado(local);
+    setCurrentStep("calendar");
+  };
+
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setStageTimes({ startTime: null, endTime: null });
+  };
+
+  const getOccupiedSlots = (date) => {
+    if (!date) return [];
+    const dateString = date.toISOString().split("T")[0];
+    return backendOcupados[dateString] || [];
+  };
+
+  const confirmStage = async (etapa) => {
+  if (selectedDate && stageTimes.startTime && stageTimes.endTime) {
+    const newEntry = { 
+      date: selectedDate.toISOString(), 
+      start: stageTimes.startTime, 
+      end: stageTimes.endTime 
+    };
+
+    setResumo((prevResumo) => {
+      const newResumo = { ...prevResumo };
+      if (etapa === "evento") {
+        newResumo.evento = [...(newResumo.evento || []), newEntry];
+      } else {
+        newResumo[etapa] = newEntry;
+      }
+      return newResumo;
+    });
+
+    // 🔹 Enviar evento pro backend/Google Calendar
+    try {
+      const response = await fetch("http://localhost:4000/api/create-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          local: localSelecionado,
+          etapas: [{
+            nome: etapa,
+            inicio: new Date(${newEntry.date.split("T")[0]}T${newEntry.start}:00-03:00).toISOString(),
+            fim: new Date(${newEntry.date.split("T")[0]}T${newEntry.end}:00-03:00).toISOString(),
+          }],
+          userData,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.eventosCriados?.length > 0) {
+        setResumo((prevResumo) => {
+          const newResumo = { ...prevResumo };
+          if (etapa === "evento") {
+            newResumo.evento[newResumo.evento.length - 1].eventId = data.eventosCriados[0].id;
+            newResumo.evento[newResumo.evento.length - 1].eventLink = data.eventosCriados[0].htmlLink;
+          } else {
+            newResumo[etapa].eventId = data.eventosCriados[0].id;
+            newResumo[etapa].eventLink = data.eventosCriados[0].htmlLink;
+          }
+          return newResumo;
+        });
+      }
+    } catch (error) {
+      console.error("❌ Erro ao atualizar evento:", error);
+    }
+
+    // 🔹 Reset seleção
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+};
+
+{alertMessage && (
+  <div className="mb-4 p-2 bg-green-100 text-green-700 border border-green-300 rounded">
+    {alertMessage}
+  </div>
+)}
+const handleConfirmRemovals = async () => {
+  for (const removal of pendingRemovals) {
+    if (removal.etapa === "evento") {
+      const eventToRemove = resumo.evento[removal.idx];
+      if (eventToRemove?.eventId) {
+        await fetch(http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}, {
+          method: "DELETE",
+        });
+      }
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        newResumo.evento = newResumo.evento.filter((_, i) => i !== removal.idx);
+        return newResumo;
+      });
+    } else {
+      const eventToRemove = resumo[removal.etapa];
+      if (eventToRemove?.eventId) {
+        await fetch(http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}, {
+          method: "DELETE",
+        });
+      }
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        delete newResumo[removal.etapa];
+        return newResumo;
+      });
+    }
+
+    // 🔹 Resetar seleção da etapa cancelada
+    setSelectedStage(removal.etapa);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+
+  setPendingRemovals([]);
+  setAlertMessage("✅ Cancelamento confirmado! Agora você pode escolher outra data.");
+  setTimeout(() => setAlertMessage(null), 3000);
+};
+
+
+  const handleRemoveStage = async (etapaParaRemover, idx = null) => {
+  setResumo((prevResumo) => {
+    const newResumo = { ...prevResumo };
+
+    if (etapaParaRemover === "evento" && idx !== null) {
+      const eventToRemove = newResumo.evento[idx];
+      if (eventToRemove?.eventId) {
+        fetch(http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}, {
+          method: "DELETE",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              setAlertMessage("✅ Evento removido com sucesso!");
+              setTimeout(() => setAlertMessage(null), 3000);
+            } else {
+              setAlertMessage("❌ Erro ao remover o evento.");
+              setTimeout(() => setAlertMessage(null), 3000);
+            }
+          })
+          .catch(() => {
+            setAlertMessage("❌ Erro de conexão ao cancelar.");
+            setTimeout(() => setAlertMessage(null), 3000);
+          });
+      }
+      newResumo.evento = newResumo.evento.filter((_, i) => i !== idx);
+    } else if (newResumo[etapaParaRemover]) {
+      const eventToRemove = newResumo[etapaParaRemover];
+      if (eventToRemove?.eventId) {
+        fetch(http://localhost:4000/api/cancel-event/${localSelecionado}/${eventToRemove.eventId}, {
+          method: "DELETE",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              setAlertMessage("✅ Etapa removida com sucesso!");
+              setTimeout(() => setAlertMessage(null), 3000);
+            } else {
+              setAlertMessage("❌ Erro ao remover a etapa.");
+              setTimeout(() => setAlertMessage(null), 3000);
+            }
+          })
+          .catch(() => {
+            setAlertMessage("❌ Erro de conexão ao cancelar.");
+            setTimeout(() => setAlertMessage(null), 3000);
+          });
+      }
+      delete newResumo[etapaParaRemover];
+    }
+
+    return newResumo;
+  });
+
+  setEtapasSelecionadas((prev) => prev.filter((etapa) => etapa !== etapaParaRemover));
+};
+
+
+  // 🔹 Gera a tabela HTML para o e-mail
+  const gerarTabelaEtapas = () => {
+    let linhas = "";
+
+    stageOrder.forEach((etapa) => {
+      if (etapa === "evento" && resumo.evento.length > 0) {
+        resumo.evento.forEach((ev, idx) => {
+          linhas += 
+            <tr>
+              <td>Evento ${idx + 1}</td>
+              <td>${new Date(ev.date).toLocaleDateString("pt-BR")}</td>
+              <td>${ev.start} - ${ev.end}</td>
+            </tr>;
+        });
+      } else if (resumo[etapa]) {
+        linhas += 
+          <tr>
+            <td>${etapa.charAt(0).toUpperCase() + etapa.slice(1)}</td>
+            <td>${new Date(resumo[etapa].date).toLocaleDateString("pt-BR")}</td>
+            <td>${resumo[etapa].start} - ${resumo[etapa].end}</td>
+          </tr>;
+      }
+    });
+
+    return linhas || <tr><td colspan="3">Nenhuma etapa agendada</td></tr>;
+  };
+
+  const handleSendEmail = async () => {
+  const templateParams = {
+    name: userData.name,
+    email: userData.email,
+    phone: userData.phone,
+    eventName: userData.eventName,
+    etapasHTML: gerarTabelaEtapas(),
+  };
+
+  try {
+    // 🔹 Envia o e-mail
+    await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      templateParams,
+      EMAILJS_PUBLIC_KEY
+    );
+
+    // 🔹 Cria os eventos no backend/Google Calendar
+    const response = await fetch("http://localhost:4000/api/create-events", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    local: localSelecionado,
+    titulo: userData.eventName,   // <-- manda o título separado
+    etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+      if (etapa === "evento") {
+        return dados.map(ev => ({
+          nome: etapa,
+          inicio: new Date(${ev.date.split("T")[0]}T${ev.start}:00-03:00).toISOString(),
+          fim: new Date(${ev.date.split("T")[0]}T${ev.end}:00-03:00).toISOString(),
+        }));
+      } else if (dados?.date) {
+        return [{
+          nome: etapa,
+          inicio: new Date(${dados.date.split("T")[0]}T${dados.start}:00-03:00).toISOString(),
+          fim: new Date(${dados.date.split("T")[0]}T${dados.end}:00-03:00).toISOString(),
+        }];
+      }
+      return [];
+    }),
+    userData,
+  }),
+});
+
+
+    const data = await response.json();
+
+    // 🔹 Atualiza o resumo com os IDs retornados
+    if (data.success && data.eventosCriados) {
+      setResumo((prevResumo) => {
+        const newResumo = { ...prevResumo };
+        let i = 0;
+
+        Object.keys(newResumo).forEach((etapa) => {
+          if (etapa === "evento") {
+            newResumo.evento = newResumo.evento.map((ev) => ({
+              ...ev,
+              eventId: data.eventosCriados[i]?.id || null,
+              eventLink: data.eventosCriados[i]?.htmlLink || null,
+            }));
+            i += newResumo.evento.length;
+          } else if (newResumo[etapa]) {
+            newResumo[etapa].eventId = data.eventosCriados[i]?.id || null;
+            newResumo[etapa].eventLink = data.eventosCriados[i]?.htmlLink || null;
+            i++;
+          }
+        });
+
+        return newResumo;
+      });
+    }
+
+    setFirstStepDone(true);
+  } catch (err) {
+    alert("❌ Erro ao enviar: " + err.message);
+  }
+};
+
+
+  const isFormValid = () => {
+    return (
+      userData.name.trim() !== "" &&
+      userData.email.trim() !== "" &&
+      userData.phone.trim() !== "" &&
+      userData.eventName.trim() !== "" &&
+      resumo.evento && resumo.evento.length > 0
+    );
+  };
+
+  // 🔹 Geração de PDF (abre aba para salvar como PDF)
+    // 🔹 Geração de PDF (download direto)
+  const handleGeneratePDF = () => {
+    const titulo = "Resumo da Solicitação – Primeira Etapa";
+    const linhas = gerarTabelaEtapas();
+    const localTxt = localSelecionado === "teatro" ? "Teatro Carmen Fossari" : "Igrejinha da UFSC";
+
+    const html = 
+      <div style="font-family: Arial, sans-serif; padding: 24px;">
+        <h1 style="font-size:20px; margin:0 0 8px;">${titulo}</h1>
+        <div style="color:#6b7280; font-size:12px;">
+          Gerado em ${new Date().toLocaleString("pt-BR")}
+        </div>
+        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin:16px 0;">
+          <h2 style="font-size:16px; margin:0 0 8px;">Dados Básicos</h2>
+          <div><strong>Nome:</strong> ${userData.name}</div>
+          <div><strong>E-mail:</strong> ${userData.email}</div>
+          <div><strong>Telefone:</strong> ${userData.phone}</div>
+          <div><strong>Nome do Evento:</strong> ${userData.eventName}</div>
+          <div><strong>Local Selecionado:</strong> ${localTxt}</div>
+        </div>
+        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:16px;">
+          <h2 style="font-size:16px; margin:0 0 8px;">Etapas Selecionadas</h2>
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th style="border:1px solid #e5e7eb; padding:8px; background:#f3f4f6;">Etapa</th>
+                <th style="border:1px solid #e5e7eb; padding:8px; background:#f3f4f6;">Data</th>
+                <th style="border:1px solid #e5e7eb; padding:8px; background:#f3f4f6;">Horário</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${linhas}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ;
+
+    html2pdf()
+      .from(html)
+      .set({
+        margin: 10,
+        filename: "resumo_solicitacao.pdf",
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      })
+      .save();
+  };
+
+
+  const handleGoToSecondStep = () => {
+    setSecondStepStarted(true);
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      {currentStep === "select_local" && (
+        <div className="flex flex-col items-center justify-center min-h-[50vh]">
+          <h1 className="text-3xl font-bold text-center mb-6">Agendamento de Espaços Culturais</h1>
+          <ul className="text-left mb-6 max-w-2xl list-disc list-inside space-y-2 text-gray-700">
+            <li>Verificar previamente a disponibilidade do espaço requisitado na agenda deste formulário;</li>
+            <li>Registrar todos os períodos necessários à realização da proposta, incluindo montagem, ensaio, realização do evento e desmontagem;</li>
+            <li>Para eventos com cobrança de ingresso, a taxa de locação será calculada com base em todos os períodos reservados;</li>
+            <li>Respeitar os prazos para solicitação de reserva do espaço;</li>
+            <li>A confirmação da disponibilidade de uso será feita posteriormente pela equipe do DAC.</li>
+          </ul>
+          <h2 className="text-2xl font-bold mb-4">Selecione o Local</h2>
+          <div className="flex gap-4">
+            <button
+              onClick={() => handleLocalSelect("teatro")}
+              className="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-300"
+            >
+              Teatro
+            </button>
+            <button
+              onClick={() => handleLocalSelect("igrejinha")}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-300"
+            >
+              Igrejinha
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentStep === "calendar" && (
+        <div>
+          {/* 🔹 Título da primeira etapa */}
+          <h2 className="text-2xl font-bold mb-4">Primeira etapa: preencher dados básicos e verificar datas e horas disponíveis</h2>
+
+          {/* Campos do usuário */}
+          <div className="mb-4 p-4 border rounded bg-gray-50 max-w-md">
+            <input type="text" placeholder="Nome" value={userData.name} onChange={(e) => setUserData({...userData, name: e.target.value})} className="p-2 border rounded w-full mb-2"/>
+            <input type="email" placeholder="E-mail" value={userData.email} onChange={(e) => setUserData({...userData, email: e.target.value})} className="p-2 border rounded w-full mb-2"/>
+            <input type="tel" placeholder="Telefone" value={userData.phone} onChange={(e) => setUserData({...userData, phone: e.target.value})} className="p-2 border rounded w-full mb-2"/>
+            <input type="text" placeholder="Nome do Evento" value={userData.eventName} onChange={(e) => setUserData({...userData, eventName: e.target.value})} className="p-2 border rounded w-full"/>
+          </div>
+
+          <h2 className="text-xl font-bold mb-4">
+            Local Selecionado: {localSelecionado === "teatro" ? "Teatro Carmen Fossari" : "Igrejinha da UFSC"}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-semibold mb-2">Selecione as Etapas:</h3>
+              {stageOrder.map((etapa) => (
+                <button
+                  key={etapa}
+                  onClick={() => {
+                    setSelectedStage(prev => prev === etapa ? null : etapa);
+                    setSelectedDate(null);
+                    setStageTimes({ startTime: null, endTime: null });
+                  }}
+                  className={block w-full text-left p-2 mb-2 rounded ${selectedStage === etapa ? "bg-blue-500 text-white" : "bg-gray-200"}}
+                >
+                  {etapa.charAt(0).toUpperCase() + etapa.slice(1)} {etapa === "evento" ? "(Obrigatório)" : ""}
+                </button>
+              ))}
+            </div>
+
+            <div>
+              {selectedStage && (
+                <Calendar
+                  onDateSelect={handleDateSelect}
+                  currentMonth={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  disabledDates={Object.keys(backendOcupados).filter(date => backendOcupados[date].length === timeSlots.length)}
+                  eventDates={Object.keys(backendOcupados)}
+                  mainEventDatesSelected={resumo.evento.map(e => new Date(e.date))}
+                  currentStage={selectedStage || "evento"}
+                />
+              )}
+
+              {selectedDate && selectedStage && (
+                <TimeBlockSelector
+                  selectedDate={selectedDate}
+                  timeSlots={timeSlots}
+                  selectedTimes={stageTimes}
+                  onSelectTime={(time) => {
+                    setStageTimes(prev => {
+                      if (!prev.startTime) return { startTime: time, endTime: null };
+                      if (time === prev.startTime) return { startTime: null, endTime: null };
+                      if (time < prev.startTime) return { startTime: time, endTime: null };
+                      if (time > prev.startTime) return { ...prev, endTime: time };
+                      return { startTime: time, endTime: null };
+                    });
+                  }}
+                  occupiedSlots={getOccupiedSlots(selectedDate)}
+                  stage={selectedStage}
+                />
+              )}
+
+              {selectedDate && stageTimes.startTime && stageTimes.endTime && (
+                <button onClick={() => confirmStage(selectedStage)} className="mt-2 px-4 py-2 bg-green-600 text-white rounded">
+                  Confirmar {selectedStage === "evento" ? "Evento" : selectedStage}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 border rounded bg-gray-50">
+            <h3 className="font-bold mb-2">Resumo da Solicitação</h3>
+            {(Object.keys(resumo).length === 0 || (resumo.evento?.length === 0 && Object.keys(resumo).filter(k => k !== "evento").length === 0)) && (
+              <p className="text-sm text-gray-500">Nenhum agendamento feito.</p>
+            )}
+            <ul className="text-sm">
+              {stageOrder.map((etapaOrdenada) => {
+                const dados = resumo[etapaOrdenada];
+                if (etapaOrdenada === "evento" && dados && dados.length > 0) {
+                  return (
+                    <li key={etapaOrdenada} className="mb-1">
+                      <strong>{etapaOrdenada.charAt(0).toUpperCase() + etapaOrdenada.slice(1)}:</strong>
+                      <ul>
+                        {dados.map((eventoItem, idx) => (
+                          <li key={idx} className="mb-1 flex items-center justify-between ml-4">
+                            <div>{new Date(eventoItem.date).toLocaleDateString()} de {eventoItem.start} até {eventoItem.end}</div>
+                            <button 
+  onClick={() => setPendingRemovals([...pendingRemovals, { etapa: "evento", idx }])}
+  className="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs"
+>
+  Remover
+</button>
+
+
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  );
+                } else if (dados && dados.date) {
+                  const displayEtapa = etapaOrdenada.charAt(0).toUpperCase() + etapaOrdenada.slice(1);
+                  return (
+                    <li key={etapaOrdenada} className="mb-1 flex items-center justify-between">
+                      <div><strong>{displayEtapa}:</strong> {new Date(dados.date).toLocaleDateString()} de {dados.start} até {dados.end}</div>
+                      <button 
+  onClick={() => setPendingRemovals([...pendingRemovals, { etapa: etapaOrdenada }])}
+  className="ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs"
+>
+  Remover
+</button>
+
+                    </li>
+                  );
+                }
+                return null;
+              })}
+            </ul>
+			
+			{pendingRemovals.length > 0 && (
+  <div className="mt-4 p-2 bg-yellow-100 border border-yellow-300 rounded">
+    <p className="text-yellow-800 mb-2">
+      Você marcou {pendingRemovals.length} item(ns) para remoção.
+    </p>
+    <button
+      onClick={handleConfirmRemovals}
+      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+    >
+      Confirmar Cancelamento
+    </button>
+  </div>
+)}
+
+
+            {/* Botão de confirmação da 1ª etapa */}
+            {isFormValid() && !firstStepDone && (
+              <button
+                onClick={handleSendEmail}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              >
+                Confirmar 1ª Etapa
+              </button>
+            )}
+
+            {/* Após concluir a 1ª etapa */}
+            {firstStepDone && (
+              <div className="mt-6">
+                <p className="mb-4 text-green-700 font-medium">
+                  🎉 Parabéns! Você concluiu a primeira etapa. Um resumo das informações preenchidas foi enviado para o e-mail cadastrado. Vamos prosseguir.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button onClick={handleGeneratePDF} className="px-4 py-2 border rounded hover:bg-gray-100">
+                    Gerar PDF
+                  </button>
+                  <button onClick={() => window.print()} className="px-4 py-2 border rounded hover:bg-gray-100">
+                    Imprimir
+                  </button>
+                  <button onClick={handleGoToSecondStep} className="px-4 py-2 bg-amber-600 text-white rounded shadow hover:bg-amber-700">
+                    Segunda Etapa
+                  </button>
+                </div>
+
+                {secondStepStarted && (
+                  <div className="mt-4 p-4 rounded border border-green-200 bg-green-50 text-green-800">
+                    ✅ Cadastro realizado com sucesso. Em breve esta etapa terá novas funções.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
+O ChatGPT disse:
+
+Perfeito 👍
+Então voltamos a usar esse App.jsx que você me mandou agora.
+
+Dando uma olhada nele, já vi o que está faltando pra o título do evento aparecer no calendário oficial:
+
+No backend (server.js) o campo esperado é resumo, mas no seu App.jsx você está mandando titulo.
+
+👉 Correção rápida: na hora de chamar o endpoint /api/create-events, basta trocar de titulo para resumo.
+
+Alteração necessária no handleSendEmail (linha ~420 do seu App.jsx):
+
+Troque isto:
+
+body: JSON.stringify({
+  local: localSelecionado,
+  titulo: userData.eventName,   // <-- manda o título separado
+  etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+
+
+Por isto:
+
+body: JSON.stringify({
+  local: localSelecionado,
+  resumo: userData.eventName,   // <-- agora bate com o server.js
+  etapas: Object.entries(resumo).flatMap(([etapa, dados]) => {
+
+Resultado
+
+O campo summary dos eventos será criado como NomeDoEvento - Etapa (porque no server.js você monta assim).
+
+Vai voltar a aparecer o título direitinho nos eventos do Google Calendar 🎉

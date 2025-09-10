@@ -1,0 +1,68 @@
+Passo a passo sugerido pra começar
+1. Criar o Google Forms de teste
+
+Mesmo que simples (pode ser só 1 pergunta além do e-mail).
+
+Copiar o link público.
+
+Esse link vai ser usado no botão da Segunda Etapa.
+
+👉 Isso dá a base pra ter algo real pra apontar.
+
+2. Criar o painel Admin (frontend)
+
+Criar o Admin.jsx no React.
+
+Nele colocar:
+
+Um campo de texto pro link do Forms.
+
+Um botão “Salvar” que envia esse link pro backend.
+
+Uma tabela (mesmo vazia no começo) para os inscritos da primeira etapa.
+
+👉 Nesse ponto já teremos /admin rodando, mesmo que só salve/recupere o link.
+
+3. Ajustar backend (server.js)
+
+Adicionar rotas:
+
+GET /api/forms-link → pega o link do Forms do config.json.
+
+POST /api/forms-link → atualiza o link no config.json.
+
+(mais pra frente) GET /api/inscritos → devolve os inscritos.
+
+(opcional) POST /api/inscritos → salva novos inscritos no inscritos.json.
+
+👉 Isso conecta o painel admin com algo persistente (JSON local).
+
+4. Ajustar App.jsx (usuário)
+
+No botão da Segunda Etapa, em vez de usar um link fixo:
+
+Ele busca o link salvo no backend (/api/forms-link).
+
+Abre esse link.
+
+Assim o admin pode trocar o Forms a qualquer momento sem mexer em código.
+
+5. Só depois: salvar os inscritos da primeira etapa
+
+Toda vez que alguém concluir a 1ª etapa → mandar pro backend → salvar em inscritos.json.
+
+Assim a tabela do Admin começa a mostrar dados reais.
+
+🚀 Resumindo
+
+Se eu fosse você começaria nessa ordem:
+
+Forms de teste.
+
+Painel Admin básico (/admin).
+
+Backend com rotas de config.
+
+Alterar App.jsx pra ler link do backend.
+
+Persistir inscritos e exibir no admin.

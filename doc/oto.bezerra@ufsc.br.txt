@@ -1,0 +1,12 @@
+oto.bezerra@ufsc.br
+cristianosilva.ufsc@gmail.com
+
+
+baseado no readme 4, crie o readme 5  acrescentando  o que implementamos depois disso como um documento .md para eu continuar editando depois em outro chat 
+
+ESSE é o nosso projeto e nossa última conversa
+
+
+Quer que eu ajuste seu trecho do handleGeneratePDF para usar só jspdf + html2canvas (sem html2pdf.js), aí você não precisa instalar mais nada? Isso deixaria mais leve e 100% compatível com Vite.
+
+Quer que eu também ajuste o handleSendEmail pra não duplicar eventos quando a pessoa já tiver confirmado antes?

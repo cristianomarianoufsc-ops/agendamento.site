@@ -1,0 +1,41 @@
+npm install uuid
+npm install multer
+npm install dotenv
+
+PDF
+npm install pdfkit
+
+EMAIL
+npm install @emailjs/browser
+
+PARA BECKEND
+npm install node-cron
+
+
+PAGE ADMIN
+npm install react-router-dom
+
+NODEMAILER
+npm install nodemailer
+
+PARA BAIXAR ARQUIVO ZIP (beckend)
+npm install archiver
+
+PARA BAIXAR CSV (beckend)
+npm install csv-parse
+
+
+
+https://docs.google.com/forms/d/e/1FAIpQLSdF9oPXJIvJ2R-yf5HHIgI_gyDstjA7TTY9waubPmB-qe0qdg/viewform?usp=dialog
+
+Quer que eu já prepare também o .env com as variáveis certas (EMAIL_USER e EMAIL_PASS) pra garantir que funcione de primeira?
+
+Se você quiser, posso fazer uma versão ainda mais limpa, onde o merge de inscrições e arquivos fica mais fácil de ler e mantendo o código pronto para escalabilidade.
+
+Quer que eu faça isso?
+
+
+
+
+
+npm run dev

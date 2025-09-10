@@ -1,0 +1,28 @@
+DEPENDÊNCIAS
+
+npm install react-router-dom
+
+horas certas timezone
+
+npm install date-fns date-fns-tz
+
+
+GERAR PDF
+npm install html2canvas jspdf
+
+
+
+CMD
+
+
+curl http://localhost:3000/ical/teatro/horarios
+
+
+
+Dados da Solicitação de Uso
+
+- Verificar previamente a disponibilidade do espaço requisitado nas agendas do Teatro e Igrejinha
+- Registrar todos os períodos necessários à realização da proposta, incluindo montagem, ensaio, realização do evento e desmontagem;
+-Para eventos com cobrança de ingresso, a taxa de locação será calculada com base em todos os períodos reservados, incluindo aqueles destinados à montagem, desmontagem e ensaio, conforme disposto no item 11.4.2 do edital;  
+-Respeitar os prazos para solicitação de reserva do espaço, de acordo com o item 8.1.6. do edital;
+-A confirmação da disponibilidade de uso será feita posteriormente pela equipe do DAC.
