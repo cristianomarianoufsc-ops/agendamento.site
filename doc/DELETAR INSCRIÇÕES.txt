@@ -1,6 +1,0 @@
-DELETAR INSCRIÇÕES
-
-cd C:\agendamento-site\backend
-sqlite3 inscricoes.db
-DELETE FROM inscricoes;
-.exit

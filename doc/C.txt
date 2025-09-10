@@ -1,7 +1,0 @@
-5300332771040782
-Cód 639
-Venc 07/27
-Meu CPF 00384032770
-
-
-e vamos configurar pra ser um slide html aonde tem setas para avançar e recuar o slide
