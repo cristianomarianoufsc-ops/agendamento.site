@@ -19,10 +19,6 @@ dist-ssr/
 *.db
 backend/uploads/
 
-# Documentos grandes
-doc/*.pdf
-doc/*.zip
-
 # Configurações de editor
 .vscode/*
 !.vscode/extensions.json
@@ -37,7 +33,8 @@ doc/*.zip
 # Arquivos de ambiente
 .env
 
-# 🚫 Credenciais sensíveis (NUNCA versionar)
-backend/credentials.json
-backend/agendamento-teste-*.json
-doc/google clound chaves.txt
+# 🚫 Arquivos e pastas pessoais / grandes
+doc/
+backup/
+*.zip
+*.pdf
