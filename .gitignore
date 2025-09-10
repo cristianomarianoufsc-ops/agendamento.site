@@ -36,3 +36,8 @@ doc/*.zip
 
 # Arquivos de ambiente
 .env
+
+# 🚫 Credenciais sensíveis (NUNCA versionar)
+backend/credentials.json
+backend/agendamento-teste-*.json
+doc/google clound chaves.txt
