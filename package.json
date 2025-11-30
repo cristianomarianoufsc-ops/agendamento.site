@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 & node backend/server.js",
     "start": "node backend/server.js",
-   "build": "npx vite build",
+   "build": "VITE_API_URL=$VITE_API_URL npx vite build",
     "preview": "vite preview"
   },
   "keywords": [
