@@ -22,13 +22,22 @@ import { v4 as uuidv4 } from "uuid";
 dotenv.config();
 
 // --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'edital_ufsc',
-});
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: {
+          rejectUnauthorized: false, // Necessário para conexões externas no Render
+        },
+      }
+    : {
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME || 'edital_ufsc',
+      }
+);
 
 // Função auxiliar para executar queries
 async function query(text, params = []) {
@@ -255,7 +264,10 @@ async function atualizarCache() {
 
 // --- 6. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 const { auth } = await google.auth.getClient({
-  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || './credentials.json',
+  // Tenta usar a variável de ambiente GOOGLE_CREDENTIALS_JSON (Render)
+  // Se não existir, tenta usar o arquivo local (Desenvolvimento)
+  keyFile: process.env.GOOGLE_CREDENTIALS_JSON ? undefined : (process.env.GOOGLE_APPLICATION_CREDENTIALS || './credentials.json'),
+  credentials: process.env.GOOGLE_CREDENTIALS_JSON ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON) : undefined,
 });
 
 const calendar = google.calendar({ version: 'v3', auth });
