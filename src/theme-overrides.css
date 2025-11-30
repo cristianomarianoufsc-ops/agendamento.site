@@ -1,0 +1,69 @@
+/* Fonte global */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap');
+
+:root {
+  /* 🎨 Paleta de cores principal */
+  --color-primary: #2563eb; /* Azul principal */
+  --color-primary-hover: #1d4ed8;
+  --color-accent: #facc15;  /* Amarelo */
+  --color-accent-hover: #eab308;
+  --color-success: #16a34a; /* Verde para seleção */
+  --color-success-hover: #15803d;
+  --color-danger: #dc2626;  /* Vermelho para remover/cancelar */
+  --color-bg: #f9fafb;
+  --color-card: #ffffff;
+  --color-text: #1f2937;
+}
+
+/* Aplica fonte global */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Ajustes de botões genéricos */
+button {
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Classes utilitárias extras */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-accent {
+  background-color: var(--color-accent);
+  color: #1f2937;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-accent:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: white;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}

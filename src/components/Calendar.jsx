@@ -1,96 +1,103 @@
-import React from "react";
+import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-function Calendar({ onDateSelect, disabledDates = [], onMonthChange, currentMonth, eventDates = [], mainEventDatesSelected = [], currentStage }) {
+// ATUALIZADO: Adicionada a prop 'selectedDate'
+const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, disabledDates = [], eventDates = [], mainEventDatesSelected = [] }) => {
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Zera o horário para comparação apenas de data
+  today.setHours(0, 0, 0, 0);
 
-  const isDisabled = (date) => {
-    const isPast = date < today;
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const lastDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  const daysInMonth = lastDayOfMonth.getDate();
+  const startDayOfWeek = firstDayOfMonth.getDay();
 
-    const isDisabledFromFullEvents = disabledDates.some(disabled =>
-      date.toDateString() === new Date(disabled).toDateString()
-    );
-
-    const isMainEventDateAlreadySelected = currentStage === 'evento' && mainEventDatesSelected.some(selectedMainDate =>
-      date.toDateString() === selectedMainDate.toDateString()
-    );
-
-    return isPast || isDisabledFromFullEvents || isMainEventDateAlreadySelected;
-  };
-
-  const hasEvent = (date) => {
-    return eventDates.some(eventDate =>
-      date.toDateString() === new Date(eventDate).toDateString()
-    );
-  };
-
-  const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-  const endOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
-  const startDay = startOfMonth.getDay(); // 0 = domingo
-  const totalDays = endOfMonth.getDate();
-
-  const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-  const monthNames = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-  ];
-
-  const calendarDays = [];
-
-  for (let i = 0; i < startDay; i++) {
-    calendarDays.push(<div key={`empty-${i}`} />);
+  const days = [];
+  for (let i = 0; i < startDayOfWeek; i++) {
+    days.push(<div key={`empty-${i}`} className="p-1"></div>);
   }
 
-  for (let i = 1; i <= totalDays; i++) {
-    const day = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i);
-    const disabled = isDisabled(day);
-    const eventDay = hasEvent(day);
+  for (let i = 1; i <= daysInMonth; i++) {
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i);
+    // ✅ CORREÇÃO: Garante que a data de comparação seja YYYY-MM-DD
+    const dateString = date.toISOString().split('T')[0];
+    const isPast = date < today;
+    // ✅ ATUALIZADO: Verifica se a data está na lista de datas desabilitadas (bloqueadas pelo admin ou lotadas)
+    const isDisabled = disabledDates.includes(dateString) || isPast;
 
-    calendarDays.push(
-      <button
-        key={i}
-        onClick={() => !disabled && onDateSelect(day)}
-        disabled={disabled}
-        className={`p-2 rounded w-10 h-10 text-center border
-          ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-200"}
-          ${eventDay ? "bg-yellow-300 font-bold" : ""}
-        `}
-        title={eventDay ? "Dia com evento" : ""}
-      >
-        {i}
-      </button>
+    // Lógica para estilização
+    const isMainEvent = mainEventDatesSelected.some(d => d.getTime() === date.getTime());
+    const hasOtherEvent = eventDates.includes(dateString) && !isMainEvent;
+    
+    // ATUALIZADO: Lógica para saber se este é o dia atualmente selecionado
+    const isCurrentlySelected = selectedDate && selectedDate.toDateString() === date.toDateString();
+
+    let buttonClass = "w-full aspect-square flex items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200";
+
+    // ATUALIZADO: Nova ordem de prioridade para os estilos
+    if (isDisabled) {
+      buttonClass += " bg-gray-100 text-gray-400 cursor-not-allowed";
+    } else if (isCurrentlySelected) {
+      // 1ª Prioridade: Destaca o dia clicado com amarelo forte
+      buttonClass += " bg-yellow-400 text-black scale-110 shadow-lg";
+    } else if (isMainEvent) {
+      // 2ª Prioridade: Marca os eventos principais já agendados com azul
+      buttonClass += " bg-blue-600 text-white";
+    } else if (hasOtherEvent) {
+      // 3ª Prioridade: Marca outros dias ocupados com amarelo claro
+      buttonClass += " bg-yellow-200 text-yellow-800 hover:bg-yellow-300";
+    } else {
+      // Padrão: Dia livre
+      buttonClass += " bg-white text-gray-700 hover:bg-blue-100";
+    }
+
+    days.push(
+      <div key={i} className="p-1">
+        <button
+          onClick={() => !isDisabled && onDateSelect(date)}
+          disabled={isDisabled}
+          className={buttonClass}
+        >
+          {i}
+        </button>
+      </div>
     );
   }
 
   const handlePrevMonth = () => {
-    const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-    onMonthChange(prevMonth);
+    onMonthChange(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   };
 
   const handleNextMonth = () => {
-    const nextMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
-    onMonthChange(nextMonth);
+    onMonthChange(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
   };
 
   return (
-    <div className="max-w-xs mb-4">
-      <div className="flex justify-between items-center mb-2">
-        <button onClick={handlePrevMonth} className="px-2 py-1">&lt;</button>
-        <h2 className="text-lg font-bold">
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-        </h2>
-        <button onClick={handleNextMonth} className="px-2 py-1">&gt;</button>
+    <div className="w-full bg-white rounded-lg">
+      <div className="flex items-center justify-between mb-4 px-2">
+        <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-gray-100">
+          <ChevronLeft size={20} />
+        </button>
+        <h3 className="text-lg font-bold text-gray-800">
+          {currentMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())}
+        </h3>
+        <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-gray-100">
+          <ChevronRight size={20} />
+        </button>
       </div>
-      <div className="grid grid-cols-7 mb-2 text-center font-semibold">
-        {daysOfWeek.map((day, idx) => (
-          <div key={idx}>{day}</div>
-        ))}
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2">
+        <div>Dom</div>
+        <div>Seg</div>
+        <div>Ter</div>
+        <div>Qua</div>
+        <div>Qui</div>
+        <div>Sex</div>
+        <div>Sab</div>
       </div>
       <div className="grid grid-cols-7 gap-1">
-        {calendarDays}
+        {days}
       </div>
     </div>
   );
-}
+};
 
 export default Calendar;

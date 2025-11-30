@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: agendamento-ufsc
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agendamento-db
+          property: connectionString
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: SHEET_ID
+        sync: false
+      - key: SHEET_RANGE
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: ./credentials.json
+
+databases:
+  - name: agendamento-db
+    databaseName: edital_ufsc
+    user: postgres
+    plan: free

@@ -1,8 +1,9 @@
-const tailwindcss = require('@tailwindcss/postcss')
+// Arquivo: postcss.config.cjs (Sintaxe CORRETA para .cjs)
 
 module.exports = {
-  plugins: [
-    tailwindcss(),
-    require('autoprefixer'),
-  ],
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
 }
+
