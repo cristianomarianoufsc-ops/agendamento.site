@@ -270,8 +270,8 @@ async function atualizarCache() {
 const { auth } = await google.auth.getClient({
   // Tenta usar a variável de ambiente GOOGLE_CREDENTIALS_JSON (Render)
   // Se não existir, tenta usar o arquivo local (Desenvolvimento)
-  keyFile: process.env.GOOGLE_CREDENTIALS_JSON ? undefined : (process.env.GOOGLE_APPLICATION_CREDENTIALS || './credentials.json'),
-  credentials: process.env.GOOGLE_CREDENTIALS_JSON ? JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON) : undefined,
+  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || './credentials.json',
+  credentials: undefined,
 });
 
 const calendar = google.calendar({ version: 'v3', auth });
