@@ -1448,14 +1448,13 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
-app.use((req, res, next) => {
-  // Se a requisição não foi tratada por nenhuma rota anterior (incluindo APIs)
-  // e não é uma requisição de arquivo estático, envie o index.html
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
-  } else {
-    next();
+// Fallback para o React Router: Envia o index.html para qualquer rota não tratada
+app.get('*', (req, res) => {
+  // Ignora rotas de API para não interferir
+  if (req.path.startsWith('/api')) {
+    return res.status(404).send('API endpoint not found');
   }
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
 });
 
 
