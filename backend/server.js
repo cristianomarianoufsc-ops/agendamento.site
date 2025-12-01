@@ -285,8 +285,8 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// Servir arquivos estáticos do frontend
-app.use(express.static("dist"));
+// Servir arquivos estáticos do frontend (usando caminho absoluto)
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 /
 
