@@ -1449,7 +1449,7 @@ app.use("/slides-content", express.static("slides-edital-ufsc"));
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
-app.get('*', (req, res) => {
+app.use((req, res) => {
   // Ignora rotas de API para não interferir
   if (req.path.startsWith('/api')) {
     return res.status(404).send('API endpoint not found');
