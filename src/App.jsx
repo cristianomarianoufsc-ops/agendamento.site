@@ -48,7 +48,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/config");
+        const response = await fetch("/api/config");
         const data = await response.json();
         setAllowBookingOverlap(data.allowBookingOverlap);
         if (data.pageTitle) setPageTitle(data.pageTitle);
@@ -110,7 +110,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
 
   const fetchOccupiedSlots = async (local) => {
   try {
-    const response = await fetch(`" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/ical/${local}/horarios` );
+    const response = await fetch(`/ical/${local}/horarios` );
     const data = await response.json();
     const occupiedByDate = {};
     (data.eventos || []).forEach((event) => {
@@ -304,7 +304,7 @@ const newEnd = toMinutes(newEntry.end);
           .filter(Boolean); // Filtra para garantir que só temos IDs válidos
 
         if (eventosParaCancelar.length > 0) {
-          await fetch(`" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/cancel-events/${localSelecionado}`, {
+          await fetch(`/api/cancel-events/${localSelecionado}`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventIds: eventosParaCancelar } )
@@ -359,7 +359,7 @@ const handleSendEmail = async () => {
       return;
     }
 
-    const response = await fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/create-events", {
+    const response = await fetch("/api/create-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
@@ -392,7 +392,7 @@ const handleSendEmail = async () => {
 
       setResumo(novoResumoComIds);
 
-      await fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/send-confirmation-email", {
+      await fetch("/api/send-confirmation-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userData, resumo: userData.eventName, local: localSelecionado, etapas }  )
