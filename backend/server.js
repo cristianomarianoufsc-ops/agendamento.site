@@ -285,8 +285,7 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// Servir arquivos estáticos do frontend (usando caminho absoluto)
-app.use(express.static(path.join(__dirname, '..', 'dist')));
+
 
 /
 
@@ -1447,6 +1446,11 @@ app.get("/api/slides-viewer", async (req, res) => {
 
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
+
+// --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
+
+// Servir arquivos estáticos (CSS, JS, Imagens)
+app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
 app.get('*', (req, res) => {
