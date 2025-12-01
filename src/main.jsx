@@ -20,7 +20,7 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:4000/api/config" )
+    fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/config" )
       .then(res => res.json())
       .then(data => {
         setConfig(data);
