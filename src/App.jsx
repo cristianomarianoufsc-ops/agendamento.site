@@ -110,7 +110,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
 
   const fetchOccupiedSlots = async (local) => {
   try {
-    const response = await fetch(`/ical/${local}/horarios` );
+    const response = await fetch(`/api/occupied-slots/${local}/${new Date().getMonth() + 1}` );
     const data = await response.json();
     const occupiedByDate = {};
     (data.eventos || []).forEach((event) => {
