@@ -288,10 +288,7 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // Servir arquivos estáticos do frontend
 app.use(express.static("dist"));
 
-// --- 8. ROTA PADRÃO ---
-app.get("/", (req, res) => {
-  res.sendFile("dist/index.html", { root: "." });
-});
+/
 
 // --- 9. ROTA PARA OBTER CONFIGURAÇÕES ---
 app.get("/api/config", (req, res) => {
@@ -1450,9 +1447,18 @@ app.get("/api/slides-viewer", async (req, res) => {
 
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+
+app.use((req, res, next) => {
+  // Se a requisição não foi tratada por nenhuma rota anterior (incluindo APIs)
+  // e não é uma requisição de arquivo estático, envie o index.html
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  } else {
+    next();
+  }
 });
+
+
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}` );
