@@ -18,10 +18,14 @@ import archiver from "archiver";
 import { PassThrough } from "stream";
 import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
 // --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const pool = new Pool(
   process.env.DATABASE_URL
     ? {
@@ -1446,7 +1450,9 @@ app.get("/api/slides-viewer", async (req, res) => {
 
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
-
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+});
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}` );
