@@ -112,6 +112,11 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   try {
     const response = await fetch(`/api/occupied-slots/${local}/${new Date().getMonth() + 1}` );
     const data = await response.json();
+    if (!data || !data.eventos) {
+        console.error("❌ Dados de eventos incompletos ou nulos recebidos do backend.");
+        setBackendOcupados({});
+        return;
+    }
     const occupiedByDate = {};
     (data.eventos || []).forEach((event) => {
       const start = new Date(event.start);
