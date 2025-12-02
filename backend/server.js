@@ -1150,17 +1150,13 @@ app.delete("/api/cancel-events/:local", async (req, res) => {
 
 // --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
 app.get("/api/occupied-slots/:local/:month", async (req, res) => {
-  const { local, month } = req.params;
-  
-  if (!calendarIds[local]) {
+  const { local, month } = req.pa  if (!calendarIds[local]) {
     return res.status(400).json({ error: "Local não encontrado." });
   }
-
   try {
     const [year, monthNum] = month.split('-');
     const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
     const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
-
     const events = await calendar.events.list({
       calendarId: calendarIds[local],
       timeMin: startDate.toISOString(),
@@ -1168,15 +1164,13 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
       singleEvents: true,
       orderBy: 'startTime',
     });
-
-    const slots = (events.data.items || []).map(event => ({
-      start: event.start.dateTime || event.start.date,
-      end: event.end.dateTime || event.end.date,
-      summary: event.summary,
-    }));
-
-    res.json({ slots });
+    res.json({ eventos: events.data.items || [] });
   } catch (error) {
+    console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
+    // Retorna 500, mas com um JSON válido para o frontend
+    res.status(500).json({ error: "Falha ao buscar eventos do calendário. Verifique a autenticação do Google Calendar." });
+  }
+});atch (error) {
     console.error("Erro ao obter slots ocupados:", error);
     res.status(500).json({ error: "Erro ao obter slots ocupados." });
   }
