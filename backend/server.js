@@ -1150,7 +1150,8 @@ app.delete("/api/cancel-events/:local", async (req, res) => {
 
 // --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
 app.get("/api/occupied-slots/:local/:month", async (req, res) => {
-  const { local, month } = req.pa  if (!calendarIds[local]) {
+  const { local, month } = req.params;
+  if (!calendarIds[local]) {
     return res.status(400).json({ error: "Local não encontrado." });
   }
   try {
