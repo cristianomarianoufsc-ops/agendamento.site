@@ -119,6 +119,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     }
     const occupiedByDate = {};
     (data.eventos || []).forEach((event) => {
+      if (!event || !event.start || !event.end) return; // Adiciona verificação
       const start = new Date(event.start);
       const end = new Date(event.end);
       end.setMinutes(end.getMinutes() + 30);
