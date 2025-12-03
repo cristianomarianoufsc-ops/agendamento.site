@@ -1171,10 +1171,6 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
     // Retorna 500, mas com um JSON válido para o frontend
     res.status(500).json({ error: "Falha ao buscar eventos do calendário. Verifique a autenticação do Google Calendar." });
   }
-});atch (error) {
-    console.error("Erro ao obter slots ocupados:", error);
-    res.status(500).json({ error: "Erro ao obter slots ocupados." });
-  }
 });
 
 // --- 19. ROTA PARA SALVAR AVALIAÇÃO ---
