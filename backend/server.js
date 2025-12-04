@@ -267,12 +267,31 @@ async function atualizarCache() {
 }
 
 // --- 6. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
-const { auth } = await google.auth.getClient({
-  // Tenta usar a variável de ambiente GOOGLE_CREDENTIALS_JSON (Render)
-  // Se não existir, tenta usar o arquivo local (Desenvolvimento)
-  keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS || './credentials.json',
-  credentials: undefined,
-});
+let auth;
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Se a variável de ambiente contém JSON, faz o parse
+  try {
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    auth = new google.auth.GoogleAuth({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
+    });
+  } catch (e) {
+    // Se não for JSON, assume que é um caminho de arquivo
+    const { auth: fileAuth } = await google.auth.getClient({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
+    });
+    auth = fileAuth;
+  }
+} else {
+  // Desenvolvimento: usa o arquivo local
+  const { auth: localAuth } = await google.auth.getClient({
+    keyFile: './credentials.json',
+    scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
+  });
+  auth = localAuth;
+}
 
 const calendar = google.calendar({ version: 'v3', auth });
 const sheets = google.sheets({ version: 'v4', auth });
