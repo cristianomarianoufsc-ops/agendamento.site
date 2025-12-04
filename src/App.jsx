@@ -59,6 +59,8 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
           if (data.blockedDates) setBlockedDates(Array.isArray(data.blockedDates) ? data.blockedDates : []);
       } catch (error) {
         console.error("Erro ao buscar configurações:", error);
+        // Garante que o frontend não quebre se a configuração falhar
+        setPageTitle("Sistema de Agendamento de Espaços (Erro de Configuração)");
       }
     };
     fetchConfig();
