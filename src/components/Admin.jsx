@@ -270,7 +270,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/inscricoes"   );
+      const response = await fetch("/inscricoes"   );
       const data = await response.json();
       setUnificados(data.inscricoes || []);
       setEvaluationCriteria(data.criteria || []);
@@ -286,7 +286,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchEvaluators = async () => {
     if (viewOnly) return;
     try {
-        const response = await fetch("/api/evaluators"   );
+        const response = await fetch("/evaluators"   );
         const data = await response.json();
         setEvaluators(data || []);
     } catch (error) {
@@ -298,7 +298,7 @@ const Admin = ({ viewOnly = false }) => {
     fetchData();
     if (!viewOnly) {
       fetchEvaluators();
-      fetch("/api/config"   ).then(res => res.json()).then(data => {
+      fetch("/config"   ).then(res => res.json()).then(data => {
         if (data.formsLink) setFormLink(data.formsLink);
         if (data.sheetLink) setSheetLink(data.sheetLink);
         if (data.pageTitle) setPageTitle(data.pageTitle);
@@ -325,7 +325,7 @@ const Admin = ({ viewOnly = false }) => {
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
   const handleSaveConfig = async (configData) => {
     try {
-      const response = await fetch("/api/config", {
+      const response = await fetch("/config", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configData   ),
       });
@@ -342,7 +342,7 @@ const Admin = ({ viewOnly = false }) => {
       return;
     }
     try {
-      const response = await fetch("/api/auth/viewer", {
+      const response = await fetch("/auth/viewer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: evaluatorEmail, password: evaluatorPassword } ), // ENVIANDO SENHA
@@ -387,7 +387,7 @@ const Admin = ({ viewOnly = false }) => {
   const handleSaveCriteria = async () => {
     const criteriaToSave = evaluationCriteria.map((c, index) => ({ ...c, sort_order: index }));
     try {
-      const response = await fetch("/api/criteria", {
+      const response = await fetch("/criteria", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(criteriaToSave   ),
       });
@@ -416,7 +416,7 @@ const Admin = ({ viewOnly = false }) => {
   const handleSaveEvaluators = async () => {
     const emailsToSave = evaluators.map(e => e.email);
     try {
-      const response = await fetch("/api/evaluators", {
+      const response = await fetch("/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ emails: emailsToSave }),
       });
@@ -445,7 +445,7 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleOpenModal = (user) => { setSelectedUser(user); setShowModal(true); };
-  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
+  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
   
   // =================================================
   // ✅ FUNÇÃO PARA GERAR SLIDES
@@ -455,7 +455,7 @@ const Admin = ({ viewOnly = false }) => {
     setIsGeneratingSlides(true);
     try {
       // 1. Chamar o novo endpoint para obter os dados brutos
-      const response = await fetch("/api/admin/data-for-analysis");
+      const response = await fetch("/admin/data-for-analysis");
       if (!response.ok) {
         throw new Error("Falha ao buscar dados para análise.");
       }
@@ -473,8 +473,8 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
-  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
+  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
+  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
    if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
     return (

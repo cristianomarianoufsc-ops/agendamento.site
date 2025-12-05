@@ -20,7 +20,7 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/config" )
+    fetch("/config" )
       .then(res => res.json())
       .then(data => {
         setConfig(data);

@@ -8,7 +8,7 @@ function AdminPanel() {
 
   // Busca todas as inscrições ao carregar
   useEffect(() => {
-    fetch("/api/admin/inscricoes")
+    fetch("/admin/inscricoes")
       .then((res) => res.json())
       .then((data) => setInscricoes(data))
       .catch((err) => console.error("Erro ao buscar inscrições:", err));
@@ -18,7 +18,7 @@ function AdminPanel() {
   const verDetalhes = async (id) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/inscricoes/${id}`);
+      const res = await fetch(`/admin/inscricoes/${id}`);
       const data = await res.json();
       setDetalhes({ id, ...data });
     } catch (error) {

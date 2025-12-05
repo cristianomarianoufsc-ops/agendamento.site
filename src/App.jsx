@@ -48,7 +48,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await fetch("/api/config");
+        const response = await fetch("/config");
         const data = await response.json();
         setAllowBookingOverlap(data.allowBookingOverlap);
         if (data.pageTitle) setPageTitle(data.pageTitle);
@@ -115,7 +115,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     const now = new Date();
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}` );
+    const response = await fetch(`/occupied-slots/${local}/${year}-${month}` );
     const data = await response.json();
     if (!data || !data.eventos) {
         console.error("❌ Dados de eventos incompletos ou nulos recebidos do backend.");
@@ -127,6 +127,11 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
       if (!event || !event.start || !event.end) return; // Adiciona verificação
       const start = new Date(event.start);
       const end = new Date(event.end);
+      // ✅ VALIDAÇÃO: Verifica se as datas são válidas
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        console.warn("⚠️ Evento com data inválida ignorado:", event);
+        return;
+      }
       end.setMinutes(end.getMinutes() + 30);
       const dateString = start.toISOString().split("T")[0];
       const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -315,7 +320,7 @@ const newEnd = toMinutes(newEntry.end);
           .filter(Boolean); // Filtra para garantir que só temos IDs válidos
 
         if (eventosParaCancelar.length > 0) {
-          await fetch(`/api/cancel-events/${localSelecionado}`, {
+          await fetch(`/cancel-events/${localSelecionado}`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventIds: eventosParaCancelar } )
@@ -370,7 +375,7 @@ const handleSendEmail = async () => {
       return;
     }
 
-    const response = await fetch("/api/create-events", {
+    const response = await fetch("/create-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
@@ -403,7 +408,7 @@ const handleSendEmail = async () => {
 
       setResumo(novoResumoComIds);
 
-      await fetch("/api/send-confirmation-email", {
+      await fetch("/send-confirmation-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userData, resumo: userData.eventName, local: localSelecionado, etapas }  )
@@ -722,12 +727,16 @@ const handleSendEmail = async () => {
                 <ul className="space-y-3 text-sm text-gray-600">
                   {stageOrder.flatMap((etapa) => {
                     if (etapa === "evento" && resumo.evento?.length > 0) {
-                      return resumo.evento.map((item, idx) => (
+                      return resumo.evento.map((item, idx) => {
+                        // ✅ VALIDAÇÃO: Verifica se o item e suas propriedades existem
+                        if (!item || !item.date || !item.start || !item.end) return null;
+                        return (
                         <li key={`evento-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                           <div><span className="font-semibold text-gray-800">Evento {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
                           <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa: "evento", idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
                         </li>
-                      ));
+                        );
+                      });
                     } else if (resumo[etapa]) {
                       const item = resumo[etapa];
                       return (
