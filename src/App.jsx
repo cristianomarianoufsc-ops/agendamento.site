@@ -48,7 +48,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const response = await fetch("/config");
+        const response = await fetch("/api/config");
         const data = await response.json();
         setAllowBookingOverlap(data.allowBookingOverlap);
         if (data.pageTitle) setPageTitle(data.pageTitle);
@@ -115,7 +115,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     const now = new Date();
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const response = await fetch(`/occupied-slots/${local}/${year}-${month}` );
+    const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}` );
     const data = await response.json();
     if (!data || !data.eventos) {
         console.error("❌ Dados de eventos incompletos ou nulos recebidos do backend.");
@@ -320,7 +320,7 @@ const newEnd = toMinutes(newEntry.end);
           .filter(Boolean); // Filtra para garantir que só temos IDs válidos
 
         if (eventosParaCancelar.length > 0) {
-          await fetch(`/cancel-events/${localSelecionado}`, {
+          await fetch(`/api/cancel-events/${localSelecionado}`, {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ eventIds: eventosParaCancelar } )
@@ -375,7 +375,7 @@ const handleSendEmail = async () => {
       return;
     }
 
-    const response = await fetch("/create-events", {
+    const response = await fetch("/api/create-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
@@ -408,7 +408,7 @@ const handleSendEmail = async () => {
 
       setResumo(novoResumoComIds);
 
-      await fetch("/send-confirmation-email", {
+      await fetch("/api/send-confirmation-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userData, resumo: userData.eventName, local: localSelecionado, etapas }  )

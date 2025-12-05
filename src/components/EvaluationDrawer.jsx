@@ -71,7 +71,7 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
     const finalPayload = { evaluatorEmail: evaluatorEmail, scores: scoresPayload };
 
     try {
-      const response = await fetch(`/assessment/${user.id}`, {
+      const response = await fetch(`/api/assessment/${user.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalPayload ),
