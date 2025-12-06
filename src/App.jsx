@@ -433,7 +433,7 @@ const handleSendEmail = async () => {
 
   const handleGoToSecondStep = async () => {
     try {
-      const res = await fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/config" );
+      const res = await fetch("/api/config");
       if (!res.ok) {
         alert("Erro ao carregar link.");
         return;
@@ -454,7 +454,7 @@ const handleSendEmail = async () => {
 
   // ✅ NOVO USEEFFECT ADICIONADO AQUI
   useEffect(() => {
-  fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/config" )
+  fetch("/api/config")
     .then(res => res.json())
     .then(data => {
       if (data.pageTitle) {

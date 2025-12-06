@@ -44,7 +44,7 @@ const EnsaioPage = () => {
   // --- FUNÇÕES DE LÓGICA ---
   const fetchOccupiedSlots = async (local) => {
     try {
-      const response = await fetch(`" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/ical/${local}/horarios`  );
+      const response = await fetch(`/ical/${local}/horarios`);
       const data = await response.json();
       const occupiedByDate = {};
       (data.eventos || []).forEach((event) => {
@@ -112,7 +112,7 @@ const EnsaioPage = () => {
   const handleConfirmRemovals = async () => {
     try {
       if (firstStepDone && resumo.ensaio?.eventId) {
-        await fetch(`" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/cancel-events/${localSelecionado}`, {
+        await fetch(`/api/cancel-events/${localSelecionado}`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ eventIds: [resumo.ensaio.eventId] }   )
@@ -141,7 +141,7 @@ const EnsaioPage = () => {
         setAlertMessage({type: 'warning', text: "Nenhum ensaio selecionado."});
         return;
       }
-      const response = await fetch("" + (import.meta.env.VITE_API_URL || "http://localhost:4000") + "/api/create-events", {
+      const response = await fetch("/api/create-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
