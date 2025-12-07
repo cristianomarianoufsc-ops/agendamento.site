@@ -1183,8 +1183,26 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
       timeMax: endDate.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
+      fields: 'items(id,summary,start,end,extendedProperties)' // Otimiza a resposta
     });
-    res.json({ eventos: events.data.items || [] });
+    
+    // ✅ PROCESSA OS EVENTOS ANTES DE ENVIAR (igual ao server.js antigo)
+    const eventosProcessados = (events.data.items || []).map((event) => {
+      const props = event.extendedProperties?.private || {};
+      const isManaged = props.managedBy === 'sistema-edital-dac';
+      const isContestable = isManaged && props.status === 'pending_evaluation';
+      
+      return {
+        id: event.id,
+        summary: event.summary,
+        // ✅ EXTRAI dateTime ou date com fallback
+        start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
+        end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
+        isContestable: isContestable
+      };
+    }).filter(e => e.start && e.end); // Remove eventos sem data válida
+    
+    res.json({ eventos: eventosProcessados });
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
     // Retorna 500, mas com um JSON válido para o frontend
