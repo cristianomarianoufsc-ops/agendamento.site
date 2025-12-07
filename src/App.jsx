@@ -12,7 +12,7 @@ const AppVertical = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ evento: [] });
+  const [resumo, setResumo] = useState({ evento: null });
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -221,15 +221,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     if (etapa === stageToExclude) return;
 
     // ...
-if (etapa === "evento" && resumo.evento.length > 0) {
-  resumo.evento.forEach((ev) => {
-    // ✅ VALIDAÇÃO: Verifica se ev tem todas as propriedades
-    if (!ev || !ev.date || !ev.start || !ev.end) return;
-    if (ev.date.split("T")[0] === dateString) {
-      localSlots.push({ start: ev.start, end: ev.end, isContestable: true }); 
-    }
-  });
-} else if (resumo[etapa] && resumo[etapa].date) {
+if (resumo[etapa] && resumo[etapa].date) {
   if (resumo[etapa].date.split("T")[0] === dateString) {
     // ✅ E ADICIONA AQUI TAMBÉM
     localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
@@ -272,30 +264,14 @@ const newEnd = toMinutes(newEntry.end);
     }
   }
 
-  // ✅ VALIDAÇÃO: Filtra eventos válidos antes de verificar duplicação
-  if (resumo.evento.filter(ev => ev && ev.date && ev.start && ev.end).some((ev) => ev.date === newEntry.date && ev.start === newEntry.start && ev.end === newEntry.end)) return;
-
-  if (etapa === "evento" && resumo.evento.length >= 6) {
-    setAlertMessage({ type: 'error', text: "Limite de 6 eventos já atingido." });
-    setTimeout(() => setAlertMessage(null), 4000);
-    return;
-  }
+  // ✅ VALIDAÇÃO: Verifica duplicação para evento
+  if (etapa === "evento" && resumo.evento && resumo.evento.date === newEntry.date && resumo.evento.start === newEntry.start && resumo.evento.end === newEntry.end) return;
 
   setResumo((prev) => {
     const novoResumo = { ...prev };
-    if (etapa === "evento") {
-      novoResumo.evento = [...(prev.evento || []), newEntry];
-    } else {
-      novoResumo[etapa] = newEntry;
-    }
+    novoResumo[etapa] = newEntry; // ✅ TRATA EVENTO IGUAL AOS OUTROS
 
-    if (etapa === "evento") {
-      if (novoResumo.evento.length < 6) {
-        setShowConfirmNextEventModal(true);
-      } else {
-        setShowConfirmNextEventModal(true);
-      }
-    } else {
+    if (etapa !== "evento") {
       setSelectedStage(null);
       setSelectedDate(null);
       setStageTimes({ startTime: null, endTime: null });
@@ -349,13 +325,9 @@ const newEnd = toMinutes(newEntry.end);
 
       // Esta parte remove os itens da tela (estado local), funcionando para ambos os casos
       const novoResumo = { ...resumo };
-      // Processa as remoções de trás para frente para não bagunçar os índices
-      pendingRemovals.sort((a, b) => (b.idx || 0) - (a.idx || 0)).forEach(r => {
-        if (r.etapa === 'evento') {
-          novoResumo.evento.splice(r.idx, 1);
-        } else {
-          delete novoResumo[r.etapa];
-        }
+      // Processa as remoções
+      pendingRemovals.forEach(r => {
+        delete novoResumo[r.etapa]; // ✅ TRATA EVENTO IGUAL AOS OUTROS
       });
       setResumo(novoResumo);
 
@@ -363,7 +335,7 @@ const newEnd = toMinutes(newEntry.end);
       setAlertMessage({ type: 'success', text: "Cancelamento confirmado!" });
 
       // Verifica se o resumo ficou vazio após a remoção
-      const resumoVazio = !novoResumo.ensaio && !novoResumo.montagem && !novoResumo.desmontagem && novoResumo.evento.length === 0;
+      const resumoVazio = !novoResumo.ensaio && !novoResumo.montagem && !novoResumo.desmontagem && !novoResumo.evento;
       if (resumoVazio) {
         setFirstStepDone(false); // Reseta o fluxo se tudo foi cancelado
       }
@@ -380,10 +352,7 @@ const handleSendEmail = async () => {
   try {
     const etapas = [];
     stageOrder.forEach(etapa => {
-      if (etapa === 'evento' && resumo.evento?.length > 0) {
-        // ✅ VALIDAÇÃO: Filtra apenas eventos válidos
-        resumo.evento.filter(ev => ev && ev.date && ev.start && ev.end).forEach(ev => etapas.push({ nome: "evento", inicio: `${ev.date.split("T")[0]}T${ev.start}:00`, fim: `${ev.date.split("T")[0]}T${ev.end}:00` }));
-      } else if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
         // ✅ VALIDAÇÃO: Verifica se todas as propriedades existem
         etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
       }
@@ -407,20 +376,9 @@ const handleSendEmail = async () => {
       setAlertMessage({type: 'success', text: "Agendamento confirmado! Enviando e-mails..."});
 
       // Lógica corrigida para associar os eventIds
-      const eventosCriadosDoTipoEvento = result.eventos.filter(e => e.etapa === 'evento');
-      const outrosEventosCriados = result.eventos.filter(e => e.etapa !== 'evento');
+      const novoResumoComIds = { ...resumo };
 
-      const novosEventosComId = resumo.evento.map((eventoLocal, index) => {
-        const eventoCriadoCorrespondente = eventosCriadosDoTipoEvento[index];
-        if (eventoCriadoCorrespondente) {
-          return { ...eventoLocal, eventId: eventoCriadoCorrespondente.id };
-        }
-        return eventoLocal;
-      });
-
-      const novoResumoComIds = { ...resumo, evento: novosEventosComId };
-
-      outrosEventosCriados.forEach(eventoCriado => {
+      result.eventos.forEach(eventoCriado => {
         if (novoResumoComIds[eventoCriado.etapa]) {
           novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
         }
@@ -449,7 +407,7 @@ const handleSendEmail = async () => {
   }
 };
 
-  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento?.length > 0;
+  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento;
 
   const handleGoToSecondStep = async () => {
     try {
@@ -649,9 +607,7 @@ const handleSendEmail = async () => {
 	                </p>
                 <div className="flex flex-col space-y-3">
                   {stageOrder.map((etapa) => {
-                    const isDisabled = 
-                      (etapa === "desmontagem" && (!resumo.evento || resumo.evento.length === 0)) ||
-                      (etapa === "evento" && resumo.evento?.length >= 6);
+                    const isDisabled = (etapa === "desmontagem" && !resumo.evento);
                     const isSelected = selectedStage === etapa;
 
                     return (
@@ -663,13 +619,6 @@ const handleSendEmail = async () => {
                         >
                           <span>
     {etapa.charAt(0).toUpperCase() + etapa.slice(1)}
-    {etapa === "evento" && (
-      <span className="text-xs font-normal ml-1 opacity-80">
-        {resumo.evento?.length >= 6 
-          ? "(Limite de 6 atingido)" 
-          : `(${resumo.evento?.length || 0} de 6 adicionados)`
-        }
-      </span>
     )}
   </span>
                           <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
@@ -695,7 +644,7 @@ const handleSendEmail = async () => {
               onMonthChange={setCurrentMonth}
               disabledDates={blockedDates} // Passando as datas bloqueadas
               eventDates={Object.keys(backendOcupados)}
-              mainEventDatesSelected={resumo.evento.map(e => new Date(e.date))}
+              mainEventDatesSelected={resumo.evento ? [new Date(resumo.evento.date)] : []}
             />
                                 <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
                                   <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
@@ -746,18 +695,7 @@ const handleSendEmail = async () => {
                 <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
                 <ul className="space-y-3 text-sm text-gray-600">
                   {stageOrder.flatMap((etapa) => {
-                    if (etapa === "evento" && resumo.evento?.length > 0) {
-                      return resumo.evento.map((item, idx) => {
-                        // ✅ VALIDAÇÃO: Verifica se o item e suas propriedades existem
-                        if (!item || !item.date || !item.start || !item.end) return null;
-                        return (
-                        <li key={`evento-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                          <div><span className="font-semibold text-gray-800">Evento {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
-                          <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa: "evento", idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-                        </li>
-                        );
-                      });
-                    } else if (resumo[etapa]) {
+                    if (resumo[etapa]) {
                       const item = resumo[etapa];
                       // ✅ VALIDAÇÃO: Verifica se o item tem todas as propriedades necessárias
                       if (!item || !item.date || !item.start || !item.end) return null;
@@ -770,7 +708,7 @@ const handleSendEmail = async () => {
                     }
                     return [];
                   })}
-                  {resumo.evento?.length === 0 && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
+                  {!resumo.evento && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
                 </ul>
 
                 {pendingRemovals.length > 0 && (
