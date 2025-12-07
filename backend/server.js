@@ -29,6 +29,11 @@ const __dirname = path.dirname(__filename);
 // Em produção (Render), as variáveis vêm do Environment Variables
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// DEBUG: Mostrar quais variáveis de e-mail estão disponíveis
+console.log('\ud83d\udd0d DEBUG - Variáveis de ambiente:');
+console.log('  EMAIL_USER:', process.env.EMAIL_USER ? '✅ Definida' : '❌ Não encontrada');
+console.log('  EMAIL_PASS:', process.env.EMAIL_PASS ? '✅ Definida' : '❌ Não encontrada');
+
 // --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
 const pool = new Pool(
   process.env.DATABASE_URL
