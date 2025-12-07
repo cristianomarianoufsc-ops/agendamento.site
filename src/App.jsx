@@ -206,9 +206,10 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
 
     // ...
 if (etapa === "evento" && resumo.evento.length > 0) {
-  resumo.evento.forEach((ev) => { 
+  resumo.evento.forEach((ev) => {
+    // ✅ VALIDAÇÃO: Verifica se ev tem todas as propriedades
+    if (!ev || !ev.date || !ev.start || !ev.end) return;
     if (ev.date.split("T")[0] === dateString) {
-      // ✅ ADICIONA A PROPRIEDADE FALTANTE
       localSlots.push({ start: ev.start, end: ev.end, isContestable: true }); 
     }
   });
@@ -255,7 +256,8 @@ const newEnd = toMinutes(newEntry.end);
     }
   }
 
-  if (resumo.evento.some((ev) => ev.date === newEntry.date && ev.start === newEntry.start && ev.end === newEntry.end)) return;
+  // ✅ VALIDAÇÃO: Filtra eventos válidos antes de verificar duplicação
+  if (resumo.evento.filter(ev => ev && ev.date && ev.start && ev.end).some((ev) => ev.date === newEntry.date && ev.start === newEntry.start && ev.end === newEntry.end)) return;
 
   if (etapa === "evento" && resumo.evento.length >= 6) {
     setAlertMessage({ type: 'error', text: "Limite de 6 eventos já atingido." });
@@ -363,8 +365,10 @@ const handleSendEmail = async () => {
     const etapas = [];
     stageOrder.forEach(etapa => {
       if (etapa === 'evento' && resumo.evento?.length > 0) {
-        resumo.evento.forEach(ev => etapas.push({ nome: "evento", inicio: `${ev.date.split("T")[0]}T${ev.start}:00`, fim: `${ev.date.split("T")[0]}T${ev.end}:00` }));
-      } else if (resumo[etapa]) {
+        // ✅ VALIDAÇÃO: Filtra apenas eventos válidos
+        resumo.evento.filter(ev => ev && ev.date && ev.start && ev.end).forEach(ev => etapas.push({ nome: "evento", inicio: `${ev.date.split("T")[0]}T${ev.start}:00`, fim: `${ev.date.split("T")[0]}T${ev.end}:00` }));
+      } else if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+        // ✅ VALIDAÇÃO: Verifica se todas as propriedades existem
         etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
       }
     });
@@ -739,6 +743,8 @@ const handleSendEmail = async () => {
                       });
                     } else if (resumo[etapa]) {
                       const item = resumo[etapa];
+                      // ✅ VALIDAÇÃO: Verifica se o item tem todas as propriedades necessárias
+                      if (!item || !item.date || !item.start || !item.end) return null;
                       return (
                         <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                           <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
