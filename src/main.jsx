@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Completo)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
 import Admin from "./components/Admin.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 import "./index.css";
 
@@ -106,7 +107,8 @@ const HomePage = () => {
 // 3. Defina todas as rotas da sua aplicação aqui
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <Routes>
         {/* Rota principal que mostra os botões de escolha */}
         <Route path="/" element={<HomePage />} />
@@ -129,5 +131,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );

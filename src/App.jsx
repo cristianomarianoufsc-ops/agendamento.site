@@ -180,11 +180,13 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
       
       // ✅ NOVA LÓGICA: Verifica se há conflito ANTES de definir o horário
       const timeInMinutes = toMinutes(time);
-      const conflictingSlot = getOccupiedSlots(selectedDate, selectedStage).find(occupied => {
-        const occupiedStart = toMinutes(occupied.start);
-        const occupiedEnd = toMinutes(occupied.end);
-        return timeInMinutes < occupiedEnd && (timeInMinutes + 30) > occupiedStart;
-      });
+    const conflictingSlot = getOccupiedSlots(selectedDate, selectedStage).find(occupied => {
+      // ✅ VALIDAÇÃO: Verifica se occupied existe e tem as propriedades necessárias
+      if (!occupied || !occupied.start || !occupied.end) return false;
+      const occupiedStart = toMinutes(occupied.start);
+      const occupiedEnd = toMinutes(occupied.end);
+      return timeInMinutes < occupiedEnd && (timeInMinutes + 30) > occupiedStart;
+    });
 
       // Se há conflito e é um horário contestável com a opção ativada
       // Se há conflito e é um horário contestável com a opção ativada
@@ -207,23 +209,23 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     setStageTimes({ ...stageTimes, endTime: time });
   };
 
-  const getOccupiedSlots = (date, stageToExclude = null) => {
-  if (!date) return [];
-  const dateString = date.toISOString().split("T")[0];
-  
-  // Slots que vêm do backend (outros usuários e eventos fixos)
-  const backendSlots = backendOcupados[dateString] || [];
-  
-  // Slots que o usuário JÁ CONFIRMOU nesta sessão
-  const localSlots = [];
+  const getOccupiedSlots = (date, etapa) => {
+    console.log("🔍 getOccupiedSlots chamado:", { date, etapa });
+    if (!date) {
+      console.log("⚠️ Sem data, retornando array vazio");
+      return [];
+    }
+    const dateString = date.toISOString().split("T")[0];
+    
+    // Slots que vêm do backend (outros usuários e eventos fixos)
+    const backendSlots = backendOcupados[dateString] || [];
+    
+    // Slots que o usuário JÁ CONFIRMOU nesta sessão
+    const localSlots = [];
   stageOrder.forEach((etapa) => {
-    // ✅ LÓGICA CHAVE: Não adiciona a etapa que está sendo editada no momento!
-    if (etapa === stageToExclude) return;
-
-    // ...
-if (resumo[etapa] && resumo[etapa].date) {
+// ✅ VALIDAÇÃO COMPLETA: Verifica se existe E se tem todas as propriedades necessárias
+if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
   if (resumo[etapa].date.split("T")[0] === dateString) {
-    // ✅ E ADICIONA AQUI TAMBÉM
     localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
   }
 }
@@ -231,7 +233,9 @@ if (resumo[etapa] && resumo[etapa].date) {
 
   });
   
-  return [...backendSlots, ...localSlots];
+  const result = [...backendSlots, ...localSlots];
+  console.log("✅ getOccupiedSlots retornando:", result);
+  return result;
 };
 
 
@@ -251,6 +255,8 @@ const newEnd = toMinutes(newEntry.end);
   // Aqui, apenas verificamos se há conflito com um horário FIXO (não contestável)
   // ou se a opção de sobreposição está DESLIGADA.
   const conflictingSlot = getOccupiedSlots(selectedDate, etapa).find((slot) => {
+    // ✅ VALIDAÇÃO: Verifica se slot existe e tem as propriedades necessárias
+    if (!slot || !slot.start || !slot.end) return false;
     const s = toMinutes(slot.start);
     const e = toMinutes(slot.end);
     return newStart < e && newEnd > s;
@@ -644,7 +650,11 @@ const handleSendEmail = async () => {
               onMonthChange={setCurrentMonth}
               disabledDates={blockedDates} // Passando as datas bloqueadas
               eventDates={Object.keys(backendOcupados)}
-              mainEventDatesSelected={resumo.evento ? [new Date(resumo.evento.date)] : []}
+              mainEventDatesSelected={(() => {
+                if (!resumo.evento || !resumo.evento.date) return [];
+                const d = new Date(resumo.evento.date);
+                return isNaN(d.getTime()) ? [] : [d];
+              })()}
             />
                                 <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
                                   <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>

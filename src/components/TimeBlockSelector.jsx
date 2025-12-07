@@ -85,8 +85,9 @@ const TimeBlockSelector = ({
           }
           
           // ✅ NOVA LÓGICA DE LIMITE DE HORÁRIO DINÂMICO
-          const maxStartTimeMinutes = toMinutes(stageTimeLimits.start);
-          const maxEndTimeMinutes = toMinutes(stageTimeLimits.end);
+          // ✅ VALIDAÇÃO: Verifica se stageTimeLimits existe antes de acessar
+          const maxStartTimeMinutes = stageTimeLimits && stageTimeLimits.start ? toMinutes(stageTimeLimits.start) : 0;
+          const maxEndTimeMinutes = stageTimeLimits && stageTimeLimits.end ? toMinutes(stageTimeLimits.end) : 24 * 60;
 
           if (!startTime) {
             // Se estiver selecionando o horário de INÍCIO
