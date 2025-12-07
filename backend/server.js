@@ -120,6 +120,16 @@ async function initializeTables() {
       );
     `);
 
+    // Tabela de configurações (para persistir config.json no banco)
+    await query(`
+      CREATE TABLE IF NOT EXISTS config (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        config_json TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CHECK (id = 1)
+      );
+    `);
+
     console.log("✅ Banco de dados PostgreSQL inicializado com sucesso.");
   } catch (error) {
     console.error("❌ Erro ao inicializar tabelas:", error);
@@ -305,7 +315,7 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // --- 9. ROTA PARA OBTER CONFIGURAÇÕES ---
-app.get("/api/config", (req, res) => {
+app.get("/api/config", async (req, res) => {
   try {
     const defaultConfig = {
       blockedDates: [],
@@ -327,15 +337,33 @@ app.get("/api/config", (req, res) => {
       requiredAssessments: 3,
     };
 
+    // 1. Tenta buscar do banco de dados primeiro
+    try {
+      const result = await query('SELECT config_json FROM config WHERE id = 1');
+      if (result.rows.length > 0) {
+        const savedConfig = JSON.parse(result.rows[0].config_json);
+        const fullConfig = { ...defaultConfig, ...savedConfig };
+        console.log("✅ Configurações carregadas do banco de dados.");
+        return res.json(fullConfig);
+      }
+    } catch (dbError) {
+      console.warn("⚠️ Erro ao buscar configurações do banco:", dbError.message);
+    }
+
+    // 2. Fallback: tenta buscar do arquivo local (desenvolvimento)
     if (fs.existsSync("config.json")) {
       const savedConfig = JSON.parse(fs.readFileSync("config.json", "utf-8"));
       const fullConfig = { ...defaultConfig, ...savedConfig };
-      res.json(fullConfig);
-    } else {
-      res.json(defaultConfig);
+      console.log("✅ Configurações carregadas do arquivo local (fallback).");
+      return res.json(fullConfig);
     }
+
+    // 3. Se não encontrou em nenhum lugar, retorna configuração padrão
+    console.log("ℹ️ Usando configuração padrão.");
+    res.json(defaultConfig);
   } catch (e) {
-    res.status(500).json({ error: "Erro ao ler arquivo de configuração." });
+    console.error("❌ Erro em GET /api/config:", e.message);
+    res.status(500).json({ error: "Erro ao ler configuração." });
   }
 });
 
@@ -459,19 +487,19 @@ app.post('/api/auth/viewer', async (req, res) => {
 });
 
 // NOVO: Endpoint unificado para SALVAR a configuração
-app.post("/api/config", (req, res) => {
+app.post("/api/config", async (req, res) => {
   try {
     const newConfigData = req.body;
     let currentConfig = {};
 
-    // 1. Lê a configuração atual, se existir
-    if (fs.existsSync("config.json")) {
-      try {
-        currentConfig = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-      } catch (e) {
-        console.warn("config.json estava corrompido, criando um novo.");
-        currentConfig = {};
+    // 1. Busca a configuração atual do banco de dados
+    try {
+      const result = await query('SELECT config_json FROM config WHERE id = 1');
+      if (result.rows.length > 0) {
+        currentConfig = JSON.parse(result.rows[0].config_json);
       }
+    } catch (e) {
+      console.warn("⚠️ Nenhuma configuração encontrada no banco, criando nova.");
     }
 
     // 2. Mescla a configuração atual com os novos dados recebidos
@@ -488,12 +516,30 @@ app.post("/api/config", (req, res) => {
       updatedConfig.sheetId = match ? match[1] : ""; // Se não encontrar, define como vazio
     }
 
-    // 5. Salva o arquivo completo
+    // 3. Salva no banco de dados (INSERT ou UPDATE)
+    const configJson = JSON.stringify(updatedConfig);
+    console.log("📦 Tentando salvar no banco de dados...");
+    try {
+      await query(`
+        INSERT INTO config (id, config_json, updated_at)
+        VALUES (1, $1, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) 
+        DO UPDATE SET config_json = $1, updated_at = CURRENT_TIMESTAMP
+      `, [configJson]);
+      console.log("✅ Configurações salvas com sucesso no banco de dados!");
+    } catch (dbError) {
+      console.error("❌ Erro ao salvar no banco de dados:", dbError.message);
+      console.error("   Detalhes:", dbError);
+    }
+
+    // 4. Também salva no arquivo local (para desenvolvimento/backup)
     fs.writeFileSync("config.json", JSON.stringify(updatedConfig, null, 2));
+    console.log("✅ Configurações salvas no arquivo local (backup).");
+    
     res.json({ success: true, ...updatedConfig });
     
   } catch (err) {
-    console.error("Erro em POST /api/config:", err.message);
+    console.error("❌ Erro em POST /api/config:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
