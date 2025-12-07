@@ -21,11 +21,15 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
 
-dotenv.config();
-
-// --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
+// Define __dirname para ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configura dotenv para ler .env do diretório backend (desenvolvimento)
+// Em produção (Render), as variáveis vêm do Environment Variables
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+// --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
 const pool = new Pool(
   process.env.DATABASE_URL
     ? {
