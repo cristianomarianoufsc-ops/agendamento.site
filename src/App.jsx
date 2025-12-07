@@ -620,9 +620,8 @@ const handleSendEmail = async () => {
                           className={`w-full p-3 text-left rounded-lg font-semibold transition-all duration-200 flex items-center justify-between ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-md" : "border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400"}`}
                         >
                           <span>
-    {etapa.charAt(0).toUpperCase() + etapa.slice(1)}
-    )}
-  </span>
+                            {etapa.charAt(0).toUpperCase() + etapa.slice(1)}
+                          </span>
                           <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
                             <ChevronDown size={20} />
                           </motion.div>
