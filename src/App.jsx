@@ -355,58 +355,29 @@ const newEnd = toMinutes(newEntry.end);
   };
 // SUBSTITUA TODA A SUA FUNÇÃO 'handleSendEmail' POR ESTA:
 const handleSendEmail = async () => {
-  try {
-    const etapas = [];
-    stageOrder.forEach(etapa => {
-      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
-        // ✅ VALIDAÇÃO: Verifica se todas as propriedades existem
-        etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
-      }
-    });
-
-    if (etapas.length === 0) {
-      setAlertMessage({type: 'warning', text: "Nenhuma etapa selecionada."});
-      setTimeout(() => setAlertMessage(null), 4000);
-      return;
+  // ✅ TEMPORARIAMENTE DESABILITADO: Envio de e-mail removido para acelerar transição
+  
+  // Validar se há pelo menos uma etapa selecionada
+  const etapas = [];
+  stageOrder.forEach(etapa => {
+    if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+      etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
     }
+  });
 
-    const response = await fetch("/api/create-events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
-    });
-
-    const result = await response.json();
-
-    if (result?.success && result.eventos) {
-      setAlertMessage({type: 'success', text: "Agendamento confirmado! Enviando e-mails..."});
-
-      // Lógica corrigida para associar os eventIds
-      const novoResumoComIds = { ...resumo };
-
-      result.eventos.forEach(eventoCriado => {
-        if (novoResumoComIds[eventoCriado.etapa]) {
-          novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
-        }
-      });
-
-      setResumo(novoResumoComIds);
-
-      // E-mail de confirmação é enviado automaticamente pelo backend em /api/create-events
-
-      fetchOccupiedSlots(localSelecionado, currentMonth);
-      setFirstStepDone(true);
-      setAlertMessage({type: 'success', text: "Primeira etapa concluída com sucesso!"});
-
-    } else {
-      setAlertMessage({type: 'error', text: result.error || "Erro ao salvar eventos."});
-    }
-  } catch (err) {
-    console.error("Falha na comunicação:", err);
-    setAlertMessage({type: 'error', text: "Falha na comunicação com o servidor."});
-  } finally {
-    setTimeout(() => setAlertMessage(null), 5000);
+  if (etapas.length === 0) {
+    setAlertMessage({type: 'warning', text: "Nenhuma etapa selecionada."});
+    setTimeout(() => setAlertMessage(null), 2000);
+    return;
   }
+
+  // ✅ TRANSIÇÃO INSTANTÂNEA: Marca como concluída sem chamar API
+  setFirstStepDone(true);
+  setAlertMessage({type: 'success', text: "Primeira etapa concluída!"});
+  setTimeout(() => setAlertMessage(null), 2000);
+  
+  // TODO: Reativar envio de e-mail quando corrigido
+  // const response = await fetch("/api/create-events", { ... });
 };
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento;

@@ -300,10 +300,11 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 } else {
   // Desenvolvimento: usa o arquivo local
   const { auth: localAuth } = await google.auth.getClient({
-    keyFile: './credentials.json',
+    keyFile: './backend/credentials.json',
     scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
   });
   auth = localAuth;
+  console.log('✅ Google Calendar autenticado com sucesso!');
 }
 
 const calendar = google.calendar({ version: 'v3', auth });
