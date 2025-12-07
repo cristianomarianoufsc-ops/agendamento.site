@@ -116,11 +116,27 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}` );
+    
+    // ✅ VERIFICA SE A RESPOSTA FOI BEM-SUCEDIDA
+    if (!response.ok) {
+      console.error("❌ Erro ao buscar eventos: Status", response.status);
+      setBackendOcupados({});
+      return;
+    }
+    
     const data = await response.json();
+    
+    // ✅ VERIFICA SE A API RETORNOU ERRO AO INVÉS DE EVENTOS
+    if (data.error) {
+      console.error("❌ Erro retornado pela API:", data.error);
+      setBackendOcupados({});
+      return;
+    }
+    
     if (!data || !data.eventos) {
-        console.error("❌ Dados de eventos incompletos ou nulos recebidos do backend.");
-        setBackendOcupados({});
-        return;
+      console.warn("⚠️ Dados de eventos incompletos ou nulos recebidos do backend.");
+      setBackendOcupados({});
+      return;
     }
     const occupiedByDate = {};
     (data.eventos || []).forEach((event) => {
