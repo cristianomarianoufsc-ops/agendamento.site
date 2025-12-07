@@ -179,13 +179,19 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     }
   });
 
+  console.log('🔌 Tentando conectar ao servidor SMTP do Gmail...');
   transporter.verify((error, success) => {
     if (error) {
-      console.error('❌ Erro ao conectar com o servidor de e-mail:', error.message);
-      console.error('   -> Verifique se EMAIL_USER e EMAIL_PASSWORD estão corretos no .env.');
+      console.error('❌❌❌ ERRO SMTP DETALHADO ❌❌❌');
+      console.error('Mensagem:', error.message);
+      console.error('Código:', error.code);
+      console.error('Comando:', error.command);
+      console.error('Erro completo:', JSON.stringify(error, null, 2));
+      console.error('   -> Verifique se EMAIL_USER e EMAIL_PASS estão corretos.');
       console.error('   -> Se estiver usando Gmail, certifique-se de que a senha é uma "Senha de App".');
+      console.error('   -> Verifique se o Gmail permite acesso de "apps menos seguros".');
     } else {
-      console.log('✅ Servidor de e-mail conectado com sucesso.');
+      console.log('✅✅✅ Servidor de e-mail conectado com sucesso! ✅✅✅');
     }
   });
 } else {
