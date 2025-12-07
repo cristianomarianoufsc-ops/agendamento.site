@@ -38,6 +38,8 @@ const TimeBlockSelector = ({
           const timeInMinutes = toMinutes(time);
 
           const conflictingSlot = occupiedSlots.find(occupied => {
+            // ✅ VALIDAÇÃO: Verifica se occupied existe e tem as propriedades necessárias
+            if (!occupied || !occupied.start || !occupied.end) return false;
             const occupiedStart = toMinutes(occupied.start);
             const occupiedEnd = toMinutes(occupied.end);
             return timeInMinutes < occupiedEnd && (timeInMinutes + 30) > occupiedStart;
