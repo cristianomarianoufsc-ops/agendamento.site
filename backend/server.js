@@ -13,6 +13,7 @@ import { google } from "googleapis";
 import pkg from 'pg';
 const { Pool } = pkg;
 import nodemailer from "nodemailer";
+import { Resend } from 'resend';
 import { parse } from "csv-parse/sync";
 import archiver from "archiver";
 import { PassThrough } from "stream";
@@ -167,7 +168,7 @@ const calendarIds = {
   igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
 };
 
-// --- 3. CONFIGURACAO DO NODEMAILER ---
+// --- 3. CONFIGURACAO DO NODEMAILER (SMTP Gmail) ---
 let transporter = null;
 
 if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
@@ -178,24 +179,11 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       pass: process.env.EMAIL_PASS
     }
   });
-
-  console.log('🔌 Tentando conectar ao servidor SMTP do Gmail...');
-  transporter.verify((error, success) => {
-    if (error) {
-      console.error('❌❌❌ ERRO SMTP DETALHADO ❌❌❌');
-      console.error('Mensagem:', error.message);
-      console.error('Código:', error.code);
-      console.error('Comando:', error.command);
-      console.error('Erro completo:', JSON.stringify(error, null, 2));
-      console.error('   -> Verifique se EMAIL_USER e EMAIL_PASS estão corretos.');
-      console.error('   -> Se estiver usando Gmail, certifique-se de que a senha é uma "Senha de App".');
-      console.error('   -> Verifique se o Gmail permite acesso de "apps menos seguros".');
-    } else {
-      console.log('✅✅✅ Servidor de e-mail conectado com sucesso! ✅✅✅');
-    }
-  });
+  console.log('✅ Servidor de e-mail (Gmail SMTP) configurado com sucesso!');
+  console.log('   De:', process.env.EMAIL_USER);
+  // NÃO usar verify() para evitar travamento no Render
 } else {
-  console.warn('⚠️ Variáveis de ambiente de e-mail (EMAIL_USER/EMAIL_PASSWORD) não encontradas. O envio de e-mails está desabilitado.');
+  console.warn('⚠️ Variáveis EMAIL_USER/EMAIL_PASS não encontradas. O envio de e-mails está desabilitado.');
 }
 
 // FUNCOES PARA GERAÇÃO DE SENHA E ENVIO DE EMAIL
@@ -1328,7 +1316,7 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
   }).join('');
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: process.env.EMAIL_USER || 'noreply@agendamento.site',
     to: email,
     subject: `✅ Confirmação da 1ª Etapa: ${evento_nome}`,
     html: `
@@ -1348,11 +1336,12 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
   };
 
   try {
+    console.log(`📧 Enviando e-mail via Gmail SMTP para: ${email}`);
     await transporter.sendMail(mailOptions);
-    console.log(`✅ E-mail de confirmação da Etapa 1 enviado para: ${email}`);
+    console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
     return true;
   } catch (error) {
-    console.error(`❌ Erro ao enviar e-mail de confirmação da Etapa 1 para ${email}:`, error);
+    console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
     return false;
   }
 }
