@@ -392,11 +392,7 @@ const handleSendEmail = async () => {
 
       setResumo(novoResumoComIds);
 
-      await fetch("/api/send-confirmation-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userData, resumo: userData.eventName, local: localSelecionado, etapas }  )
-      });
+      // E-mail de confirmação é enviado automaticamente pelo backend em /api/create-events
 
       fetchOccupiedSlots(localSelecionado, currentMonth);
       setFirstStepDone(true);
