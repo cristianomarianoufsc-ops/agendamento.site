@@ -1525,7 +1525,7 @@ app.use("/slides-content", express.static("slides-edital-ufsc"));
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
 // Servir arquivos estáticos (CSS, JS, Imagens)
-app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
 app.use((req, res) => {
@@ -1533,7 +1533,7 @@ app.use((req, res) => {
   if (req.path.startsWith('/api')) {
     return res.status(404).send('API endpoint not found');
   }
-  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 
