@@ -281,51 +281,35 @@ async function atualizarCache() {
 
 // --- 6. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 let auth;
-let calendar;
-let sheets;
-let drive;
-
-try {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
-    // Se a variável de ambiente contém JSON, faz o parse
-    try {
-      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      console.log('🔑 Service Account:', credentials.client_email);
-      auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-      });
-    } catch (e) {
-      console.log('🔑 Não é JSON, usando como caminho de arquivo');
-      // Se não for JSON, assume que é um caminho de arquivo
-      const { auth: fileAuth } = await google.auth.getClient({
-        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-      });
-      auth = fileAuth;
-    }
-  } else {
-    console.log('🔑 Usando credentials.json local (desenvolvimento)');
-    // Desenvolvimento: usa o arquivo local
-    const credData = JSON.parse(fs.readFileSync('./credentials.json', 'utf8'));
-    console.log('🔑 Service Account:', credData.client_email);
-    
-    // ✅ Usar GoogleAuth com credentials direto
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Se a variável de ambiente contém JSON, faz o parse
+  try {
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
     auth = new google.auth.GoogleAuth({
-      credentials: credData,
-      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
     });
+  } catch (e) {
+    // Se não for JSON, assume que é um caminho de arquivo
+    const { auth: fileAuth } = await google.auth.getClient({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
+    });
+    auth = fileAuth;
   }
-
-  calendar = google.calendar({ version: 'v3', auth });
-  sheets = google.sheets({ version: 'v4', auth });
-  drive = google.drive({ version: 'v3', auth });
-  console.log('✅ Google APIs autenticadas com sucesso!');
-} catch (error) {
-  console.error('❌ Erro ao inicializar Google APIs:', error.message);
-  process.exit(1);
+} else {
+  // Desenvolvimento: usa o arquivo local
+  const { auth: localAuth } = await google.auth.getClient({
+    keyFile: './backend/credentials.json',
+    scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets'],
+  });
+  auth = localAuth;
+  console.log('✅ Google Calendar autenticado com sucesso!');
 }
+
+const calendar = google.calendar({ version: 'v3', auth });
+const sheets = google.sheets({ version: 'v4', auth });
+const drive = google.drive({ version: 'v3', auth });
 
 // --- 7. CONFIGURAÇÃO DO EXPRESS ---
 const app = express();
@@ -1541,85 +1525,7 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
-
-// --- ROTAS DE CONFIGURAÇÃO ---
-
 // --- 24. ROTA: GERAR PDF COM DADOS DO GOOGLE SHEETS ---
-// --- ROTAS DE CONFIGURAÇÃO (GET E POST /api/config) ---
-
-// GET /api/config - Ler configurações do banco
-app.get("/api/config", async (req, res) => {
-  try {
-    const result = await query("SELECT config_json FROM config WHERE id = 1");
-    
-    if (result.rows.length > 0) {
-      const config = JSON.parse(result.rows[0].config_json);
-      res.json(config);
-    } else {
-      // Se não existe, retorna config vazio
-      res.json({
-        formsLink: "",
-        sheetLink: "",
-        sheetId: "",
-        pageTitle: "Sistema de Agendamento de Espaços",
-        allowBookingOverlap: false,
-        blockedDates: [],
-        stageTimes: {
-          ensaio: { start: "08:00", end: "21:00" },
-          montagem: { start: "08:00", end: "21:00" },
-          evento: { start: "08:00", end: "21:00" },
-          desmontagem: { start: "08:00", end: "21:00" }
-        },
-        enableInternalEdital: true,
-        enableExternalEdital: true,
-        enableRehearsal: true
-      });
-    }
-  } catch (error) {
-    console.error("Erro ao ler configurações:", error);
-    res.status(500).json({ error: "Erro ao ler configurações" });
-  }
-});
-
-// POST /api/config - Salvar configurações no banco
-app.post("/api/config", async (req, res) => {
-  try {
-    // Ler config atual
-    const currentResult = await query("SELECT config_json FROM config WHERE id = 1");
-    let currentConfig = {};
-    
-    if (currentResult.rows.length > 0) {
-      currentConfig = JSON.parse(currentResult.rows[0].config_json);
-    }
-    
-    // Merge com novos dados
-    const newConfig = { ...currentConfig, ...req.body };
-    
-    // Extrair sheetId do sheetLink se fornecido
-    if (newConfig.sheetLink) {
-      const match = newConfig.sheetLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match) {
-        newConfig.sheetId = match[1];
-        console.log(`✅ SheetId extraído: ${newConfig.sheetId}`);
-      }
-    }
-    
-    // Salvar no banco (INSERT ou UPDATE)
-    await query(`
-      INSERT INTO config (id, config_json, updated_at)
-      VALUES (1, $1, NOW())
-      ON CONFLICT (id) DO UPDATE
-      SET config_json = $1, updated_at = NOW()
-    `, [JSON.stringify(newConfig)]);
-    
-    console.log("✅ Configurações salvas no banco:", newConfig);
-    res.json({ success: true });
-    
-  } catch (error) {
-    console.error("Erro ao salvar configurações:", error);
-    res.status(500).json({ error: "Erro ao salvar configurações" });
-  }
-});
 app.get("/api/gerar-pdf/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -1632,121 +1538,92 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // 2. Buscar dados do Google Sheets via CSV (como no backup)
-    let respostaForms = null;
+    // 2. Buscar dados do Google Sheets
+    let formsData = null;
     try {
-      // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
-      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
-      let sheetId = null;
-      if (configResult.rows.length > 0) {
-        const config = JSON.parse(configResult.rows[0].config_json);
-        sheetId = config.sheetId;
-      }
-      console.log(`[PDF] SheetId do banco:`, sheetId);
-
-      if (sheetId) {
-        // ✅ Usar Sheets API ao invés do Drive API
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'A:Z'
+      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      if (config.sheetId) {
+        const response = await sheets.spreadsheets.values.get({ 
+          spreadsheetId: config.sheetId, 
+          range: "A:ZZ" 
         });
-        
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-          console.log('[PDF] Sheet vazio');
-        } else {
-          // Primeira linha = cabeçalhos
+        const rows = (response.data.values || []);
+        if (rows.length > 1) {
           const headers = rows[0];
-          // Converter para array de objetos
-          const records = rows.slice(1).map(row => {
-            const obj = {};
-            headers.forEach((header, i) => {
-              obj[header] = row[i] || '';
-            });
-            return obj;
-          });
-          console.log(`[PDF] Records found: ${records.length}`);
-          if (records.length > 0) {
-            console.log(`[PDF] Columns:`, Object.keys(records[0]));
-          }
-
-        // Encontrar linha correspondente
-        respostaForms = records.find(f => {
-          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
-          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
-          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
+          const formsDataRows = rows.slice(1).map(row => 
+            headers.reduce((acc, header, index) => ({ 
+              ...acc, 
+              [header]: row[index] || "" 
+            }), {})
+          );
+          
+          // Encontrar linha correspondente por e-mail ou telefone
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
           const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
           
-          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                 (telForms && telEtapa1 && telForms === telEtapa1);
-        });
-          console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'N\u00c3O');
-          if (respostaForms) {
-            console.log(`[PDF] Campos:`, Object.keys(respostaForms));
-          }
+          formsData = formsDataRows.find(rowData => {
+            let emailForms = '', telForms = '';
+            for (const key in rowData) {
+              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
+              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+            }
+            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                   (telForms && telEtapa1 && telForms === telEtapa1);
+          });
         }
       }
     } catch (e) {
-      console.error("[PDF] ERRO ao buscar dados do Forms:", e.message);
-      console.error(e.stack);
+      console.warn("⚠️ Erro ao buscar dados do Google Sheets:", e.message);
     }
     
     // 3. Gerar PDF
     const doc = new PDFDocument({ margin: 50 });
-    const chunks = [];
-    doc.on("data", chunk => chunks.push(chunk));
-    doc.on("end", () => {
-      const pdfBuffer = Buffer.concat(chunks);
-      const filename = `inscricao-${id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
-      res.send(pdfBuffer);
-    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="formulario_${id}.pdf"`);
+    doc.pipe(res);
     
     // Título
-    doc.fontSize(18).font('Helvetica-Bold').text("Formulário de Inscrição", { align: "center" });
-    doc.fontSize(12).font('Helvetica').text(`Inscrição #${inscricao.id}`, { align: "center" }).moveDown(2);
+    doc.fontSize(20).text('Formulário de Inscrição - Edital UFSC', { align: 'center' });
+    doc.moveDown();
     
-    // Dados da 1ª Etapa
-    doc.font('Helvetica-Bold').fontSize(14).text("1. DADOS DO PROPONENTE (Etapa 1)");
-    doc.font('Helvetica').fontSize(10)
-      .text(`Nome: ${inscricao.nome || "N/A"}`)
-      .text(`Email: ${inscricao.email || "N/A"}`)
-      .text(`Telefone: ${inscricao.telefone || "N/A"}`)
-      .text(`Nome do Evento: ${inscricao.evento_nome || "N/A"}`)
-      .text(`Local: ${inscricao.local || "N/A"}`).moveDown(1.5);
-
+    // Dados da 1ª Etapa (do banco)
+    doc.fontSize(14).text('1ª ETAPA - Dados do Agendamento', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12);
+    doc.text(`Nome: ${inscricao.nome || 'N/A'}`);
+    doc.text(`E-mail: ${inscricao.email || 'N/A'}`);
+    doc.text(`Telefone: ${inscricao.telefone || 'N/A'}`);
+    doc.text(`Nome do Evento: ${inscricao.evento_nome || 'N/A'}`);
+    doc.text(`Local: ${inscricao.local || 'N/A'}`);
+    doc.moveDown();
+    
     // Horários
-    doc.font('Helvetica-Bold').fontSize(14).text("2. AGENDAMENTOS REALIZADOS");
-    const linhaEtapa = (rotulo, inicio, fim) => {
-      if (!inicio || !fim) return;
-      const data = new Date(inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const hIni = new Date(inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      const hFim = new Date(fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      doc.font('Helvetica').fontSize(10).text(`• ${rotulo}: ${data}, das ${hIni} às ${hFim}`);
-    };
-    linhaEtapa("Ensaio", inscricao.ensaio_inicio, inscricao.ensaio_fim);
-    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
-      JSON.parse(inscricao.eventos_json).forEach((ev, i) => linhaEtapa(`Evento ${i + 1}`, ev.inicio, ev.fim));
+    if (inscricao.ensaio_inicio) {
+      doc.text(`Ensaio: ${new Date(inscricao.ensaio_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.ensaio_fim).toLocaleString('pt-BR')}`);
     }
-    linhaEtapa("Montagem", inscricao.montagem_inicio, inscricao.montagem_fim);
-    linhaEtapa("Desmontagem", inscricao.desmontagem_inicio, inscricao.desmontagem_fim);
-    doc.moveDown(1.5);
-
-    // Dados da 2ª Etapa (do Google Sheets) - SEMPRE MOSTRAR
-    doc.font('Helvetica-Bold').fontSize(14).text("3. DETALHAMENTO DO EVENTO (Etapa 2)");
-    if (respostaForms) {
-      doc.font('Helvetica').fontSize(10);
-      for (const [key, value] of Object.entries(respostaForms)) {
-        // Normalizar key para comparação
-        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (normalizedKey.includes('carimbo') || !value || String(value).trim() === "") continue;
-        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${value}`);
+    if (inscricao.montagem_inicio) {
+      doc.text(`Montagem: ${new Date(inscricao.montagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.montagem_fim).toLocaleString('pt-BR')}`);
+    }
+    if (inscricao.desmontagem_inicio) {
+      doc.text(`Desmontagem: ${new Date(inscricao.desmontagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.desmontagem_fim).toLocaleString('pt-BR')}`);
+    }
+    doc.moveDown(2);
+    
+    // Dados da 2ª Etapa (do Google Sheets)
+    if (formsData) {
+      doc.fontSize(14).text('2ª ETAPA - Dados do Formulário Google', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(12);
+      
+      for (const [key, value] of Object.entries(formsData)) {
+        if (value && value.trim()) {
+          doc.text(`${key}: ${value}`, { continued: false });
+          doc.moveDown(0.3);
+        }
       }
     } else {
-      doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
+      doc.fontSize(12).text('⚠️ Dados da 2ª etapa não encontrados no Google Sheets', { align: 'center' });
     }
     
     doc.end();
@@ -1757,10 +1634,11 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
   }
 });
 
-// --- 25. ROTA: DOWNLOAD DE ANEXOS EM ZIP (CORRIGIDA) ---
+// --- 25. ROTA: DOWNLOAD DE ANEXOS EM ZIP ---
 app.get("/api/download-zip/:id", async (req, res) => {
-  const { id } = req.params;
   try {
+    const { id } = req.params;
+    
     // 1. Buscar inscrição no banco
     const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
     if (result.rows.length === 0) {
@@ -1769,117 +1647,78 @@ app.get("/api/download-zip/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // Dados da 2ª Etapa (do Google Sheets)
-    let respostaForms = null;
+    // 2. Buscar URLs de anexos no Google Sheets
+    let anexosUrls = [];
     try {
-      // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
-      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
-      let sheetId = null;
-      if (configResult.rows.length > 0) {
-        const config = JSON.parse(configResult.rows[0].config_json);
-        sheetId = config.sheetId;
-      }
-      console.log(`[ZIP] SheetId do banco:`, sheetId);
-
-      if (sheetId) {
-        console.log(`[ZIP] Buscando dados para inscri\u00e7\u00e3o #${id}`);
-        console.log(`[ZIP] E-mail: ${inscricao.email}, Telefone: ${inscricao.telefone}`);
-        
-        // ✅ Usar Sheets API ao invés do Drive API
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'A:Z'
+      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      if (config.sheetId) {
+        const response = await sheets.spreadsheets.values.get({ 
+          spreadsheetId: config.sheetId, 
+          range: "A:ZZ" 
         });
-        
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-          console.log('[ZIP] Sheet vazio');
-          return res.status(404).send("Etapa 2 n\u00e3o preenchida.");
-        }
-        
-        // Primeira linha = cabe\u00e7alhos
-        const headers = rows[0];
-        // Converter para array de objetos
-        const records = rows.slice(1).map(row => {
-          const obj = {};
-          headers.forEach((header, i) => {
-            obj[header] = row[i] || '';
-          });
-          return obj;
-        });
-        console.log(`[ZIP] Records found: ${records.length}`);
-        if (records.length > 0) {
-          console.log(`[ZIP] Columns:`, Object.keys(records[0]));
-        }
-
-        respostaForms = records.find(f => {
-          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
-          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
-          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
+        const rows = (response.data.values || []);
+        if (rows.length > 1) {
+          const headers = rows[0];
+          const formsDataRows = rows.slice(1).map(row => 
+            headers.reduce((acc, header, index) => ({ 
+              ...acc, 
+              [header]: row[index] || "" 
+            }), {})
+          );
+          
+          // Encontrar linha correspondente
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
           const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
-          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                 (telForms && telEtapa1 && telForms === telEtapa1);
-        });
-      }
-    } catch (e) {
-      console.error("Erro ao buscar dados do Forms:", e.message);
-    }
-
-    if (!respostaForms) {
-      return res.status(404).send("Inscrição não encontrada ou Etapa 2 não preenchida.");
-    }
-
-    // 3. Criar ZIP com anexos reais do Google Drive
-    const zipFileName = `anexos-inscricao-${id}.zip`;
-    res.attachment(zipFileName);
-    const archive = archiver("zip", { zlib: { level: 9 } });
-    archive.pipe(res);
-
-    const fileIdRegex = /id=([a-zA-Z0-9_-]+)/;
-    const filePromises = [];
-
-    for (const [key, value] of Object.entries(respostaForms)) {
-      if (typeof value === 'string' && value.includes('drive.google.com')) {
-        const urls = value.split(', '); // O Forms separa múltiplos arquivos com ", "
-        for (const url of urls) {
-          const match = url.match(fileIdRegex);
-          if (match && match[1]) {
-            const fileId = match[1];
-            console.log(`🔎 Encontrado anexo com ID: ${fileId}`);
-            
-            const promise = drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
-              .then(response => {
-                // Precisamos do nome do arquivo, então fazemos outra chamada rápida
-                return drive.files.get({ fileId, fields: 'name' }).then(meta => {
-                  const fileName = meta.data.name || `${fileId}-anexo`;
-                  console.log(`➕ Adicionando "${fileName}" ao ZIP.`);
-                  archive.append(response.data, { name: fileName });
-                });
-              })
-              .catch(err => console.error(`❌ Falha ao baixar arquivo ${fileId}:`, err.message));
-            filePromises.push(promise);
+          
+          const formsData = formsDataRows.find(rowData => {
+            let emailForms = '', telForms = '';
+            for (const key in rowData) {
+              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
+              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+            }
+            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                   (telForms && telEtapa1 && telForms === telEtapa1);
+          });
+          
+          // Extrair URLs de anexos (colunas que contêm "drive.google.com")
+          if (formsData) {
+            for (const [key, value] of Object.entries(formsData)) {
+              if (value && typeof value === 'string' && value.includes('drive.google.com')) {
+                anexosUrls.push({ nome: key, url: value });
+              }
+            }
           }
         }
       }
+    } catch (e) {
+      console.warn("⚠️ Erro ao buscar anexos do Google Sheets:", e.message);
     }
-
-    if (filePromises.length === 0) {
-      console.log(`⚠️ Nenhum anexo encontrado para a inscrição ${id}. Finalizando ZIP vazio.`);
-      archive.finalize();
-      return;
-    }
-
-    // Espera todas as promessas de download terminarem antes de finalizar o ZIP
-    await Promise.all(filePromises);
     
-    console.log(`✅ Finalizando o arquivo ZIP para a inscrição ${id}.`);
+    if (anexosUrls.length === 0) {
+      return res.status(404).send('Nenhum anexo encontrado');
+    }
+    
+    // 3. Criar ZIP com os anexos
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="anexos_${id}.zip"`);
+    
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+    
+    // Adicionar informações dos anexos ao ZIP
+    const info = `Anexos da inscrição #${id}\n\n` + 
+                 anexosUrls.map((a, i) => `${i+1}. ${a.nome}:\n   ${a.url}\n`).join('\n');
+    archive.append(info, { name: 'LEIA-ME.txt' });
+    
+    // Nota: Para baixar arquivos do Google Drive, seria necessário usar a API do Drive
+    // Por enquanto, apenas listamos as URLs no arquivo LEIA-ME.txt
+    
     archive.finalize();
-
-  } catch (err) {
-    console.error(`❌ Erro fatal ao gerar ZIP para inscrição ${id}:`, err);
-    res.status(500).send("Erro interno ao gerar o arquivo ZIP.");
+    
+  } catch (error) {
+    console.error("❌ Erro ao gerar ZIP:", error);
+    res.status(500).send("Erro ao gerar ZIP de anexos");
   }
 });
 

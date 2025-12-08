@@ -38,3 +38,4 @@ doc/
 backup/
 *.zip
 *.pdf
+backend/credentials.json
