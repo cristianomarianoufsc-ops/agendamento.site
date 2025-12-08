@@ -1561,6 +1561,7 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
           const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
           const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          
           return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                  (telForms && telEtapa1 && telForms === telEtapa1);
         });
