@@ -74,6 +74,7 @@ const Admin = ({ viewOnly = false }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
+  const [sharedPassword, setSharedPassword] = useState(''); // ✅ NOVO: Senha única para todos os avaliadores
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -400,10 +401,10 @@ const Admin = ({ viewOnly = false }) => {
       alert("❌ Erro ao salvar critérios.");
     }
   };
-  const handleAddEvaluator = (email) => {
-    if (email && email.includes('@')) {
-      if (!evaluators.some(e => e.email === email.trim().toLowerCase())) {
-        const newEvaluator = { id: `new-${Date.now()}`, email: email.trim().toLowerCase() };
+  const handleAddEvaluator = (name) => {
+    if (name && name.trim() !== '') {
+      if (!evaluators.some(e => e.name === name.trim())) {
+        const newEvaluator = { id: `new-${Date.now()}`, name: name.trim() };
         setEvaluators(prev => [...prev, newEvaluator]);
       }
     }
@@ -414,33 +415,25 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleSaveEvaluators = async () => {
-    const emailsToSave = evaluators.map(e => e.email);
+    if (!sharedPassword || sharedPassword.trim() === '') {
+      alert("Por favor, defina uma Senha Unica para todos os avaliadores.");
+      return;
+    }
+    const evaluatorsToSave = evaluators.map(e => ({ name: e.name }));
     try {
       const response = await fetch("/api/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emails: emailsToSave }),
+        body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: sharedPassword }),
       });
       const data = await response.json();
       if (response.ok) {
-        let message = "✅ Avaliadores processados com sucesso!\n\n";
-        if (data.results && data.results.length > 0) {
-          message += "Resultados:\n";
-          data.results.forEach(result => {
-            message += `- ${result.email}: ${result.message}\n`;
-          });
-        }
-        if (data.errors && data.errors.length > 0) {
-          message += "\nErros:\n";
-          data.errors.forEach(error => {
-            message += `- ${error.email}: ${error.error}\n`;
-          });
-        }
-        alert(message);
+        alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
         fetchEvaluators();
+        setSharedPassword('');
       } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
     } catch (error) {
       console.error("Erro ao salvar avaliadores:", error);
-      alert("❌ Erro ao salvar a lista de avaliadores: " + error.message);
+      alert("Erro ao salvar a lista de avaliadores: " + error.message);
     }
   };
 
@@ -987,18 +980,22 @@ const Admin = ({ viewOnly = false }) => {
                     <UserCheck size={20} /> Gerenciar Avaliadores
                   </h3>
                   <div className="mb-4">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Adicionar E-mail de Avaliador Autorizado</label>
+                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Nome do Avaliador (Identificador)</label>
                     <div className="flex gap-2">
-                      <input type="email" placeholder="email@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
+                      <input type="text" placeholder="Ex: Joao Silva" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
                       <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
                     </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Senha Unica para Todos os Avaliadores</label>
+                    <input type="password" placeholder="Digite a senha unica" className="p-2 border rounded-md w-full" value={sharedPassword} onChange={(e) => setSharedPassword(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <label className="block font-semibold text-gray-600 mb-2 text-sm">Avaliadores Atuais</label>
                     {evaluators.length > 0 ? (
                       evaluators.map((evaluator) => (
-                        <div key={evaluator.id || evaluator.email} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                          <span className="text-gray-700">{evaluator.email}</span>
+                        <div key={evaluator.id || evaluator.name} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
+                          <span className="text-gray-700">{evaluator.name}</span>
                           <button onClick={() => handleRemoveEvaluator(evaluator.id)} className="p-1 text-red-500 hover:bg-red-100 rounded-full" title="Remover Avaliador">
                             <X size={16} />
                           </button>
