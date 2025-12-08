@@ -258,7 +258,7 @@ async function atualizarCache() {
   try {
     const agora = new Date();
     const start = agora.toISOString();
-    const end = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
     for (const local in calendarIds) {
       try {
