@@ -1525,7 +1525,85 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
+
+// --- ROTAS DE CONFIGURAÇÃO ---
+
 // --- 24. ROTA: GERAR PDF COM DADOS DO GOOGLE SHEETS ---
+// --- ROTAS DE CONFIGURAÇÃO (GET E POST /api/config) ---
+
+// GET /api/config - Ler configurações do banco
+app.get("/api/config", async (req, res) => {
+  try {
+    const result = await query("SELECT config_json FROM config WHERE id = 1");
+    
+    if (result.rows.length > 0) {
+      const config = JSON.parse(result.rows[0].config_json);
+      res.json(config);
+    } else {
+      // Se não existe, retorna config vazio
+      res.json({
+        formsLink: "",
+        sheetLink: "",
+        sheetId: "",
+        pageTitle: "Sistema de Agendamento de Espaços",
+        allowBookingOverlap: false,
+        blockedDates: [],
+        stageTimes: {
+          ensaio: { start: "08:00", end: "21:00" },
+          montagem: { start: "08:00", end: "21:00" },
+          evento: { start: "08:00", end: "21:00" },
+          desmontagem: { start: "08:00", end: "21:00" }
+        },
+        enableInternalEdital: true,
+        enableExternalEdital: true,
+        enableRehearsal: true
+      });
+    }
+  } catch (error) {
+    console.error("Erro ao ler configurações:", error);
+    res.status(500).json({ error: "Erro ao ler configurações" });
+  }
+});
+
+// POST /api/config - Salvar configurações no banco
+app.post("/api/config", async (req, res) => {
+  try {
+    // Ler config atual
+    const currentResult = await query("SELECT config_json FROM config WHERE id = 1");
+    let currentConfig = {};
+    
+    if (currentResult.rows.length > 0) {
+      currentConfig = JSON.parse(currentResult.rows[0].config_json);
+    }
+    
+    // Merge com novos dados
+    const newConfig = { ...currentConfig, ...req.body };
+    
+    // Extrair sheetId do sheetLink se fornecido
+    if (newConfig.sheetLink) {
+      const match = newConfig.sheetLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      if (match) {
+        newConfig.sheetId = match[1];
+        console.log(`✅ SheetId extraído: ${newConfig.sheetId}`);
+      }
+    }
+    
+    // Salvar no banco (INSERT ou UPDATE)
+    await query(`
+      INSERT INTO config (id, config_json, updated_at)
+      VALUES (1, $1, NOW())
+      ON CONFLICT (id) DO UPDATE
+      SET config_json = $1, updated_at = NOW()
+    `, [JSON.stringify(newConfig)]);
+    
+    console.log("✅ Configurações salvas no banco:", newConfig);
+    res.json({ success: true });
+    
+  } catch (error) {
+    console.error("Erro ao salvar configurações:", error);
+    res.status(500).json({ error: "Erro ao salvar configurações" });
+  }
+});
 app.get("/api/gerar-pdf/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -1650,12 +1728,16 @@ app.get("/api/download-zip/:id", async (req, res) => {
     }
     
     const inscricao = result.rows[0];
-    
-       // Dados da 2ª Etapa (do Google Sheets)
+       // Dados da 2\u00aa Etapa (do Google Sheets)
     let respostaForms = null;
     try {
-      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-      console.log(`[PDF] Config lido:`, JSON.stringify(config));
+      // Ler config do banco ao inv\u00e9s do arquivo
+      const configResult = await query("SELECT config_json FROM config WHERE id = 1");
+      let config = {};
+      if (configResult.rows.length > 0) {
+        config = JSON.parse(configResult.rows[0].config_json);
+      }
+      console.log(`[PDF] Config lido do banco:`, JSON.stringify(config));
       const sheetId = config.sheetId;
       console.log(`[PDF] SheetId: ${sheetId}`);
 
