@@ -309,6 +309,7 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 
 const calendar = google.calendar({ version: 'v3', auth });
 const sheets = google.sheets({ version: 'v4', auth });
+const drive = google.drive({ version: 'v3', auth });
 
 // --- 7. CONFIGURAÇÃO DO EXPRESS ---
 const app = express();
@@ -1537,92 +1538,95 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // 2. Buscar dados do Google Sheets
-    let formsData = null;
+    // 2. Buscar dados do Google Sheets via CSV (como no backup)
+    let respostaForms = null;
     try {
       const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-      if (config.sheetId) {
-        const response = await sheets.spreadsheets.values.get({ 
-          spreadsheetId: config.sheetId, 
-          range: "A:ZZ" 
-        });
-        const rows = (response.data.values || []);
-        if (rows.length > 1) {
-          const headers = rows[0];
-          const formsDataRows = rows.slice(1).map(row => 
-            headers.reduce((acc, header, index) => ({ 
-              ...acc, 
-              [header]: row[index] || "" 
-            }), {})
-          );
-          
-          // Encontrar linha correspondente por e-mail ou telefone
+      const sheetId = config.sheetId;
+
+      if (sheetId) {
+        // Exportar Sheets como CSV
+        const csvExport = await drive.files.export({ fileId: sheetId, mimeType: "text/csv" });
+        let csv = Buffer.from(csvExport.data).toString("utf8").replace(/^\uFEFF/, "");
+        
+        // Detectar delimitador
+        const delimiter = (csv.match(/;/g) || []).length > (csv.match(/,/g) || []).length ? ";" : ",";
+        const records = parse(csv, { columns: true, skip_empty_lines: true, delimiter });
+
+        // Encontrar linha correspondente
+        respostaForms = records.find(f => {
+          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
+          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
           const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
-          
-          formsData = formsDataRows.find(rowData => {
-            let emailForms = '', telForms = '';
-            for (const key in rowData) {
-              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
-              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
-            }
-            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                   (telForms && telEtapa1 && telForms === telEtapa1);
-          });
-        }
+          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                 (telForms && telEtapa1 && telForms === telEtapa1);
+        });
       }
     } catch (e) {
-      console.warn("⚠️ Erro ao buscar dados do Google Sheets:", e.message);
+      console.error("Erro ao buscar dados do Forms para o PDF:", e.message);
     }
     
     // 3. Gerar PDF
     const doc = new PDFDocument({ margin: 50 });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="formulario_${id}.pdf"`);
-    doc.pipe(res);
+    const chunks = [];
+    doc.on("data", chunk => chunks.push(chunk));
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      const filename = `inscricao-${id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
+      res.send(pdfBuffer);
+    });
     
     // Título
-    doc.fontSize(20).text('Formulário de Inscrição - Edital UFSC', { align: 'center' });
-    doc.moveDown();
+    doc.fontSize(18).font('Helvetica-Bold').text("Formulário de Inscrição", { align: "center" });
+    doc.fontSize(12).font('Helvetica').text(`Inscrição #${inscricao.id}`, { align: "center" }).moveDown(2);
     
-    // Dados da 1ª Etapa (do banco)
-    doc.fontSize(14).text('1ª ETAPA - Dados do Agendamento', { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(12);
-    doc.text(`Nome: ${inscricao.nome || 'N/A'}`);
-    doc.text(`E-mail: ${inscricao.email || 'N/A'}`);
-    doc.text(`Telefone: ${inscricao.telefone || 'N/A'}`);
-    doc.text(`Nome do Evento: ${inscricao.evento_nome || 'N/A'}`);
-    doc.text(`Local: ${inscricao.local || 'N/A'}`);
-    doc.moveDown();
-    
+    // Dados da 1ª Etapa
+    doc.font('Helvetica-Bold').fontSize(14).text("1. DADOS DO PROPONENTE (Etapa 1)");
+    doc.font('Helvetica').fontSize(10)
+      .text(`Nome: ${inscricao.nome || "N/A"}`)
+      .text(`Email: ${inscricao.email || "N/A"}`)
+      .text(`Telefone: ${inscricao.telefone || "N/A"}`)
+      .text(`Nome do Evento: ${inscricao.evento_nome || "N/A"}`)
+      .text(`Local: ${inscricao.local || "N/A"}`).moveDown(1.5);
+
     // Horários
-    if (inscricao.ensaio_inicio) {
-      doc.text(`Ensaio: ${new Date(inscricao.ensaio_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.ensaio_fim).toLocaleString('pt-BR')}`);
+    doc.font('Helvetica-Bold').fontSize(14).text("2. AGENDAMENTOS REALIZADOS");
+    const linhaEtapa = (rotulo, inicio, fim) => {
+      if (!inicio || !fim) return;
+      const data = new Date(inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const hIni = new Date(inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      const hFim = new Date(fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      doc.font('Helvetica').fontSize(10).text(`• ${rotulo}: ${data}, das ${hIni} às ${hFim}`);
+    };
+    linhaEtapa("Ensaio", inscricao.ensaio_inicio, inscricao.ensaio_fim);
+    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
+      JSON.parse(inscricao.eventos_json).forEach((ev, i) => linhaEtapa(`Evento ${i + 1}`, ev.inicio, ev.fim));
     }
-    if (inscricao.montagem_inicio) {
-      doc.text(`Montagem: ${new Date(inscricao.montagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.montagem_fim).toLocaleString('pt-BR')}`);
-    }
-    if (inscricao.desmontagem_inicio) {
-      doc.text(`Desmontagem: ${new Date(inscricao.desmontagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.desmontagem_fim).toLocaleString('pt-BR')}`);
-    }
-    doc.moveDown(2);
-    
+    linhaEtapa("Montagem", inscricao.montagem_inicio, inscricao.montagem_fim);
+    linhaEtapa("Desmontagem", inscricao.desmontagem_inicio, inscricao.desmontagem_fim);
+    doc.moveDown(1.5);
+
     // Dados da 2ª Etapa (do Google Sheets)
-    if (formsData) {
-      doc.fontSize(14).text('2ª ETAPA - Dados do Formulário Google', { underline: true });
-      doc.moveDown(0.5);
-      doc.fontSize(12);
-      
-      for (const [key, value] of Object.entries(formsData)) {
-        if (value && value.trim()) {
-          doc.text(`${key}: ${value}`, { continued: false });
-          doc.moveDown(0.3);
+    const isEventoCompleto = inscricao.eventos_json !== '[]' || inscricao.montagem_inicio || inscricao.desmontagem_inicio;
+    
+    if (isEventoCompleto) {
+      doc.font('Helvetica-Bold').fontSize(14).text("3. DETALHAMENTO DO EVENTO (Etapa 2)");
+      if (respostaForms) {
+        doc.font('Helvetica').fontSize(10);
+        for (const [key, value] of Object.entries(respostaForms)) {
+          // Normalizar key para comparação
+          const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normalizedKey.includes('carimbo') || !value || String(value).trim() === "") continue;
+          doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${value}`);
         }
+      } else {
+        doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
       }
-    } else {
-      doc.fontSize(12).text('⚠️ Dados da 2ª etapa não encontrados no Google Sheets', { align: 'center' });
     }
     
     doc.end();
@@ -1633,11 +1637,10 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
   }
 });
 
-// --- 25. ROTA: DOWNLOAD DE ANEXOS EM ZIP ---
+// --- 25. ROTA: DOWNLOAD DE ANEXOS EM ZIP (CORRIGIDA) ---
 app.get("/api/download-zip/:id", async (req, res) => {
+  const { id } = req.params;
   try {
-    const { id } = req.params;
-    
     // 1. Buscar inscrição no banco
     const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
     if (result.rows.length === 0) {
@@ -1646,78 +1649,86 @@ app.get("/api/download-zip/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // 2. Buscar URLs de anexos no Google Sheets
-    let anexosUrls = [];
+    // 2. Buscar dados do Google Sheets via CSV
+    let respostaForms = null;
     try {
       const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-      if (config.sheetId) {
-        const response = await sheets.spreadsheets.values.get({ 
-          spreadsheetId: config.sheetId, 
-          range: "A:ZZ" 
-        });
-        const rows = (response.data.values || []);
-        if (rows.length > 1) {
-          const headers = rows[0];
-          const formsDataRows = rows.slice(1).map(row => 
-            headers.reduce((acc, header, index) => ({ 
-              ...acc, 
-              [header]: row[index] || "" 
-            }), {})
-          );
-          
-          // Encontrar linha correspondente
+      const sheetId = config.sheetId;
+
+      if (sheetId) {
+        const csvExport = await drive.files.export({ fileId: sheetId, mimeType: "text/csv" });
+        let csv = Buffer.from(csvExport.data).toString("utf8").replace(/^\uFEFF/, "");
+        const delimiter = (csv.match(/;/g) || []).length > (csv.match(/,/g) || []).length ? ";" : ",";
+        const records = parse(csv, { columns: true, skip_empty_lines: true, delimiter });
+
+        respostaForms = records.find(f => {
+          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
+          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
           const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
-          
-          const formsData = formsDataRows.find(rowData => {
-            let emailForms = '', telForms = '';
-            for (const key in rowData) {
-              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
-              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
-            }
-            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                   (telForms && telEtapa1 && telForms === telEtapa1);
-          });
-          
-          // Extrair URLs de anexos (colunas que contêm "drive.google.com")
-          if (formsData) {
-            for (const [key, value] of Object.entries(formsData)) {
-              if (value && typeof value === 'string' && value.includes('drive.google.com')) {
-                anexosUrls.push({ nome: key, url: value });
-              }
-            }
+          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                 (telForms && telEtapa1 && telForms === telEtapa1);
+        });
+      }
+    } catch (e) {
+      console.error("Erro ao buscar dados do Forms:", e.message);
+    }
+
+    if (!respostaForms) {
+      return res.status(404).send("Inscrição não encontrada ou Etapa 2 não preenchida.");
+    }
+
+    // 3. Criar ZIP com anexos reais do Google Drive
+    const zipFileName = `anexos-inscricao-${id}.zip`;
+    res.attachment(zipFileName);
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.pipe(res);
+
+    const fileIdRegex = /id=([a-zA-Z0-9_-]+)/;
+    const filePromises = [];
+
+    for (const [key, value] of Object.entries(respostaForms)) {
+      if (typeof value === 'string' && value.includes('drive.google.com')) {
+        const urls = value.split(', '); // O Forms separa múltiplos arquivos com ", "
+        for (const url of urls) {
+          const match = url.match(fileIdRegex);
+          if (match && match[1]) {
+            const fileId = match[1];
+            console.log(`🔎 Encontrado anexo com ID: ${fileId}`);
+            
+            const promise = drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' })
+              .then(response => {
+                // Precisamos do nome do arquivo, então fazemos outra chamada rápida
+                return drive.files.get({ fileId, fields: 'name' }).then(meta => {
+                  const fileName = meta.data.name || `${fileId}-anexo`;
+                  console.log(`➕ Adicionando "${fileName}" ao ZIP.`);
+                  archive.append(response.data, { name: fileName });
+                });
+              })
+              .catch(err => console.error(`❌ Falha ao baixar arquivo ${fileId}:`, err.message));
+            filePromises.push(promise);
           }
         }
       }
-    } catch (e) {
-      console.warn("⚠️ Erro ao buscar anexos do Google Sheets:", e.message);
     }
-    
-    if (anexosUrls.length === 0) {
-      return res.status(404).send('Nenhum anexo encontrado');
+
+    if (filePromises.length === 0) {
+      console.log(`⚠️ Nenhum anexo encontrado para a inscrição ${id}. Finalizando ZIP vazio.`);
+      archive.finalize();
+      return;
     }
+
+    // Espera todas as promessas de download terminarem antes de finalizar o ZIP
+    await Promise.all(filePromises);
     
-    // 3. Criar ZIP com os anexos
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="anexos_${id}.zip"`);
-    
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    archive.pipe(res);
-    
-    // Adicionar informações dos anexos ao ZIP
-    const info = `Anexos da inscrição #${id}\n\n` + 
-                 anexosUrls.map((a, i) => `${i+1}. ${a.nome}:\n   ${a.url}\n`).join('\n');
-    archive.append(info, { name: 'LEIA-ME.txt' });
-    
-    // Nota: Para baixar arquivos do Google Drive, seria necessário usar a API do Drive
-    // Por enquanto, apenas listamos as URLs no arquivo LEIA-ME.txt
-    
+    console.log(`✅ Finalizando o arquivo ZIP para a inscrição ${id}.`);
     archive.finalize();
-    
-  } catch (error) {
-    console.error("❌ Erro ao gerar ZIP:", error);
-    res.status(500).send("Erro ao gerar ZIP de anexos");
+
+  } catch (err) {
+    console.error(`❌ Erro fatal ao gerar ZIP para inscrição ${id}:`, err);
+    res.status(500).send("Erro interno ao gerar o arquivo ZIP.");
   }
 });
 
