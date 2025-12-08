@@ -1524,6 +1524,203 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
+// --- 24. ROTA: GERAR PDF COM DADOS DO GOOGLE SHEETS ---
+app.get("/api/gerar-pdf/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Buscar inscrição no banco
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).send('Inscrição não encontrada');
+    }
+    
+    const inscricao = result.rows[0];
+    
+    // 2. Buscar dados do Google Sheets
+    let formsData = null;
+    try {
+      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      if (config.sheetId) {
+        const response = await sheets.spreadsheets.values.get({ 
+          spreadsheetId: config.sheetId, 
+          range: "A:ZZ" 
+        });
+        const rows = (response.data.values || []);
+        if (rows.length > 1) {
+          const headers = rows[0];
+          const formsDataRows = rows.slice(1).map(row => 
+            headers.reduce((acc, header, index) => ({ 
+              ...acc, 
+              [header]: row[index] || "" 
+            }), {})
+          );
+          
+          // Encontrar linha correspondente por e-mail ou telefone
+          const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
+          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          
+          formsData = formsDataRows.find(rowData => {
+            let emailForms = '', telForms = '';
+            for (const key in rowData) {
+              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
+              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+            }
+            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                   (telForms && telEtapa1 && telForms === telEtapa1);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Erro ao buscar dados do Google Sheets:", e.message);
+    }
+    
+    // 3. Gerar PDF
+    const doc = new PDFDocument({ margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="formulario_${id}.pdf"`);
+    doc.pipe(res);
+    
+    // Título
+    doc.fontSize(20).text('Formulário de Inscrição - Edital UFSC', { align: 'center' });
+    doc.moveDown();
+    
+    // Dados da 1ª Etapa (do banco)
+    doc.fontSize(14).text('1ª ETAPA - Dados do Agendamento', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12);
+    doc.text(`Nome: ${inscricao.nome || 'N/A'}`);
+    doc.text(`E-mail: ${inscricao.email || 'N/A'}`);
+    doc.text(`Telefone: ${inscricao.telefone || 'N/A'}`);
+    doc.text(`Nome do Evento: ${inscricao.evento_nome || 'N/A'}`);
+    doc.text(`Local: ${inscricao.local || 'N/A'}`);
+    doc.moveDown();
+    
+    // Horários
+    if (inscricao.ensaio_inicio) {
+      doc.text(`Ensaio: ${new Date(inscricao.ensaio_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.ensaio_fim).toLocaleString('pt-BR')}`);
+    }
+    if (inscricao.montagem_inicio) {
+      doc.text(`Montagem: ${new Date(inscricao.montagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.montagem_fim).toLocaleString('pt-BR')}`);
+    }
+    if (inscricao.desmontagem_inicio) {
+      doc.text(`Desmontagem: ${new Date(inscricao.desmontagem_inicio).toLocaleString('pt-BR')} - ${new Date(inscricao.desmontagem_fim).toLocaleString('pt-BR')}`);
+    }
+    doc.moveDown(2);
+    
+    // Dados da 2ª Etapa (do Google Sheets)
+    if (formsData) {
+      doc.fontSize(14).text('2ª ETAPA - Dados do Formulário Google', { underline: true });
+      doc.moveDown(0.5);
+      doc.fontSize(12);
+      
+      for (const [key, value] of Object.entries(formsData)) {
+        if (value && value.trim()) {
+          doc.text(`${key}: ${value}`, { continued: false });
+          doc.moveDown(0.3);
+        }
+      }
+    } else {
+      doc.fontSize(12).text('⚠️ Dados da 2ª etapa não encontrados no Google Sheets', { align: 'center' });
+    }
+    
+    doc.end();
+    
+  } catch (error) {
+    console.error("❌ Erro ao gerar PDF:", error);
+    res.status(500).send("Erro ao gerar PDF");
+  }
+});
+
+// --- 25. ROTA: DOWNLOAD DE ANEXOS EM ZIP ---
+app.get("/api/download-zip/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 1. Buscar inscrição no banco
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).send('Inscrição não encontrada');
+    }
+    
+    const inscricao = result.rows[0];
+    
+    // 2. Buscar URLs de anexos no Google Sheets
+    let anexosUrls = [];
+    try {
+      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      if (config.sheetId) {
+        const response = await sheets.spreadsheets.values.get({ 
+          spreadsheetId: config.sheetId, 
+          range: "A:ZZ" 
+        });
+        const rows = (response.data.values || []);
+        if (rows.length > 1) {
+          const headers = rows[0];
+          const formsDataRows = rows.slice(1).map(row => 
+            headers.reduce((acc, header, index) => ({ 
+              ...acc, 
+              [header]: row[index] || "" 
+            }), {})
+          );
+          
+          // Encontrar linha correspondente
+          const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
+          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          
+          const formsData = formsDataRows.find(rowData => {
+            let emailForms = '', telForms = '';
+            for (const key in rowData) {
+              const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
+              if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+            }
+            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                   (telForms && telEtapa1 && telForms === telEtapa1);
+          });
+          
+          // Extrair URLs de anexos (colunas que contêm "drive.google.com")
+          if (formsData) {
+            for (const [key, value] of Object.entries(formsData)) {
+              if (value && typeof value === 'string' && value.includes('drive.google.com')) {
+                anexosUrls.push({ nome: key, url: value });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Erro ao buscar anexos do Google Sheets:", e.message);
+    }
+    
+    if (anexosUrls.length === 0) {
+      return res.status(404).send('Nenhum anexo encontrado');
+    }
+    
+    // 3. Criar ZIP com os anexos
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="anexos_${id}.zip"`);
+    
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.pipe(res);
+    
+    // Adicionar informações dos anexos ao ZIP
+    const info = `Anexos da inscrição #${id}\n\n` + 
+                 anexosUrls.map((a, i) => `${i+1}. ${a.nome}:\n   ${a.url}\n`).join('\n');
+    archive.append(info, { name: 'LEIA-ME.txt' });
+    
+    // Nota: Para baixar arquivos do Google Drive, seria necessário usar a API do Drive
+    // Por enquanto, apenas listamos as URLs no arquivo LEIA-ME.txt
+    
+    archive.finalize();
+    
+  } catch (error) {
+    console.error("❌ Erro ao gerar ZIP:", error);
+    res.status(500).send("Erro ao gerar ZIP de anexos");
+  }
+});
+
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
 // Servir arquivos estáticos (CSS, JS, Imagens)
