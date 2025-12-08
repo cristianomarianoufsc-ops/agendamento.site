@@ -270,7 +270,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:4000/api/inscricoes"   );
+      const response = await fetch("/api/inscricoes"   );
       const data = await response.json();
       setUnificados(data.inscricoes || []);
       setEvaluationCriteria(data.criteria || []);
@@ -286,7 +286,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchEvaluators = async () => {
     if (viewOnly) return;
     try {
-        const response = await fetch("http://localhost:4000/api/evaluators"   );
+        const response = await fetch("/api/evaluators"   );
         const data = await response.json();
         setEvaluators(data || []);
     } catch (error) {
@@ -298,7 +298,7 @@ const Admin = ({ viewOnly = false }) => {
     fetchData();
     if (!viewOnly) {
       fetchEvaluators();
-      fetch("http://localhost:4000/api/config"   ).then(res => res.json()).then(data => {
+      fetch("/api/config"   ).then(res => res.json()).then(data => {
         if (data.formsLink) setFormLink(data.formsLink);
         if (data.sheetLink) setSheetLink(data.sheetLink);
         if (data.pageTitle) setPageTitle(data.pageTitle);
@@ -325,7 +325,7 @@ const Admin = ({ viewOnly = false }) => {
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
   const handleSaveConfig = async (configData) => {
     try {
-      const response = await fetch("http://localhost:4000/api/config", {
+      const response = await fetch("/api/config", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configData   ),
       });
@@ -342,7 +342,7 @@ const Admin = ({ viewOnly = false }) => {
       return;
     }
     try {
-      const response = await fetch("http://localhost:4000/api/auth/viewer", {
+      const response = await fetch("/api/auth/viewer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: evaluatorEmail, password: evaluatorPassword } ), // ENVIANDO SENHA
@@ -387,7 +387,7 @@ const Admin = ({ viewOnly = false }) => {
   const handleSaveCriteria = async () => {
     const criteriaToSave = evaluationCriteria.map((c, index) => ({ ...c, sort_order: index }));
     try {
-      const response = await fetch("http://localhost:4000/api/criteria", {
+      const response = await fetch("/api/criteria", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(criteriaToSave   ),
       });
@@ -401,9 +401,9 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
   const handleAddEvaluator = (email) => {
-    if (email && email.includes('@')) {
-      if (!evaluators.some(e => e.email === email.trim().toLowerCase())) {
-        const newEvaluator = { id: `new-${Date.now()}`, email: email.trim().toLowerCase() };
+    if (email && email.trim() !== '') {
+      if (!evaluators.some(e => e.email === email.trim())) {
+        const newEvaluator = { id: `new-${Date.now()}`, email: email.trim() };
         setEvaluators(prev => [...prev, newEvaluator]);
       }
     }
@@ -415,37 +415,25 @@ const Admin = ({ viewOnly = false }) => {
 
   const handleSaveEvaluators = async () => {
     const emailsToSave = evaluators.map(e => e.email);
+    const sharedPassword = 'dac.ufsc2026'; // Senha unica hardcoded
     try {
-      const response = await fetch("http://localhost:4000/api/evaluators", {
+      const response = await fetch("/api/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emails: emailsToSave }),
+        body: JSON.stringify({ evaluators: emailsToSave.map(e => ({ email: e })), sharedPassword: sharedPassword }),
       });
       const data = await response.json();
       if (response.ok) {
-        let message = "✅ Avaliadores processados com sucesso!\n\n";
-        if (data.results && data.results.length > 0) {
-          message += "Resultados:\n";
-          data.results.forEach(result => {
-            message += `- ${result.email}: ${result.message}\n`;
-          });
-        }
-        if (data.errors && data.errors.length > 0) {
-          message += "\nErros:\n";
-          data.errors.forEach(error => {
-            message += `- ${error.email}: ${error.error}\n`;
-          });
-        }
-        alert(message);
+        alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
         fetchEvaluators();
       } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
     } catch (error) {
       console.error("Erro ao salvar avaliadores:", error);
-      alert("❌ Erro ao salvar a lista de avaliadores: " + error.message);
+      alert("Erro ao salvar a lista de avaliadores: " + error.message);
     }
   };
 
   const handleOpenModal = (user) => { setSelectedUser(user); setShowModal(true); };
-  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`http://localhost:4000/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
+  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
   
   // =================================================
   // ✅ FUNÇÃO PARA GERAR SLIDES
@@ -455,7 +443,7 @@ const Admin = ({ viewOnly = false }) => {
     setIsGeneratingSlides(true);
     try {
       // 1. Chamar o novo endpoint para obter os dados brutos
-      const response = await fetch("http://localhost:4000/api/admin/data-for-analysis");
+      const response = await fetch("/api/admin/data-for-analysis");
       if (!response.ok) {
         throw new Error("Falha ao buscar dados para análise.");
       }
@@ -473,8 +461,8 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("http://localhost:4000/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
-  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("http://localhost:4000/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
+  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
+  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
    if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
     return (
@@ -686,7 +674,7 @@ const Admin = ({ viewOnly = false }) => {
                                   )}
                                 </td>
 
-                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`http://localhost:4000/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`http://localhost:4000/api/download
+                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`/api/download
 -zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button></td>}
                                 <td className="px-6 py-4 text-center align-top">
                                   <div className="flex items-center justify-center space-x-2">
@@ -987,9 +975,9 @@ const Admin = ({ viewOnly = false }) => {
                     <UserCheck size={20} /> Gerenciar Avaliadores
                   </h3>
                   <div className="mb-4">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Adicionar E-mail de Avaliador Autorizado</label>
+                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Email do Avaliador</label>
                     <div className="flex gap-2">
-                      <input type="email" placeholder="email@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
+                      <input type="text" placeholder="Ex: joao@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
                       <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
                     </div>
                   </div>
