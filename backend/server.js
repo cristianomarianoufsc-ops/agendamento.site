@@ -402,107 +402,56 @@ app.get('/api/evaluators', async (req, res) => {
 });
 
 app.post('/api/evaluators', async (req, res) => {
-  const { emails } = req.body;
-  if (!Array.isArray(emails)) {
-    return res.status(400).json({ error: 'O corpo da requisição deve ser um array de e-mails.' });
+  const { evaluators, sharedPassword } = req.body;
+  
+  if (!Array.isArray(evaluators) || !sharedPassword) {
+    return res.status(400).json({ error: 'Dados invalidos. Forneca um array de avaliadores e uma senha unica.' });
   }
 
-  const results = [];
-  const errors = [];
-
   try {
-    // 1. Buscar avaliadores existentes para comparação
-    const existingResult = await query('SELECT email FROM evaluators');
-    const existingEvaluators = existingResult.rows.map(e => e.email);
-    const emailsToKeep = new Set(emails.map(e => e.trim().toLowerCase()).filter(e => e !== ''));
-    const emailsToRemove = existingEvaluators.filter(email => !emailsToKeep.has(email));
+    // 1. Remover todos os avaliadores antigos
+    await query('DELETE FROM evaluators');
     
-    // 2. Remover avaliadores que não estão na nova lista
-    if (emailsToRemove.length > 0) {
-        const placeholders = emailsToRemove.map((_, i) => `$${i + 1}`).join(',');
-        await query(`DELETE FROM evaluators WHERE email IN (${placeholders})`, emailsToRemove);
+    // 2. Inserir novos avaliadores com a senha unica
+    for (const evaluator of evaluators) {
+      const name = evaluator.name || evaluator.email;
+      await query(
+        'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2)',
+        [name, sharedPassword]
+      );
     }
-
-    for (const email of emails) {
-      if (!email || email.trim() === '') continue;
-
-      const normalizedEmail = email.trim().toLowerCase();
-      const isNewEvaluator = !existingEvaluators.includes(normalizedEmail);
-
-      if (isNewEvaluator) {
-        // Apenas para novos avaliadores: gerar senha, hash e enviar e-mail
-        const password = generateRandomPassword(6);
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        try {
-          // Inserir novo avaliador
-          await query(
-            'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET password_hash = $2',
-            [normalizedEmail, passwordHash]
-          );
-          const emailSent = await sendEvaluatorCredentials(normalizedEmail, password);
-
-          results.push({
-            email: normalizedEmail,
-            success: emailSent,
-            message: emailSent ? 'Avaliador adicionado e e-mail enviado com sucesso.' : 'Avaliador adicionado, mas houve erro ao enviar e-mail.'
-          });
-        } catch (insertError) {
-          errors.push({
-            email: normalizedEmail,
-            error: insertError.message
-          });
-        }
-      } else {
-        // Avaliador existente: apenas confirma que foi mantido
-        results.push({
-            email: normalizedEmail,
-            success: true,
-            message: 'Avaliador existente mantido. Nenhuma alteração de senha ou e-mail enviada.'
-        });
-      }
-    }
-
-    res.status(200).json({
-      success: errors.length === 0,
-      message: 'Processamento de avaliadores concluído.',
-      results,
-      errors: errors.length > 0 ? errors : undefined
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Avaliadores salvos com sucesso. Nenhum e-mail foi enviado.' 
     });
   } catch (error) {
     console.error('Erro ao salvar avaliadores:', error);
-    res.status(500).json({ error: 'Erro ao salvar a lista de avaliadores.' });
+    res.status(500).json({ error: 'Erro ao salvar avaliadores.' });
   }
 });
 
 app.post('/api/auth/viewer', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
-        return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
+        return res.status(400).json({ error: 'Nome e senha sao obrigatorios.' });
     }
     try {
         const result = await query('SELECT * FROM evaluators WHERE email = $1', [email.trim().toLowerCase()]);
         const evaluator = result.rows[0];
         
         if (!evaluator) {
-            return res.status(403).json({ success: false, message: 'Acesso negado. E-mail não encontrado.' });
+            return res.status(403).json({ success: false, message: 'Acesso negado. Nome nao encontrado na lista de avaliadores.' });
         }
 
-        // 1. Verifica se o avaliador tem um hash de senha
-        if (!evaluator.password_hash) {
-            return res.status(403).json({ success: false, message: 'Acesso negado. Senha não configurada. Tente adicionar o avaliador novamente.' });
-        }
-
-        // 2. Compara a senha fornecida com o hash armazenado
-        const match = await bcrypt.compare(password, evaluator.password_hash);
-
-        if (match) {
+        // Comparacao simples (sem bcrypt)
+        if (password === evaluator.password_hash) {
             res.json({ success: true, message: 'Acesso autorizado.' });
         } else {
             res.status(403).json({ success: false, message: 'Acesso negado. Senha incorreta.' });
         }
     } catch (error) {
-        console.error('Erro na autenticação do avaliador:', error);
+        console.error('Erro na autenticacao do avaliador:', error);
         res.status(500).json({ error: 'Erro interno do servidor.' });
     }
 });
