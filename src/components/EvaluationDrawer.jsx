@@ -68,10 +68,10 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
     const scoreMap = { 'Não atende ao critério': 0, 'Atende parcialmente ao critério': 1, 'Atende plenamente ao critério': 2 };
     const scoresPayload = {};
     criteria.forEach(crit => { scoresPayload[crit.id] = scoreMap[assessments[crit.id]]; });
-    const finalPayload = { evaluatorEmail: evaluatorEmail, scores: scoresPayload };
+    const finalPayload = { inscriptionId: user.id, evaluatorEmail: evaluatorEmail, scoresJson: scoresPayload };
 
     try {
-      const response = await fetch(`/api/assessment/${user.id}`, {
+      const response = await fetch(`/api/save-assessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalPayload ),
