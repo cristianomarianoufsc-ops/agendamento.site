@@ -1565,9 +1565,14 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
           return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                  (telForms && telEtapa1 && telForms === telEtapa1);
         });
+        console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'N\u00c3O');
+        if (respostaForms) {
+          console.log(`[PDF] Campos:`, Object.keys(respostaForms));
+        }
       }
     } catch (e) {
-      console.error("Erro ao buscar dados do Forms para o PDF:", e.message);
+      console.error("[PDF] ERRO ao buscar dados do Forms:", e.message);
+      console.error(e.stack);
     }
     
     // 3. Gerar PDF
@@ -1646,17 +1651,27 @@ app.get("/api/download-zip/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // 2. Buscar dados do Google Sheets via CSV
+       // Dados da 2ª Etapa (do Google Sheets)
     let respostaForms = null;
     try {
       const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      console.log(`[PDF] Config lido:`, JSON.stringify(config));
       const sheetId = config.sheetId;
+      console.log(`[PDF] SheetId: ${sheetId}`);
 
       if (sheetId) {
+        console.log(`[PDF] Buscando dados para inscri\u00e7\u00e3o #${id}`);
+        console.log(`[PDF] E-mail: ${inscricao.email}, Telefone: ${inscricao.telefone}`);
         const csvExport = await drive.files.export({ fileId: sheetId, mimeType: "text/csv" });
         let csv = Buffer.from(csvExport.data).toString("utf8").replace(/^\uFEFF/, "");
+        console.log(`[PDF] CSV length: ${csv.length}`);
         const delimiter = (csv.match(/;/g) || []).length > (csv.match(/,/g) || []).length ? ";" : ",";
+        console.log(`[PDF] Delimiter: ${delimiter}`);
         const records = parse(csv, { columns: true, skip_empty_lines: true, delimiter });
+        console.log(`[PDF] Records found: ${records.length}`);
+        if (records.length > 0) {
+          console.log(`[PDF] Columns:`, Object.keys(records[0]));
+        }
 
         respostaForms = records.find(f => {
           const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
