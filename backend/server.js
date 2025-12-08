@@ -1611,22 +1611,18 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     linhaEtapa("Desmontagem", inscricao.desmontagem_inicio, inscricao.desmontagem_fim);
     doc.moveDown(1.5);
 
-    // Dados da 2ª Etapa (do Google Sheets)
-    const isEventoCompleto = inscricao.eventos_json !== '[]' || inscricao.montagem_inicio || inscricao.desmontagem_inicio;
-    
-    if (isEventoCompleto) {
-      doc.font('Helvetica-Bold').fontSize(14).text("3. DETALHAMENTO DO EVENTO (Etapa 2)");
-      if (respostaForms) {
-        doc.font('Helvetica').fontSize(10);
-        for (const [key, value] of Object.entries(respostaForms)) {
-          // Normalizar key para comparação
-          const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (normalizedKey.includes('carimbo') || !value || String(value).trim() === "") continue;
-          doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${value}`);
-        }
-      } else {
-        doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
+    // Dados da 2ª Etapa (do Google Sheets) - SEMPRE MOSTRAR
+    doc.font('Helvetica-Bold').fontSize(14).text("3. DETALHAMENTO DO EVENTO (Etapa 2)");
+    if (respostaForms) {
+      doc.font('Helvetica').fontSize(10);
+      for (const [key, value] of Object.entries(respostaForms)) {
+        // Normalizar key para comparação
+        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normalizedKey.includes('carimbo') || !value || String(value).trim() === "") continue;
+        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${value}`);
       }
+    } else {
+      doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
     }
     
     doc.end();
