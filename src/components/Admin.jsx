@@ -164,7 +164,9 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
- const dadosProcessados = useMemo(() => {
+  const dadosProcessados = useMemo(() => {
+    if (!isAuthenticated && !viewOnly) return []; // Adiciona verificação de autenticação
+    if (loading) return []; // Adiciona verificação de loading
     let dadosParaProcessar = [...unificados];
 
     // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
