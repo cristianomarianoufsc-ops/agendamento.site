@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
-import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowLeft, PartyPopper, ChevronDown, XCircle, CheckCircle, ArrowRight } from "lucide-react";
+import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowLeft, PartyPopper, ChevronDown, XCircle, CheckCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal"; 
 
@@ -313,68 +313,35 @@ const EnsaioPage = () => {
               </div>
             </div>
             {resumo.ensaio && (
-              <div className="mt-6 flex justify-center">
-                <button
-                  onClick={() => setCurrentStep("user_data")}
-                  className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
-                >
-                  Continuar para Dados do Proponente
-                  <ArrowRight size={20} />
-                </button>
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">2. Dados do Proponente e Confirmação</h2>
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+                  <h3 className="text-xl font-bold text-blue-800 mb-3">Resumo do Ensaio</h3>
+                  <p className="text-blue-700 font-semibold mb-2">Local: {locaisNomes[localSelecionado]}</p>
+                  <div className="flex justify-between items-center text-sm text-gray-700 bg-white p-3 rounded-md shadow-sm">
+                    <span className="font-medium">Ensaio:</span>
+                    <span>{new Date(resumo.ensaio.date).toLocaleDateString('pt-BR')} das {resumo.ensaio.start} às {resumo.ensaio.end}</span>
+                    <button onClick={() => setResumo({ ensaio: null })} className="text-red-500 hover:text-red-700 transition-colors">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <input type="text" placeholder="Nome Completo" value={userData.name} onChange={(e) => setUserData({ ...userData, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                  <input type="email" placeholder="E-mail" value={userData.email} onChange={(e) => setUserData({ ...userData, email: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                  <input type="tel" placeholder="Telefone (com DDD)" value={userData.phone} onChange={(e) => setUserData({ ...userData, phone: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                  <input type="text" placeholder="Título do Ensaio" value={userData.eventName} onChange={(e) => setUserData({ ...userData, eventName: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div className="flex justify-end pt-4">
+                  <button onClick={handleSendEmail} disabled={!isFormValid()} className={`px-6 py-3 rounded-lg text-white font-bold transition-colors ${isFormValid() ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}>
+                    Finalizar Agendamento
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
         )}
-        {currentStep === "user_data" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
-            <div className="mb-8 flex items-center justify-between">
-              <h1 className="text-3xl font-bold text-gray-800">Dados do Proponente</h1>
-              <button onClick={() => setCurrentStep("calendar")} className="text-sm text-blue-600 hover:text-blue-800 flex items-center">
-                <ArrowLeft size={16} className="mr-1" /> Voltar
-              </button>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
-              <h3 className="text-xl font-bold text-blue-800 mb-3">Resumo do Ensaio</h3>
-              <p className="text-blue-700 font-semibold mb-2">Local: {locaisNomes[localSelecionado]}</p>
-              {resumo.ensaio ? (
-                <div className="flex justify-between items-center text-sm text-gray-700 bg-white p-3 rounded-md shadow-sm">
-                  <span className="font-medium">Ensaio:</span>
-                  <span>{new Date(resumo.ensaio.date).toLocaleDateString('pt-BR')} das {resumo.ensaio.start} às {resumo.ensaio.end}</span>
-                  <button onClick={() => setPendingRemovals(prev => [...prev, { etapa: 'ensaio' }])} className="text-red-500 hover:text-red-700 transition-colors">
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ) : (
-                <p className="text-gray-500">Nenhum horário de ensaio selecionado.</p>
-              )}
-              {pendingRemovals.length > 0 && (
-                <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg">
-                  <p className="text-red-800 font-semibold mb-2">Confirmação de Cancelamento:</p>
-                  <p className="text-red-700 text-sm mb-3">Você marcou o ensaio para remoção. Confirme para remover permanentemente.</p>
-                  <div className="flex gap-2">
-                    <button onClick={handleConfirmRemovals} className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors">
-                      Confirmar Remoção
-                    </button>
-                    <button onClick={() => setPendingRemovals([])} className="px-3 py-1 bg-gray-300 text-gray-800 text-sm rounded hover:bg-gray-400 transition-colors">
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-4">
-              <input type="text" placeholder="Nome Completo" value={userData.name} onChange={(e) => setUserData({ ...userData, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-              <input type="email" placeholder="E-mail" value={userData.email} onChange={(e) => setUserData({ ...userData, email: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-              <input type="tel" placeholder="Telefone (com DDD)" value={userData.phone} onChange={(e) => setUserData({ ...userData, phone: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-              <input type="text" placeholder="Título do Ensaio" value={userData.eventName} onChange={(e) => setUserData({ ...userData, eventName: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-            </div>
-            <div className="flex justify-end pt-4">
-              <button onClick={handleSendEmail} disabled={!isFormValid()} className={`px-6 py-3 rounded-lg text-white font-bold transition-colors ${isFormValid() ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}>
-                Finalizar Agendamento
-              </button>
-            </div>
-          </motion.div>
-        )}
+
       </div>
     </div>
   );
