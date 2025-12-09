@@ -122,14 +122,21 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
       const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
       
       try {
-        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
-        
-        if (!response.ok) {
-          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
-          continue;
-        }
-        
-        const data = await response.json();
+	        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
+	        
+	        if (!response.ok) {
+	          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
+	          continue;
+	        }
+	        
+	        let data;
+	        try {
+	          data = await response.json();
+	        } catch (e) {
+	          console.error(`❌ Erro ao processar JSON para ${year}-${month}:`, e);
+	          console.error("Resposta da API (texto):", await response.text());
+	          continue;
+	        }
         
         if (data.error) {
           console.error(`❌ Erro retornado pela API para ${year}-${month}:`, data.error);
