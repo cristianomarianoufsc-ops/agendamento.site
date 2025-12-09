@@ -75,10 +75,6 @@ const Admin = ({ viewOnly = false }) => {
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
   const [sharedPassword, setSharedPassword] = useState(''); // ✅ NOVO: Senha única para todos os avaliadores
-  
-  // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -370,39 +366,6 @@ const Admin = ({ viewOnly = false }) => {
     setIsAuthenticated(false); // DEFINE COMO DESAUTENTICADO
     window.location.reload();
   };
-  
-  // ✅ FUNÇÃO DE LOGIN DO ADMINISTRADOR
-  const handleAdminLogin = async () => {
-    if (!adminPassword) {
-      alert("Por favor, insira a senha de administrador.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/auth/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        sessionStorage.setItem('adminAuth', 'true');
-        setIsAdminAuthenticated(true);
-        setAdminPassword(''); // Limpa o campo de senha
-      } else {
-        alert(data.message || "❌ Senha incorreta.");
-      }
-    } catch (error) {
-      alert("❌ Erro ao tentar conectar com o servidor.");
-      console.error("Erro no login admin:", error);
-    }
-  };
-  
-  // ✅ FUNÇÃO DE LOGOUT DO ADMINISTRADOR
-  const handleAdminLogout = () => {
-    sessionStorage.removeItem('adminAuth');
-    setIsAdminAuthenticated(false);
-    window.location.reload();
-  };
 
   const handleCriterionChange = (id, field, value) => {
     setEvaluationCriteria(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
@@ -506,41 +469,6 @@ const Admin = ({ viewOnly = false }) => {
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
-  
-  // ✅ TELA DE LOGIN PARA ADMINISTRADOR
-  if (!viewOnly && !isAdminAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-              <Settings size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Painel Administrativo</h2>
-            <p className="text-gray-600">Insira a senha para acessar</p>
-          </div>
-          <input
-            type="password"
-            placeholder="Senha de administrador"
-            value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-blue-500 focus:border-blue-500"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
-            autoFocus
-          />
-          <button
-            onClick={handleAdminLogin}
-            className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <CheckCircle size={20} />
-            Entrar
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  // ✅ TELA DE LOGIN PARA AVALIADOR
    if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -585,18 +513,6 @@ const Admin = ({ viewOnly = false }) => {
                 onClick={handleViewerLogout} 
                 className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors"
               >
-                Sair
-              </button>
-            </div>
-          )}
-          {!viewOnly && isAdminAuthenticated && (
-            <div className="flex items-center justify-between mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm font-semibold text-green-800">✅ Sessão Administrativa Ativa</p>
-              <button 
-                onClick={handleAdminLogout} 
-                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors flex items-center gap-1"
-              >
-                <X size={16} />
                 Sair
               </button>
             </div>

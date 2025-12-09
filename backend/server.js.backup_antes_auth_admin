@@ -464,39 +464,6 @@ app.post('/api/auth/viewer', async (req, res) => {
     }
 });
 
-// ✅ NOVA ROTA: Autenticação do Administrador
-app.post('/api/auth/admin', async (req, res) => {
-    const { password } = req.body;
-    
-    if (!password) {
-        return res.status(400).json({ success: false, message: 'Senha é obrigatória.' });
-    }
-    
-    try {
-        // Busca a senha do admin na configuração
-        const result = await query('SELECT config_json FROM config WHERE id = 1');
-        
-        let adminPassword = 'admin.dac.ufsc'; // Senha padrão
-        
-        if (result.rows.length > 0) {
-            const config = JSON.parse(result.rows[0].config_json);
-            if (config.adminPassword) {
-                adminPassword = config.adminPassword;
-            }
-        }
-        
-        // Comparação simples da senha
-        if (password === adminPassword) {
-            res.json({ success: true, message: 'Acesso administrativo autorizado.' });
-        } else {
-            res.status(403).json({ success: false, message: 'Senha incorreta.' });
-        }
-    } catch (error) {
-        console.error('Erro na autenticação do admin:', error);
-        res.status(500).json({ success: false, message: 'Erro interno do servidor.' });
-    }
-});
-
 // NOVO: Endpoint unificado para SALVAR a configuração
 app.post("/api/config", async (req, res) => {
   try {
