@@ -256,6 +256,9 @@ async function getEvaluationCriteria() {
 console.log("✅ CRON JOB ATIVO: O cache será atualizado a cada 5 minutos.");
 let cacheEventos = {};
 async function atualizarCache() {
+  const timestamp = new Date().toLocaleString('pt-BR');
+  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
+  
   try {
     const agora = new Date();
     const start = agora.toISOString();
@@ -263,6 +266,7 @@ async function atualizarCache() {
 
     for (const local in calendarIds) {
       try {
+        console.log(`  📅 Buscando eventos para: ${local}`);
         const events = await calendar.events.list({
           calendarId: calendarIds[local],
           timeMin: start,
@@ -270,13 +274,16 @@ async function atualizarCache() {
           singleEvents: true,
           orderBy: 'startTime',
         });
+        const numEventos = events.data.items ? events.data.items.length : 0;
         cacheEventos[local] = events.data.items || [];
+        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
       } catch (err) {
-        console.warn(`⚠️ Erro ao atualizar cache para ${local}:`, err.message);
+        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
       }
     }
+    console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
   } catch (err) {
-    console.error("❌ Erro ao atualizar cache:", err.message);
+    console.error(`❌ [${timestamp}] Erro ao atualizar cache:`, err.message);
   }
 }
 
