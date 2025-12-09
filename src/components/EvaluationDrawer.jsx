@@ -1,7 +1,7 @@
 // Arquivo: src/components/EvaluationDrawer.jsx
 // VERSÃO FINAL BASEADA NO SEU CÓDIGO COMPLETO, COM A ORDEM CORRIGIDA
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Calendar, FileText, Star, ChevronDown, Save, Edit } from 'lucide-react';
 
 // --- COMPONENTES REUTILIZÁVEIS ---
@@ -11,6 +11,14 @@ const InfoRow = ({ label, value }) => ( <div className="grid grid-cols-1 sm:grid
 
 // --- COMPONENTE PRINCIPAL ---
 const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => {
+  const drawerRef = useRef(null);
+
+  useEffect(() => {
+    // Tenta focar no topo do drawer para evitar que o scroll vá para o topo da página
+    if (drawerRef.current) {
+      drawerRef.current.focus();
+    }
+  }, [user]); // Roda quando o drawer é aberto/atualizado com um novo usuário
 
   // --- ESTADOS ---
   const [assessments, setAssessments] = useState({});
@@ -152,7 +160,7 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
   // ✅ ESTRUTURA DE RENDERIZAÇÃO DO SEU BACKUP, COM A ORDEM CORRIGIDA
   // CÓDIGO CORRIGIDO (PAINEL DE AVALIAÇÃO SEMPRE NO FINAL)
   return (
-    <div className="bg-gray-100 p-4 sm:p-6">
+    <div ref={drawerRef} tabIndex={-1} className="bg-gray-100 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Bloco de informações sempre aparece primeiro */}
         <Section icon={<User size={22} className="text-blue-600" />} title="Informações Gerais">
