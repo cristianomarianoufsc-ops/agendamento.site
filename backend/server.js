@@ -253,12 +253,13 @@ async function getEvaluationCriteria() {
 }
 
 // --- 5. CACHE DE EVENTOS DO CALENDÁRIO ---
+console.log("✅ CRON JOB ATIVO: O cache será atualizado a cada 5 minutos.");
 let cacheEventos = {};
 async function atualizarCache() {
   try {
     const agora = new Date();
     const start = agora.toISOString();
-    const end = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
 
     for (const local in calendarIds) {
       try {
@@ -1190,6 +1191,13 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
     return res.status(400).json({ error: "Local não encontrado." });
   }
   try {
+    console.log(`\n\n🔍 REQUISIÇÃO: /api/occupied-slots/${local}/${month}`);
+    // A rota está buscando diretamente do Google Calendar, e não do cache.
+    // Isso pode sobrecarregar a API e não refletir o cache atualizado.
+    // Vamos usar o cache se a data estiver dentro do período de cache (12 meses).
+    // Para fins de debug, vamos manter a busca direta por enquanto, mas adicionar um log.
+    console.log(`⚠️ ATENÇÃO: A rota /api/occupied-slots está buscando diretamente do Google Calendar para o mês ${month}.`);
+    
     const [year, monthNum] = month.split('-');
     const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
     const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
@@ -1219,6 +1227,7 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
     }).filter(e => e.start && e.end); // Remove eventos sem data válida
     
     res.json({ eventos: eventosProcessados });
+    console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados para ${local}/${month}.`);
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
     // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
@@ -1848,6 +1857,8 @@ app.use((req, res) => {
 
 
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
+// A rotina cron já está aqui, mas vamos garantir que ela seja chamada.
+// A função atualizarCache será chamada uma vez na inicialização e a cada 5 minutos.
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}` );
   cron.schedule("*/5 * * * *", atualizarCache);
