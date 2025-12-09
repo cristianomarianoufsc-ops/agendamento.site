@@ -113,6 +113,68 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   const fetchOccupiedSlots = async (local) => {
   try {
     const now = new Date();
+    const occupiedByDate = {};
+    
+    // 🔄 Busca eventos dos próximos 12 meses
+    for (let i = 0; i < 12; i++) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const year = monthDate.getFullYear();
+      const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
+      
+      try {
+        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
+        
+        if (!response.ok) {
+          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
+          continue;
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          console.error(`❌ Erro retornado pela API para ${year}-${month}:`, data.error);
+          continue;
+        }
+        
+        if (!data || !data.eventos) {
+          console.warn(`⚠️ Dados de eventos incompletos para ${year}-${month}`);
+          continue;
+        }
+        
+        // Processa eventos do mês
+        (data.eventos || []).forEach((event) => {
+          if (!event || !event.start || !event.end) return;
+          const start = new Date(event.start);
+          const end = new Date(event.end);
+          
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn("⚠️ Evento com data inválida ignorado:", event);
+            return;
+          }
+          
+          end.setMinutes(end.getMinutes() + 30);
+          const dateString = start.toISOString().split("T")[0];
+          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          
+          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
+        });
+        
+        console.log(`✅ ${(data.eventos || []).length} eventos carregados para ${year}-${month}`);
+      } catch (monthError) {
+        console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
+        continue;
+      }
+    }
+    
+    setBackendOcupados(occupiedByDate);
+    console.log(`✅ Total de datas com eventos ocupados: ${Object.keys(occupiedByDate).length}`);
+    return;
+    
+    // Código antigo (mantido como comentário para referência)
+    /*
+    const now = new Date();
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}` );
