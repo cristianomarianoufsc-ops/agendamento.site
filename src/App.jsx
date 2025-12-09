@@ -170,57 +170,12 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     
     setBackendOcupados(occupiedByDate);
     console.log(`✅ Total de datas com eventos ocupados: ${Object.keys(occupiedByDate).length}`);
-    return;
-    
-    // Código antigo (mantido como comentário para referência)
-    /*
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}` );
-    
-    // ✅ VERIFICA SE A RESPOSTA FOI BEM-SUCEDIDA
-    if (!response.ok) {
-      console.error("❌ Erro ao buscar eventos: Status", response.status);
-      setBackendOcupados({});
-      return;
-    }
-    
-    const data = await response.json();
-    
-    // ✅ VERIFICA SE A API RETORNOU ERRO AO INVÉS DE EVENTOS
-    if (data.error) {
-      console.error("❌ Erro retornado pela API:", data.error);
-      setBackendOcupados({});
-      return;
-    }
-    
-    if (!data || !data.eventos) {
-      console.warn("⚠️ Dados de eventos incompletos ou nulos recebidos do backend.");
-      setBackendOcupados({});
-      return;
-    }
-    const occupiedByDate = {};
-    (data.eventos || []).forEach((event) => {
-      if (!event || !event.start || !event.end) return; // Adiciona verificação
-      const start = new Date(event.start);
-      const end = new Date(event.end);
-      // ✅ VALIDAÇÃO: Verifica se as datas são válidas
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        console.warn("⚠️ Evento com data inválida ignorado:", event);
-        return;
-      }
-      end.setMinutes(end.getMinutes() + 30);
-      const dateString = start.toISOString().split("T")[0];
-      const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-      const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-      if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
-      // ✅ ATUALIZE ESTA LINHA PARA INCLUIR 'isContestable'
-      occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
-    });
-    setBackendOcupados(occupiedByDate);
-  } catch (error) { console.error("❌ Erro ao buscar eventos:", error); setBackendOcupados({}); }
+  } catch (error) {
+    console.error("❌ Erro ao buscar eventos:", error);
+    setBackendOcupados({});
+  }
 };
+
   const handleLocalSelect = (local) => { setLocalSelecionado(local); setCurrentStep("calendar"); };
 
   const handleBackToLocalSelect = () => {
