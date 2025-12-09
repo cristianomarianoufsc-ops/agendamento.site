@@ -1,3 +1,5 @@
+// src/components/Admin.jsx
+
 // Comentário para forçar o reconhecimento da alteração no Render
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
@@ -271,108 +273,145 @@ const Admin = ({ viewOnly = false }) => {
             const currentUserHasAssessed = item.evaluatorsWhoAssessed?.includes(evaluatorEmail);
             if (assessmentFilter === 'avaliados') return currentUserHasAssessed;
             if (assessmentFilter === 'nao_avaliados') return !currentUserHasAssessed;
-          } else { // Modo Admin (viewOnly = false)
+          } else {
             if (assessmentFilter === 'avaliados') return isFullyAssessed;
             if (assessmentFilter === 'nao_avaliados') return !isFullyAssessed;
           }
         }
+      } else if (inscricoesTab === 'ensaios') {
+        const isEnsaio = item.ensaio_inicio && !item.montagem_inicio && !item.desmontagem_inicio && item.eventos_json === '[]';
+        return isEnsaio;
       }
 
-      // Lógica de filtro de avaliação para o modo viewOnly (mantida para a ordenação)
-      if (viewOnly) {
-        const isEvento = item.eventos_json !== '[]' || item.montagem_inicio || item.desmontagem_inicio;
-        if (!isEvento) return false;
-
-        const currentUserHasAssessed = item.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-        if (assessmentFilter === 'avaliados') return currentUserHasAssessed;
-        if (assessmentFilter === 'nao_avaliados') return !currentUserHasAssessed;
-        return true;
-      }
-
-      const tipoCorreto = inscricoesTab === 'eventos'
-        ? item.eventos_json !== '[]' || item.montagem_inicio || item.desmontagem_inicio
-        : item.ensaio_inicio && item.eventos_json === '[]' && !item.montagem_inicio && !item.desmontagem_inicio;
-      
-      return tipoCorreto;
+      return true;
     });
 
     // Lógica de ordenação
-    return dadosParaProcessar.sort((a, b) => {
-      // ✅ ORDENAÇÃO POR GRUPO DE CONFLITO
-      if (conflictFilter) {
-        const aGroup = a.conflictGroup ?? Infinity;
-        const bGroup = b.conflictGroup ?? Infinity;
-        if (aGroup !== bGroup) {
-          return aGroup - bGroup;
-        }
-      }
-
-      if (viewOnly) {
-        const aHasBeenAssessedByMe = a.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-        const bHasBeenAssessedByMe = b.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-
-        if (aHasBeenAssessedByMe && !bHasBeenAssessedByMe) return 1;
-        if (!aHasBeenAssessedByMe && bHasBeenAssessedByMe) return -1;
-      }
-     
-      switch (sortOrder) {
-        case 'nota_desc': return (b.finalScore ?? -1) - (a.finalScore ?? -1);
-        case 'nota_asc': return (a.finalScore ?? Infinity) - (b.finalScore ?? Infinity);
-        case 'id_asc': default: return a.id - b.id;
-      }
+    dadosParaProcessar.sort((a, b) => {
+      if (sortOrder === 'id_asc') return a.id - b.id;
+      if (sortOrder === 'nota_desc') return (b.averageScore || 0) - (a.averageScore || 0);
+      if (sortOrder === 'nota_asc') return (a.averageScore || 0) - (b.averageScore || 0);
+      return 0;
     });
-  }, [unificados, inscricoesTab, localFilters, sortOrder, viewOnly, assessmentFilter, evaluatorEmail, conflictFilter]);
 
+    return dadosParaProcessar;
+  }, [unificados, localFilters, inscricoesTab, sortOrder, assessmentFilter, viewOnly, evaluatorEmail, conflictFilter]);
 
-  const handleLocalFilterChange = (local) => { setLocalFilters(prev => ({ ...prev, [local]: !prev[local] })); };
-  // --- FUNÇÕES DE API ---
+  // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/inscricoes"   );
+      const response = await fetch("/api/admin/data");
       const data = await response.json();
-      setUnificados(data.inscricoes || []);
-      setEvaluationCriteria(data.criteria || []);
-    } catch (err) { 
-      console.error("Erro ao carregar dados:", err);
-      setUnificados([]);
-      setEvaluationCriteria([]);
-    } finally { 
-      setLoading(false); 
-    }
-  };
+      
+      // Processa os dados para incluir contagem de avaliações e nota média
+      const processedData = data.inscriptions.map(item => {
+        const assessments = data.assessments.filter(a => a.inscription_id === item.id);
+        const assessmentsCount = assessments.length;
+        
+        // Calcula a nota média
+        let totalScore = 0;
+        let totalWeight = 0;
+        
+        assessments.forEach(a => {
+          try {
+            const scores = JSON.parse(a.scores_json);
+            let assessmentScore = 0;
+            let assessmentWeight = 0;
+            
+            Object.keys(scores).forEach(criterionId => {
+              const criterion = data.criteria.find(c => c.id === criterionId);
+              if (criterion) {
+                assessmentScore += scores[criterionId] * criterion.weight;
+                assessmentWeight += criterion.weight;
+              }
+            });
+            
+            if (assessmentWeight > 0) {
+              totalScore += assessmentScore / assessmentWeight;
+            }
+          } catch (e) {
+            console.error("Erro ao parsear scores_json:", e);
+          }
+        });
+        
+        const averageScore = assessmentsCount > 0 ? (totalScore / assessmentsCount) : null;
+        
+        // Lista de avaliadores que já avaliaram
+        const evaluatorsWhoAssessed = assessments.map(a => a.evaluator_email);
 
-  const fetchEvaluators = async () => {
-    if (viewOnly) return;
-    try {
-        const response = await fetch("/api/evaluators"   );
-        const data = await response.json();
-        setEvaluators(data || []);
+        return {
+          ...item,
+          assessmentsCount,
+          averageScore: averageScore !== null ? parseFloat(averageScore.toFixed(2)) : null,
+          requiredAssessments: data.config.requiredAssessments || 3,
+          evaluatorsWhoAssessed,
+          hasConflict: item.hasConflict === 1, // Converte o valor do banco de dados
+        };
+      });
+
+      setUnificados(processedData);
+      
+      // Carrega as configurações
+      setFormLink(data.config.formLink || "");
+      setSheetLink(data.config.sheetLink || "");
+      setPageTitle(data.config.pageTitle || "Sistema de Agendamento de Espaços");
+      setEvaluationCriteria(data.config.evaluationCriteria || []);
+      setEvaluators(data.config.evaluators || []);
+      setAllowBookingOverlap(data.config.allowBookingOverlap || false);
+      setBlockedDates(data.config.blockedDates || []);
+      setStageTimes(data.config.stageTimes || {
+        ensaio: { start: "08:00", end: "21:00" },
+        montagem: { start: "08:00", end: "21:00" },
+        evento: { start: "08:00", end: "21:00" },
+        desmontagem: { start: "08:00", end: "21:00" },
+      });
+      setEnableInternalEdital(data.config.enableInternalEdital || false);
+      setEnableExternalEdital(data.config.enableExternalEdital || true);
+      setEnableRehearsal(data.config.enableRehearsal || true);
+      setButtonExternalEditalText(data.config.buttonExternalEditalText || "Edital Externo");
+      setRequiredAssessments(data.config.requiredAssessments || 3);
+
     } catch (error) {
-        console.error("Erro ao buscar avaliadores:", error);
+      console.error("Erro ao buscar dados:", error);
+      alert("❌ Erro ao carregar dados do servidor.");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
     if (!viewOnly) {
-      fetchEvaluators();
-      fetch("/api/config"   ).then(res => res.json()).then(data => {
-        if (data.formsLink) setFormLink(data.formsLink);
-        if (data.sheetLink) setSheetLink(data.sheetLink);
-        if (data.pageTitle) setPageTitle(data.pageTitle);
-        if (data.allowBookingOverlap) setAllowBookingOverlap(data.allowBookingOverlap);
-        // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
-        if (data.blockedDates) setBlockedDates(data.blockedDates);
-        if (data.stageTimes) setStageTimes(data.stageTimes);
-        
-        // Atualiza os estados dos botões
-        setEnableInternalEdital(data.enableInternalEdital);
-        setEnableExternalEdital(data.enableExternalEdital);
-        setEnableRehearsal(data.enableRehearsal);
-        if (data.buttonExternalEditalText) setButtonExternalEditalText(data.buttonExternalEditalText); // NOVO: Carrega o texto do botão
+      fetchData();
+    } else if (evaluatorEmail) {
+      fetchData();
+    }
+  }, [viewOnly, evaluatorEmail]);
 
-        // ✅ ATUALIZA O NOVO ESTADO
+  // Carrega as configurações iniciais
+  useEffect(() => {
+    if (!viewOnly) {
+      fetch("/api/config")
+      .then(res => res.json())
+      .then(data => {
+        setFormLink(data.formLink || "");
+        setSheetLink(data.sheetLink || "");
+        setPageTitle(data.pageTitle || "Sistema de Agendamento de Espaços");
+        setEvaluationCriteria(data.evaluationCriteria || []);
+        setEvaluators(data.evaluators || []);
+        setAllowBookingOverlap(data.allowBookingOverlap || false);
+        setBlockedDates(data.blockedDates || []);
+        setStageTimes(data.stageTimes || {
+          ensaio: { start: "08:00", end: "21:00" },
+          montagem: { start: "08:00", end: "21:00" },
+          evento: { start: "08:00", end: "21:00" },
+          desmontagem: { start: "08:00", end: "21:00" },
+        });
+        setEnableInternalEdital(data.enableInternalEdital || false);
+        setEnableExternalEdital(data.enableExternalEdital || true);
+        setEnableRehearsal(data.enableRehearsal || true);
+        setButtonExternalEditalText(data.buttonExternalEditalText || "Edital Externo");
         if (data.requiredAssessments) {
           setRequiredAssessments(data.requiredAssessments);
         }
@@ -389,115 +428,39 @@ const Admin = ({ viewOnly = false }) => {
         body: JSON.stringify(configData   ),
       });
       if (response.ok) alert("✅ Configurações salvas com sucesso!");
-      else throw new Error("Erro no servidor.");
+      else throw new Error("Falha ao salvar configurações.");
     } catch (error) {
-      alert("❌ Erro ao salvar configurações.");
+      console.error("Erro ao salvar config:", error);
+      alert(`❌ Erro ao salvar configurações: ${error.message}`);
     }
   };
-// ✅ FUNÇÃO DE LOGIN DO AVALIADOR (handleViewerLogin)
-  const handleViewerLogin = async () => {
+
+  const handleLocalFilterChange = (local) => {
+    setLocalFilters(prev => ({ ...prev, [local]: !prev[local] }));
+  };
+
+  const handleViewerLogin = () => {
     if (!evaluatorEmail || !evaluatorPassword) {
-      alert("Por favor, insira seu e-mail e senha.");
+      alert("Por favor, preencha o e-mail e a senha.");
       return;
     }
-    try {
-      const response = await fetch("/api/auth/viewer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: evaluatorEmail, password: evaluatorPassword } ), // ENVIANDO SENHA
-      });
-      const data = await response.json();
-      if (data.success) {
-        localStorage.setItem('evaluatorEmail', evaluatorEmail);
-        setIsAuthenticated(true); // DEFINE COMO AUTENTICADO
-        // Não salvamos a senha no localStorage por segurança, apenas o email.
-        window.location.reload();
-      } else {
-        alert(data.message || "Erro de autenticação.");
-      }
-    } catch (error) {
-      alert("Erro ao tentar conectar com o servidor.");
+    // Lógica de autenticação do avaliador (simples, apenas verifica se o email está na lista)
+    const isValid = evaluators.some(e => e.email === evaluatorEmail && e.password === evaluatorPassword);
+    if (isValid) {
+      localStorage.setItem('evaluatorEmail', evaluatorEmail);
+      setIsAuthenticated(true);
+      fetchData(); // Carrega os dados após o login
+    } else {
+      alert("E-mail ou senha inválidos.");
     }
   };
-   const handleViewerLogout = () => {
+
+  const handleViewerLogout = () => {
     localStorage.removeItem('evaluatorEmail');
     // Não altera o isAuthenticated do Admin, apenas do avaliador
     setEvaluatorEmail('');
-  };  window.location.reload();
   };
 
-  const handleCriterionChange = (id, field, value) => {
-    setEvaluationCriteria(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
-  };
-
-  const handleAddCriterion = () => {
-    const newCriterion = {
-      id: uuidv4(), title: 'Novo Critério', description: 'Descrição do novo critério.',
-      weight: 1, sort_order: evaluationCriteria.length,
-    };
-    setEvaluationCriteria(prev => [...prev, newCriterion]);
-  };
-
-  const handleRemoveCriterion = (id) => {
-    if (window.confirm("Tem certeza que deseja remover este critério?")) {
-      setEvaluationCriteria(prev => prev.filter(c => c.id !== id).map((c, index) => ({ ...c, sort_order: index })));
-    }
-  };
-
-  const handleSaveCriteria = async () => {
-    const criteriaToSave = evaluationCriteria.map((c, index) => ({ ...c, sort_order: index }));
-    try {
-      const response = await fetch("/api/criteria", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(criteriaToSave   ),
-      });
-      if (response.ok) {
-        alert("✅ Critérios de avaliação salvos com sucesso!");
-        fetchData();
-      } else { throw new Error("Erro no servidor ao salvar critérios."); }
-    } catch (error) {
-      console.error("Erro ao salvar critérios:", error);
-      alert("❌ Erro ao salvar critérios.");
-    }
-  };
-  const handleAddEvaluator = (email) => {
-    if (email && email.trim() !== '') {
-      if (!evaluators.some(e => e.email === email.trim())) {
-        const newEvaluator = { id: `new-${Date.now()}`, email: email.trim() };
-        setEvaluators(prev => [...prev, newEvaluator]);
-      }
-    }
-  };
-
-  const handleRemoveEvaluator = (id) => {
-    setEvaluators(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleSaveEvaluators = async () => {
-    const emailsToSave = evaluators.map(e => e.email);
-    const sharedPassword = 'dac.ufsc2026'; // Senha unica hardcoded
-    try {
-      const response = await fetch("/api/evaluators", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ evaluators: emailsToSave.map(e => ({ email: e })), sharedPassword: sharedPassword }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
-        fetchEvaluators();
-      } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
-    } catch (error) {
-      console.error("Erro ao salvar avaliadores:", error);
-      alert("Erro ao salvar a lista de avaliadores: " + error.message);
-    }
-  };
-
-  const handleOpenModal = (user) => { setSelectedUser(user); setShowModal(true); };
-  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
-  
-  // =================================================
-  // ✅ FUNÇÃO PARA GERAR SLIDES
-  // =================================================
   const handleGenerateSlides = async () => {
     if (isGeneratingSlides) return;
     setIsGeneratingSlides(true);
@@ -523,8 +486,43 @@ const Admin = ({ viewOnly = false }) => {
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
+  
+  // Funções de Gerenciamento de Critérios
+  const handleAddCriterion = () => {
+    setEvaluationCriteria(prev => [...prev, { id: uuidv4(), title: '', description: '', weight: 1 }]);
+  };
+  const handleRemoveCriterion = (id) => {
+    setEvaluationCriteria(prev => prev.filter(c => c.id !== id));
+  };
+  const handleCriterionChange = (id, field, value) => {
+    setEvaluationCriteria(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+  };
+  const handleSaveCriteria = () => {
+    handleSaveConfig({ evaluationCriteria });
+  };
+
+  // Funções de Gerenciamento de Avaliadores
+  const handleAddEvaluator = (email) => {
+    if (!email || evaluators.some(e => e.email === email)) return;
+    setEvaluators(prev => [...prev, { id: uuidv4(), email, password: '' }]); // Senha vazia por enquanto
+  };
+  const handleRemoveEvaluator = (id) => {
+    setEvaluators(prev => prev.filter(e => e.id !== id));
+  };
+  const handleSaveEvaluators = () => {
+    handleSaveConfig({ evaluators });
+  };
+
+  // Funções de Gerenciamento de Horários
+  const handleStageTimeChange = (stage, field, value) => {
+    setStageTimes(prev => ({ ...prev, [stage]: { ...prev[stage], [field]: value } }));
+  };
+  const handleSaveStageTimes = () => {
+    handleSaveConfig({ stageTimes });
+  };
+
   // --- RENDERIZAÇÃO ---
-   if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
+   if (viewOnly && !evaluatorEmail) { // AGORA USA evaluatorEmail
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
@@ -615,7 +613,7 @@ const Admin = ({ viewOnly = false }) => {
                         <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
                       </>
                     )}
-                    {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'   ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
+                    {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'    ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
                   </div>
                 </div>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
@@ -625,40 +623,40 @@ const Admin = ({ viewOnly = false }) => {
                     <div className="w-full border-b border-gray-200"></div>
                   )}
 <div className="flex items-center gap-4">
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="id_asc">Ordenar por Inscrição</option>
-	        <option value="nota_desc">Maior Nota</option>
-	        <option value="nota_asc">Menor Nota</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="todos">Mostrar Todos</option>
-	        <option value="avaliados">{viewOnly ? 'Apenas Avaliados por Mim' : 'Apenas Avaliados (100%)'}</option>
-	        <option value="nao_avaliados">{viewOnly ? 'Não Avaliados por Mim' : 'Não Avaliados (Pendente)'}</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.teatro} onChange={() => handleLocalFilterChange('teatro')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Theater size={16} /> Teatro</label>
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.igrejinha} onChange={() => handleLocalFilterChange('igrejinha')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Church size={16} /> Igrejinha</label>
-  
-  {/* ✅ NOVO CHECKBOX DE FILTRO DE CONFLITO */}
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-red-600">
-    <input 
-      type="checkbox" 
-      checked={conflictFilter} 
-      onChange={() => setConflictFilter(!conflictFilter)} 
-      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500" 
-    />
-    <AlertTriangle size={16} /> Apenas Conflitos
-  </label>
-</div>
+		  {inscricoesTab === 'eventos' && (
+		    <div className="relative">
+		      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+		        <option value="id_asc">Ordenar por Inscrição</option>
+		        <option value="nota_desc">Maior Nota</option>
+		        <option value="nota_asc">Menor Nota</option>
+		      </select>
+		      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
+		    </div>
+		  )}
+		  {inscricoesTab === 'eventos' && (
+		    <div className="relative">
+		      <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+		        <option value="todos">Mostrar Todos</option>
+		        <option value="avaliados">{viewOnly ? 'Apenas Avaliados por Mim' : 'Apenas Avaliados (100%)'}</option>
+		        <option value="nao_avaliados">{viewOnly ? 'Não Avaliados por Mim' : 'Não Avaliados (Pendente)'}</option>
+		      </select>
+		      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
+		    </div>
+		  )}
+	  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.teatro} onChange={() => handleLocalFilterChange('teatro')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Theater size={16} /> Teatro</label>
+	  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.igrejinha} onChange={() => handleLocalFilterChange('igrejinha')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Church size={16} /> Igrejinha</label>
+	  
+	  {/* ✅ NOVO CHECKBOX DE FILTRO DE CONFLITO */}
+	  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-red-600">
+	    <input 
+	      type="checkbox" 
+	      checked={conflictFilter} 
+	      onChange={() => setConflictFilter(!conflictFilter)} 
+	      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500" 
+	    />
+	    <AlertTriangle size={16} /> Apenas Conflitos
+	  </label>
+	</div>
                 </div>
                 {loading ? ( <div className="flex justify-center items-center py-20"><Loader className="animate-spin text-blue-500" size={40} /><p className="ml-4 text-gray-600">Carregando...</p></div> ) : (
                   <div className="overflow-x-auto">
@@ -689,90 +687,121 @@ const Admin = ({ viewOnly = false }) => {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 align-top">
-  {/* ✅ A classe 'text-red-500' é adicionada se 'u.hasConflict' for verdadeiro */}
-  <div className={`space-y-1 text-sm ${u.conflictColor ? u.conflictColor.split(' ')[1] : (u.hasConflict ? 'text-red-500 font-bold' : '')}`}>
-    {u.ensaio_inicio && <div className="whitespace-nowrap"><strong>Ensaio:</strong>{` ${new Date(u.ensaio_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.ensaio_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.ensaio_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-    {u.montagem_inicio && <div className="whitespace-nowrap"><strong>Montagem:</strong>{` ${new Date(u.montagem_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.montagem_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.montagem_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-    {u.eventos_json && JSON.parse(u.eventos_json).map((ev, i) => ( <div key={`evento-${i}`} className="whitespace-nowrap"><strong>Evento {i + 1}:</strong>{` ${new Date(ev.inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(ev.inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(ev.fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>))}
-    {u.desmontagem_inicio && <div className="whitespace-nowrap"><strong>Desmontagem:</strong>{` ${new Date(u.desmontagem_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.desmontagem_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.desmontagem_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-  </div>
-</td>
+                                  <ul className="list-disc list-inside space-y-1">
+                                    {u.ensaio_inicio && <li>Ensaio: {new Date(u.ensaio_inicio).toLocaleDateString('pt-BR')} ({new Date(u.ensaio_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(u.ensaio_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})</li>}
+                                    {u.montagem_inicio && <li>Montagem: {new Date(u.montagem_inicio).toLocaleDateString('pt-BR')} ({new Date(u.montagem_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(u.montagem_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})</li>}
+                                    {u.eventos_json && JSON.parse(u.eventos_json).map((ev, i) => (
+                                      <li key={i}>Evento {i + 1}: {new Date(ev.inicio).toLocaleDateString('pt-BR')} ({new Date(ev.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(ev.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})</li>
+                                    ))}
+                                    {u.desmontagem_inicio && <li>Desmontagem: {new Date(u.desmontagem_inicio).toLocaleDateString('pt-BR')} ({new Date(u.desmontagem_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(u.desmontagem_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})</li>}
+                                  </ul>
+                                </td>
                                 {!viewOnly && inscricoesTab === 'eventos' && (
-                                  <td className="px-6 py-4 text-center align-top font-bold text-lg">
-                                    {u.assessmentsCount >= u.requiredAssessments && u.finalScore !== null ? u.finalScore.toFixed(2) : '-'}
+                                  <td className="px-6 py-4 text-center align-top">
+                                    {u.averageScore !== null ? (
+                                      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold bg-blue-100 text-blue-800">
+                                        <Star size={14} className="text-blue-500" /> {u.averageScore}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 italic">N/A</span>
+                                    )}
                                   </td>
                                 )}
-                                
-                                <td className="px-6 py-4 text-center align-top">
-                                  {viewOnly ? (
-                                    (() => {
-                                      const currentUserHasAssessed = u.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-                                      if (currentUserHasAssessed) {
-                                        return (
-                                          <span className="flex items-center justify-center gap-1 text-sm text-green-600 font-semibold">
-                                            <CheckCircle size={16} /> Concluído
-                                          </span>
-                                        );
-                                      }
-                                      if (u.requiredAssessments > 0) {
-                                        return (
-                                          <span className="text-red-500 font-semibold text-lg">
-                                            {`${u.assessmentsCount || 0}/${u.requiredAssessments}`}
-                                          </span>
-                                        );
-                                      }
-                                      return <FileClock className="text-gray-400 inline-block" title="Pendente de Avaliação" />;
-                                    })()
-                                  ) : (
-                                    <>
-                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (
-                                        <CheckCircle className="text-green-500 inline-block" title="Avaliações Concluídas" />
-                                      ) : (
-                                        <span className="text-red-500 font-semibold text-lg">{`${u.assessmentsCount || 0}/${u.requiredAssessments || '?'}`}</span>
-                                      )}
-                                    </>
-                                  )}
-                                </td>
-
-                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`/api/download
--zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button></td>}
-                                <td className="px-6 py-4 text-center align-top">
-                                  <div className="flex items-center justify-center space-x-2">
-                                    {!viewOnly ? (
-                                      <>
-                                        <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full"><Contact size={18} /></button>
-                                        <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={18} /></button>
-                                      </>
+                                {(inscricoesTab === 'eventos' || viewOnly) && (
+                                  <td className="px-6 py-4 text-center align-top">
+                                    {u.assessmentsCount >= u.requiredAssessments ? (
+                                      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold bg-green-100 text-green-800">
+                                        <CheckCircle size={14} /> Completo
+                                      </span>
                                     ) : (
-                                      <button onClick={() => handleToggleAccordion(u.id)} className={`flex items-center justify-center gap-2 px-3 py-2 font-semibold rounded-lg text-sm w-28 ${openAccordionId === u.id ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'}`}>
-                                        <Eye size={16} />{openAccordionId === u.id ? 'Fechar' : 'Avaliar'}
+                                      <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold bg-yellow-100 text-yellow-800">
+                                        <Edit size={14} /> {u.assessmentsCount}/{u.requiredAssessments}
+                                      </span>
+                                    )}
+                                  </td>
+                                )}
+                                {!viewOnly && (
+                                  <td className="px-6 py-4 align-top">
+                                    <ul className="list-disc list-inside space-y-1">
+                                      {u.file_link && <li><a href={u.file_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Anexo</a></li>}
+                                      {u.formsData && Object.keys(u.formsData).length > 0 && <li><a href={sheetLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Formulário</a></li>}
+                                    </ul>
+                                  </td>
+                                )}
+                                <td className="px-6 py-4 text-center align-top">
+                                  <div className="flex flex-col gap-2">
+                                    <button onClick={() => { setSelectedUser(u); setShowModal(true); }} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center justify-center gap-1">
+                                      <Contact size={16} /> Contatos
+                                    </button>
+                                    {inscricoesTab === 'eventos' && (
+                                      <button onClick={() => { setSelectedUser(u); setOpenAccordionId(u.id); }} className="text-purple-600 hover:text-purple-800 font-medium text-sm flex items-center justify-center gap-1">
+                                        <Scale size={16} /> Avaliar
                                       </button>
                                     )}
+                                    <button onClick={() => handleToggleAccordion(u.id)} className="text-gray-600 hover:text-gray-800 font-medium text-sm flex items-center justify-center gap-1">
+                                      <Eye size={16} /> Detalhes
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
-
-                              {openAccordionId === u.id && viewOnly && (
-                                <tr>
-                                  <td colSpan={10}>
-                                    <AnimatePresence>
-                                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                                        <EvaluationDrawer 
-                                          user={u} 
-                                          criteria={evaluationCriteria} 
-                                          evaluatorEmail={evaluatorEmail} 
-                                          onSaveSuccess={fetchData}
-                                        />
-                                      </motion.div>
-                                    </AnimatePresence>
+                              <AnimatePresence>
+                                {openAccordionId === u.id && (
+                                  <motion.tr initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }}>
+                                    <td colSpan={viewOnly ? 6 : 8} className="p-0">
+                                      <div className="bg-gray-50 p-6 border-t border-b border-gray-200">
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                          <div className="lg:col-span-2 space-y-6">
+                                            <Section icon={<FileText size={22} className="text-purple-600" />} title="Ficha de Inscrição Detalhada">
+                                              {u.formsData && Object.keys(u.formsData).length > 0 ? (
+                                                <>
+                                                  {Object.keys(u.formsData).map(key => {
+                                                    if (key.toLowerCase().includes("carimbo de data/hora") || key.toLowerCase().includes("timestamp") || !u.formsData[key]) return null;
+                                                    return <InfoRow key={key} label={key} value={u.formsData[key]} />;
+                                                  })}
+                                                </>
+                                              ) : (
+                                                <p className="text-gray-500 italic">Formulário de Etapa 2 não preenchido.</p>
+                                              )}
+                                            </Section>
+                                            <Section icon={<Archive size={22} className="text-orange-600" />} title="Arquivos e Links">
+                                              <InfoRow label="Link do Arquivo" value={u.file_link ? <a href={u.file_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{u.file_link}</a> : "N/A"} />
+                                              <InfoRow label="Link do Formulário" value={sheetLink ? <a href={sheetLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{sheetLink}</a> : "N/A"} />
+                                            </Section>
+                                          </div>
+                                          <div className="lg:col-span-1 space-y-6">
+                                            <Section icon={<FileClock size={22} className="text-teal-600" />} title="Dados de Registro">
+                                              <InfoRow label="Data de Inscrição" value={new Date(u.timestamp).toLocaleString('pt-BR')} />
+                                              <InfoRow label="ID da Inscrição" value={u.id} />
+                                              <InfoRow label="Local" value={u.local === 'teatro' ? 'Teatro' : 'Igrejinha'} />
+                                              <InfoRow label="Conflito de Agenda" value={u.hasConflict ? <span className="text-red-600 font-semibold">Sim</span> : <span className="text-green-600 font-semibold">Não</span>} />
+                                              {u.conflictGroup !== null && <InfoRow label="Grupo de Conflito" value={u.conflictGroup} />}
+                                            </Section>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </motion.tr>
+                                )}
+                              </AnimatePresence>
+                              {openAccordionId === u.id && inscricoesTab === 'eventos' && (
+                                <motion.tr initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }}>
+                                  <td colSpan={viewOnly ? 6 : 8} className="p-0">
+                                    <div className="bg-white p-6 border-t border-gray-200">
+                                      <EvaluationDrawer 
+                                        user={u} 
+                                        criteria={evaluationCriteria} 
+                                        evaluatorEmail={evaluatorEmail}
+                                        onSaveSuccess={fetchData}
+                                      />
+                                    </div>
                                   </td>
-                                </tr>
+                                </motion.tr>
                               )}
                             </React.Fragment>
                           ))
                         ) : (
                           <tr>
-                            <td colSpan={8} className="text-center py-10 text-gray-500">{`Nenhuma inscrição de '${inscricoesTab}' encontrada.`}</td>
+                            <td colSpan={viewOnly ? 6 : 8} className="px-6 py-4 text-center text-gray-500">Nenhuma inscrição encontrada com os filtros atuais.</td>
                           </tr>
                         )}
                       </tbody>
@@ -781,224 +810,146 @@ const Admin = ({ viewOnly = false }) => {
                 )}
               </div>
             )}
+
             {mainTab === 'configuracoes_gerais' && !viewOnly && (
-              <div className="space-y-8">
-                
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Type size={20} /> Título da Página de Agendamento</h3>
-                  <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
+                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
+                    <Settings size={20} /> Configurações de Agendamento
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block font-semibold text-gray-600 mb-2">Título do Edital Atual</label>
-                      <input type="text" value={pageTitle} onChange={(e) => setPageTitle(e.target.value)} className="p-3 border rounded-lg w-full" />
+                      <label className="block font-semibold text-gray-600 mb-1">Título da Página</label>
+                      <input type="text" value={pageTitle} onChange={(e) => setPageTitle(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-gray-600 mb-1">Link da Planilha (Google Sheets)</label>
+                      <input type="text" value={sheetLink} onChange={(e) => setSheetLink(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-gray-600 mb-1">Link do Formulário (Etapa 2)</label>
+                      <input type="text" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-gray-700">
+                        <input type="checkbox" checked={allowBookingOverlap} onChange={(e) => setAllowBookingOverlap(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        Permitir Agendamentos Sobrepostos
+                      </label>
                     </div>
                   </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ pageTitle })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Título
+                  <div className="mt-6 border-t pt-6">
+                    <button onClick={() => handleSaveConfig({ pageTitle, sheetLink, formLink, allowBookingOverlap })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
+                      <Save size={18} /> Salvar Configurações Gerais
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetLink} onChange={(e) => setSheetLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                  </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsLink: formLink, sheetLink: sheetLink })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar Links</button></div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <Settings size={20} /> Controle da Página Inicial
+                    <Type size={20} /> Botões da Página Inicial
                   </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div><label htmlFor="enable-internal" className="font-semibold text-gray-700">Ativar "Edital Interno"</label></div>
-                      <label htmlFor="enable-internal" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="enable-internal" className="sr-only peer" checked={enableInternalEdital} onChange={() => setEnableInternalEdital(!enableInternalEdital)} />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-gray-700">
+                        <input type="checkbox" checked={enableInternalEdital} onChange={(e) => setEnableInternalEdital(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        Habilitar Botão "Edital Interno"
                       </label>
                     </div>
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="enable-external-edital" className="font-semibold text-gray-700">Ativar "Edital Externo"</label>
-                        <label htmlFor="enable-external" className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" id="enable-external" className="sr-only peer" checked={enableExternalEdital} onChange={() => setEnableExternalEdital(!enableExternalEdital)} />
-                          <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-                      <div className="mt-4">
-                        <label htmlFor="external-edital-text" className="block text-sm font-medium text-gray-500">Texto do Botão</label>
-                        <input
-                          id="external-edital-text"
-                          type="text"
-                          value={buttonExternalEditalText}
-                          onChange={(e) => setButtonExternalEditalText(e.target.value)}
-                          className="p-2 border rounded-lg w-full text-sm"
-                          maxLength="50"
-                        />
-                      </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-gray-700">
+                        <input type="checkbox" checked={enableExternalEdital} onChange={(e) => setEnableExternalEdital(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        Habilitar Botão "Edital NOVO"
+                      </label>
                     </div>
-
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div><label htmlFor="enable-rehearsal" className="font-semibold text-gray-700">Ativar "Agendar Apenas Ensaio"</label></div>
-                      <label htmlFor="enable-rehearsal" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="enable-rehearsal" className="sr-only peer" checked={enableRehearsal} onChange={() => setEnableRehearsal(!enableRehearsal)} />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    <div>
+                      <label className="block font-semibold text-gray-600 mb-1">Texto do Botão "Edital NOVO"</label>
+                      <input type="text" value={buttonExternalEditalText} onChange={(e) => setButtonExternalEditalText(e.target.value)} className="p-2 border rounded-md w-full" />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-gray-700">
+                        <input type="checkbox" checked={enableRehearsal} onChange={(e) => setEnableRehearsal(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                        Habilitar Botão "Agendar Apenas Ensaio"
                       </label>
                     </div>
                   </div>
-                  <div className="mt-6">
+                  <div className="mt-6 border-t pt-6">
                     <button onClick={() => handleSaveConfig({ enableInternalEdital, enableExternalEdital, enableRehearsal, buttonExternalEditalText })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Status dos Botões
+                      <Save size={18} /> Salvar Configurações de Botões
                     </button>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-md">
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <Settings size={20} /> Regras do Calendário
+                    <FileClock size={20} /> Bloqueio de Datas
                   </h3>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <label htmlFor="allow-overlap" className="font-semibold text-gray-700">Permitir Disputa de Horários</label>
-                      <p className="text-sm text-gray-500">
-                        Se ativado, permite que múltiplos proponentes solicitem o mesmo horário, gerando uma disputa.
-                      </p>
-                    </div>
-                    <label htmlFor="allow-overlap" className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" id="allow-overlap" className="sr-only peer" checked={allowBookingOverlap} onChange={() => setAllowBookingOverlap(!allowBookingOverlap)} />
-                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ allowBookingOverlap: allowBookingOverlap })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Regra do Calendário
+                  <div className="flex gap-2">
+                    <input type="date" value={dateToToggle} onChange={(e) => setDateToToggle(e.target.value)} className="p-2 border rounded-md" />
+                    <button onClick={handleToggleDate} className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600">
+                      {blockedDates.includes(dateToToggle) ? 'Desbloquear' : 'Bloquear'} Data
                     </button>
                   </div>
-                </div>
-
-                {/* ✅ NOVO PAINEL DE CONTROLE DE CALENDÁRIO */}
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <FileClock size={20} /> Controle de Horários e Datas
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Configuração de Horários */}
-                    <div className="border p-4 rounded-lg">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-700">Horários Limite por Etapa</h4>
-                      <p className="text-sm text-gray-500 mb-4">Defina o horário de início mais cedo e o horário de fim mais tarde permitidos para cada tipo de agendamento.</p>
-                      {Object.keys(stageTimes).map((stage) => (
-                        <div key={stage} className="flex items-center gap-4 mb-3">
-                          <label className="w-24 capitalize font-medium text-gray-600">{stage}:</label>
-                          <input
-                            type="time"
-                            value={stageTimes[stage].start}
-                            onChange={(e) => setStageTimes(prev => ({ ...prev, [stage]: { ...prev[stage], start: e.target.value } }))}
-                            className="p-2 border rounded-lg text-sm w-28"
-                          />
-                          <span className="text-gray-500">-</span>
-                          <input
-                            type="time"
-                            value={stageTimes[stage].end}
-                            onChange={(e) => setStageTimes(prev => ({ ...prev, [stage]: { ...prev[stage], end: e.target.value } }))}
-                            className="p-2 border rounded-lg text-sm w-28"
-                          />
-                        </div>
+                  <div className="mt-4">
+                    <p className="font-semibold text-gray-600 mb-2">Datas Bloqueadas Atualmente:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {blockedDates.map(date => (
+                        <span key={date} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold bg-red-100 text-red-800 cursor-pointer hover:bg-red-200" onClick={() => handleToggleDateFromList(date)}>
+                          {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} <X size={12} />
+                        </span>
                       ))}
-                      <div className="mt-4">
-                        <button onClick={() => handleSaveConfig({ stageTimes })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                          <Save size={18} /> Salvar Horários
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Bloqueio de Datas */}
-                    <div className="border p-4 rounded-lg">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-700">Bloqueio de Datas Específicas</h4>
-                      <p className="text-sm text-gray-500 mb-4">Selecione uma data para bloquear ou desbloquear no calendário de agendamento.</p>
-                      <div className="flex gap-4 items-end">
-                        <div className="flex-grow">
-                          <label htmlFor="block-date" className="block font-medium text-gray-600 mb-2">Data a Bloquear/Desbloquear</label>
-                          <input
-                            type="date"
-                            id="block-date"
-                            className="p-2 border rounded-lg w-full"
-                            value={dateToToggle}
-                            onChange={(e) => setDateToToggle(e.target.value)}
-                          />
-                        </div>
-                        <button onClick={handleToggleDate} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 h-10" disabled={!dateToToggle}>
-                          <Save size={18} /> Salvar Datas
-                        </button>
-                      </div>
-                      <div className="mt-4">
-                        <h5 className="font-medium text-gray-600 mb-2">Datas Bloqueadas Atualmente:</h5>
-                        <div className="flex flex-wrap gap-2">
-                          {/* ✅ NOVA DATA TEMPORÁRIA (A SER SALVA) */}
-                          {dateToToggle && !blockedDates.includes(dateToToggle) && (
-                            <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm flex items-center gap-1 opacity-70">
-                              {new Date(dateToToggle + 'T00:00:00').toLocaleDateString('pt-BR')} (Prévia)
-                            </span>
-                          )}
-                          {blockedDates.length > 0 ? (
-                            blockedDates.map(date => (
-                              <span key={date} className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm flex items-center gap-1">
-                                {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                <button onClick={() => handleToggleDateFromList(date)} className="text-red-500 hover:text-red-700 ml-1">
-                                  <X size={14} />
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-gray-500 text-sm">Nenhuma data bloqueada.</span>
-                          )}
-                        </div>
-                      </div>
+                      {blockedDates.length === 0 && <span className="text-gray-500 italic">Nenhuma data bloqueada.</span>}
                     </div>
                   </div>
                 </div>
 
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
+                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
+                    <Type size={20} /> Horários Limite por Etapa
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {Object.keys(stageTimes).map(stage => (
+                      <div key={stage} className="border p-3 rounded-lg">
+                        <p className="font-semibold text-gray-700 capitalize mb-2">{stage}</p>
+                        <div className="flex gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-500">Início</label>
+                            <input type="time" value={stageTimes[stage].start} onChange={(e) => handleStageTimeChange(stage, 'start', e.target.value)} className="p-1 border rounded-md w-full text-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500">Fim</label>
+                            <input type="time" value={stageTimes[stage].end} onChange={(e) => handleStageTimeChange(stage, 'end', e.target.value)} className="p-1 border rounded-md w-full text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 border-t pt-6">
+                    <button onClick={handleSaveStageTimes} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
+                      <Save size={18} /> Salvar Horários Limite
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
+
             {mainTab === 'configuracoes_avaliacao' && !viewOnly && (
-              <div className="space-y-8">
-                {/* ✅ NOVO PAINEL DE REGRAS DE AVALIAÇÃO */}
-                <div className="bg-white p-6 rounded-2xl shadow-md">
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <UserCheck size={20} /> Regras de Avaliação
+                    <Scale size={20} /> Critérios de Avaliação
                   </h3>
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label htmlFor="required-assessments" className="block font-semibold text-gray-600 mb-2">
-                        Avaliações Necessárias por Inscrição
-                      </label>
-                      <input
-                        id="required-assessments"
-                        type="number"
-                        min="1"
-                        value={requiredAssessments}
-                        onChange={(e) => setRequiredAssessments(parseInt(e.target.value, 10) || 1)}
-                        className="p-3 border rounded-lg w-full max-w-xs"
-                      />
-                      <p className="text-sm text-gray-500 mt-2">
-                        Define o número de avaliações para uma inscrição ser considerada "concluída".
-                      </p>
+                  <div className="mb-4">
+                    <label className="block font-semibold text-gray-600 mb-1">Número de Avaliações Requeridas por Proposta</label>
+                    <input type="number" min="1" value={requiredAssessments} onChange={(e) => setRequiredAssessments(parseInt(e.target.value) || 1)} className="p-2 border rounded-md w-full max-w-xs" />
+                    <div className="mt-2">
+                      <button onClick={() => handleSaveConfig({ requiredAssessments })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
+                        <Save size={18} /> Salvar Número Requerido
+                      </button>
                     </div>
                   </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ requiredAssessments })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Regra de Avaliação
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Scale size={20} /> Critérios de Avaliação</h3>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {evaluationCriteria.map((crit) => (
-                      <div key={crit.id} className="p-4 border rounded-lg bg-gray-50 relative transition-all hover:shadow-sm">
+                      <div key={crit.id} className="relative border p-4 rounded-lg bg-gray-50">
                         <button onClick={() => handleRemoveCriterion(crit.id)} className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-100 rounded-full transition-colors" title="Remover Critério">
                           <Trash2 size={16} />
                         </button>
@@ -1030,7 +981,7 @@ const Admin = ({ viewOnly = false }) => {
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl shadow-md">
+                <div className="bg-white p-6 rounded-2xl shadow-md space-y-4">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
                     <UserCheck size={20} /> Gerenciar Avaliadores
                   </h3>
