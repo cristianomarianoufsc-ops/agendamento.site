@@ -164,7 +164,7 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const dadosProcessados = useMemo(() => {
+  const getDadosProcessados = () => {
     try {
       if (!isAuthenticated && !viewOnly) return []; // Adiciona verificação de autenticação
       if (loading || !unificados) return []; // Adiciona verificação de loading e unificados
@@ -329,7 +329,8 @@ const Admin = ({ viewOnly = false }) => {
       console.error("ERRO CRÍTICO NO USEMEMO:", error);
       return [];
     }
-  }, [unificados, localFilters, inscricoesTab, sortOrder, assessmentFilter, viewOnly, evaluatorEmail, conflictFilter]);
+  };
+  const dadosProcessados = getDadosProcessados();
 
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
 
