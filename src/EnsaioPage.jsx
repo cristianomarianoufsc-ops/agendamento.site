@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
-import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowLeft, PartyPopper, ChevronDown, XCircle, CheckCircle } from "lucide-react";
+import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowLeft, PartyPopper, ChevronDown, XCircle, CheckCircle, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal"; 
 
@@ -312,6 +312,17 @@ const EnsaioPage = () => {
                 />
               </div>
             </div>
+            {resumo.ensaio && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setCurrentStep("user_data")}
+                  className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-lg flex items-center gap-2"
+                >
+                  Continuar para Dados do Proponente
+                  <ArrowRight size={20} />
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
         {currentStep === "user_data" && (
