@@ -1077,6 +1077,6 @@ const Admin = ({ viewOnly = false }) => {
       )}
     </div>
   );
-};
+}
 
 export default Admin;
