@@ -165,9 +165,12 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const dadosProcessados = useMemo(() => {
-    if (!isAuthenticated && !viewOnly) return []; // Adiciona verificação de autenticação
-    if (loading || !unificados) return []; // Adiciona verificação de loading e unificados
-    let dadosParaProcessar = [...unificados];
+    try {
+      if (!isAuthenticated && !viewOnly) return []; // Adiciona verificação de autenticação
+      if (loading || !unificados) return []; // Adiciona verificação de loading e unificados
+      
+      console.log("DEBUG: Iniciando useMemo com unificados.length:", unificados.length);
+      let dadosParaProcessar = [...unificados];
 
     // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
     const conflitosPorSlot = new Map();
@@ -297,6 +300,35 @@ const Admin = ({ viewOnly = false }) => {
     });
 
     return dadosParaProcessar;
+      console.log("DEBUG: Finalizando useMemo com dadosProcessados.length:", dadosParaProcessar.length);
+      return dadosParaProcessar.sort((a, b) => {
+        // ✅ ORDENAÇÃO POR GRUPO DE CONFLITO
+        if (conflictFilter) {
+          const aGroup = a.conflictGroup ?? Infinity;
+          const bGroup = b.conflictGroup ?? Infinity;
+          if (aGroup !== bGroup) {
+            return aGroup - bGroup;
+          }
+        }
+
+        if (viewOnly) {
+          const aHasBeenAssessedByMe = a.evaluatorsWhoAssessed?.includes(evaluatorEmail);
+          const bHasBeenAssessedByMe = b.evaluatorsWhoAssessed?.includes(evaluatorEmail);
+
+          if (aHasBeenAssessedByMe && !bHasBeenAssessedByMe) return 1;
+          if (!aHasBeenAssessedByMe && bHasBeenAssessedByMe) return -1;
+        }
+      
+        switch (sortOrder) {
+          case 'nota_desc': return (b.finalScore ?? -1) - (a.finalScore ?? -1);
+          case 'nota_asc': return (a.finalScore ?? Infinity) - (b.finalScore ?? Infinity);
+          case 'id_asc': default: return a.id - b.id;
+        }
+      });
+    } catch (error) {
+      console.error("ERRO CRÍTICO NO USEMEMO:", error);
+      return [];
+    }
   }, [unificados, localFilters, inscricoesTab, sortOrder, assessmentFilter, viewOnly, evaluatorEmail, conflictFilter]);
 
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
