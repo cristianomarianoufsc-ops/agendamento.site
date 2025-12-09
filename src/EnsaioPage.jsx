@@ -296,7 +296,7 @@ const EnsaioPage = () => {
 
         fetchOccupiedSlots(localSelecionado, currentMonth);
         setFirstStepDone(true);
-        setAlertMessage({type: 'success', text: "Ensaio agendado com sucesso!"});
+        setAlertMessage({type: 'success', text: "Ensaio agendado com sucesso! Prossiga para a próxima etapa."});
       } else {
         setAlertMessage({type: 'error', text: result.error || "Erro ao salvar evento."});
       }
@@ -308,6 +308,12 @@ const EnsaioPage = () => {
   };
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio;
+
+  const handleGoToSecondStep = () => {
+    // Lógica placeholder para a segunda etapa
+    setAlertMessage({type: 'warning', text: "A segunda etapa ainda não está implementada."});
+    setTimeout(() => setAlertMessage(null), 3000);
+  };
 
   const handleFinalize = () => {
     setShowCompletionMessage(true);
@@ -533,9 +539,18 @@ const EnsaioPage = () => {
 	                </ul>
 
 	                <div className="mt-6 border-t pt-6">
-	                  <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
-	                      Finalizar Agendamento
-	                  </button>
+	                  {!firstStepDone ? (
+	                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
+	                      Confirmar 1ª Etapa e Agendar
+	                    </button>
+	                  ) : (
+	                    <div className="space-y-3">
+	                      <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Etapa 1 Concluída!</div>
+	                      <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
+	                        Ir para a 2ª Etapa <ArrowRight size={20}/>
+	                      </button>
+	                    </div>
+	                  )}
 	                </div>
 	              </div>
 	            </div>
