@@ -42,23 +42,69 @@ const EnsaioPage = () => {
   const stageOrder = ["ensaio"];
 
   // --- FUNÇÕES DE LÓGICA ---
-  const fetchOccupiedSlots = async (local) => {
+  const fetchOccupiedSlots = async (local, currentMonth) => {
     try {
-      const response = await fetch(`/ical/${local}/horarios`);
-      const data = await response.json();
+      const now = new Date();
       const occupiedByDate = {};
-      (data.eventos || []).forEach((event) => {
-        const start = new Date(event.start);
-        const end = new Date(event.end);
-        end.setMinutes(end.getMinutes() + 30);
-        const dateString = start.toISOString().split("T")[0];
-        const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-        const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-        if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
-        occupiedByDate[dateString].push({ start: startTime, end: endTime });
-      });
+      
+      // Busca eventos dos próximos 12 meses (lógica copiada do App.jsx)
+      for (let i = 0; i < 12; i++) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const year = monthDate.getFullYear();
+        const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
+        
+        try {
+          const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
+          
+          if (!response.ok) {
+            console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
+            continue;
+          }
+          
+          let data;
+          try {
+            data = await response.json();
+          } catch (e) {
+            console.error(`❌ Erro ao processar JSON para ${year}-${month}:`, e);
+            console.error("Resposta da API (texto):", await response.text());
+            continue;
+          }
+          
+          if (!data || !data.eventos) {
+            console.warn(`⚠️ Dados de eventos incompletos para ${year}-${month}`);
+            continue;
+          }
+          
+          // Processa eventos do mês
+          (data.eventos || []).forEach((event) => {
+            if (!event || !event.start || !event.end) return;
+            const start = new Date(event.start);
+            const end = new Date(event.end);
+            
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+              console.warn("⚠️ Evento com data inválida ignorado:", event);
+              return;
+            }
+            
+            end.setMinutes(end.getMinutes() + 30);
+            const dateString = start.toISOString().split("T")[0];
+            const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+            const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+            
+            if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+            occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
+          });
+        } catch (monthError) {
+          console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
+          continue;
+        }
+      }
+      
       setBackendOcupados(occupiedByDate);
-    } catch (error) { console.error("❌ Erro ao buscar eventos:", error); setBackendOcupados({}); }
+    } catch (error) {
+      console.error("❌ Erro ao buscar eventos:", error);
+      setBackendOcupados({});
+    }
   };
 
   const handleLocalSelect = (local) => { setLocalSelecionado(local); setCurrentStep("calendar"); };
@@ -239,12 +285,13 @@ const EnsaioPage = () => {
             <div className="flex flex-col lg:flex-row gap-6">
               <div className="lg:w-1/2">
                 <Calendar
-                  local={localSelecionado}
-                  occupiedSlots={backendOcupados}
-                  selectedDate={selectedDate}
                   onDateSelect={handleDateSelect}
+                  selectedDate={selectedDate}
                   currentMonth={currentMonth}
-                  setCurrentMonth={setCurrentMonth}
+                  onMonthChange={setCurrentMonth}
+                  disabledDates={[]} // Não há blockedDates no EnsaioPage
+                  eventDates={Object.keys(backendOcupados)}
+                  mainEventDatesSelected={resumo.ensaio ? [new Date(resumo.ensaio.date)] : []}
                 />
               </div>
               <div className="lg:w-1/2">
