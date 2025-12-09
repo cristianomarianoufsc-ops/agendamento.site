@@ -757,7 +757,7 @@ const handleSendEmail = async () => {
 <TimeBlockSelector
                                       selectedDate={selectedDate}
                                       timeSlots={timeSlots}
-                                      selectedTimes={stageTimes}
+                                      selectedTimes={stageTimes || {}}
                                       onSelectTime={handleTimeSelection}
                                       occupiedSlots={selectedDate ? getOccupiedSlots(selectedDate, selectedStage) : []}
                                       stage={selectedStage}

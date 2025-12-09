@@ -23,7 +23,7 @@ const TimeBlockSelector = ({
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const isToday = selectedDate && selectedDate.getTime() === today.getTime();
-  const { startTime, endTime } = selectedTimes;
+  const { startTime, endTime } = selectedTimes || {};
 
   return (
     <div className="w-full">
