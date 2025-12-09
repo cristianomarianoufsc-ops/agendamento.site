@@ -1,3 +1,4 @@
+// Comentário para forçar o reconhecimento da alteração no Render
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
