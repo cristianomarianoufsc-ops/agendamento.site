@@ -71,11 +71,69 @@ const Admin = ({ viewOnly = false }) => {
   const [sortOrder, setSortOrder] = useState('id_asc');
   const [assessmentFilter, setAssessmentFilter] = useState('todos');
   const [evaluatorEmail, setEvaluatorEmail] = useState(localStorage.getItem('evaluatorEmail') || '');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
-  const [evaluatorPassword, setEvaluatorPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Inicia como não autenticado
+  const [passwordInput, setPasswordInput] = useState('');
+  const FIXED_PASSWORD = "admin.dac.ufsc";
+
+  // Verifica a autenticação ao carregar
+  useEffect(() => {
+    const storedAuth = localStorage.getItem('adminAuthenticated');
+    if (storedAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === FIXED_PASSWORD) {
+      setIsAuthenticated(true);
+      localStorage.setItem('adminAuthenticated', 'true');
+      setPasswordInput('');
+    } else {
+      alert("Senha incorreta. Tente novamente.");
+      setPasswordInput('');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('adminAuthenticated');
+  };
   const [conflictFilter, setConflictFilter] = useState(false);
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
+
+  if (!isAuthenticated && !viewOnly) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-2xl">
+          <h2 className="text-2xl font-bold text-center text-gray-800">Acesso Restrito - Painel Admin</h2>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">Senha de Administrador</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Digite a senha"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Entrar
+            </button>
+          </form>
+          <p className="text-xs text-center text-gray-500">A senha é fixa: "admin.dac.ufsc"</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   // ✅ NOVA FUNÇÃO: Processa a data temporária e salva no estado blockedDates
   const handleToggleDate = () => {
@@ -360,10 +418,11 @@ const Admin = ({ viewOnly = false }) => {
       alert("Erro ao tentar conectar com o servidor.");
     }
   };
-  const handleViewerLogout = () => {
+   const handleViewerLogout = () => {
     localStorage.removeItem('evaluatorEmail');
-    setIsAuthenticated(false); // DEFINE COMO DESAUTENTICADO
-    window.location.reload();
+    // Não altera o isAuthenticated do Admin, apenas do avaliador
+    setEvaluatorEmail('');
+  };  window.location.reload();
   };
 
   const handleCriterionChange = (id, field, value) => {
