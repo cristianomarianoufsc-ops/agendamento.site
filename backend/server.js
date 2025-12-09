@@ -253,7 +253,6 @@ async function getEvaluationCriteria() {
 }
 
 // --- 5. CACHE DE EVENTOS DO CALENDÁRIO ---
-console.log("✅ CRON JOB ATIVO: O cache será atualizado a cada 5 minutos.");
 let cacheEventos = {};
 async function atualizarCache() {
   try {
@@ -1190,49 +1189,73 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
   if (!calendarIds[local]) {
     return res.status(400).json({ error: "Local não encontrado." });
   }
+  
   try {
-    console.log(`\n\n🔍 REQUISIÇÃO: /api/occupied-slots/${local}/${month}`);
-    // A rota está buscando diretamente do Google Calendar, e não do cache.
-    // Isso pode sobrecarregar a API e não refletir o cache atualizado.
-    // Vamos usar o cache se a data estiver dentro do período de cache (12 meses).
-    // Para fins de debug, vamos manter a busca direta por enquanto, mas adicionar um log.
-    console.log(`⚠️ ATENÇÃO: A rota /api/occupied-slots está buscando diretamente do Google Calendar para o mês ${month}.`);
-    
     const [year, monthNum] = month.split('-');
-    const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
+    const targetMonth = parseInt(monthNum);
+    const targetYear = parseInt(year);
+    
+    // 1. Tenta usar o cache
+    if (cacheEventos[local] && cacheEventos[local].length > 0) {
+      const eventosDoCache = cacheEventos[local].filter(event => {
+        const eventStart = new Date(event.start.dateTime || event.start.date);
+        return eventStart.getFullYear() === targetYear && eventStart.getMonth() + 1 === targetMonth;
+      });
+      
+      // 2. Processa os eventos do cache
+      const eventosProcessados = eventosDoCache.map((event) => {
+        const props = event.extendedProperties?.private || {};
+        const isManaged = props.managedBy === 'sistema-edital-dac';
+        const isContestable = props.status === 'pending_evaluation';
+        
+        return {
+          id: event.id,
+          summary: event.summary,
+          start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
+          end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
+          isContestable: isContestable
+        };
+      }).filter(e => e.start && e.end);
+      
+      // console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados do CACHE para ${local}/${month}.`);
+      return res.json({ eventos: eventosProcessados });
+    }
+    
+    // 3. Se o cache estiver vazio (ex: na primeira inicialização antes do cron rodar), faz a busca direta (fallback)
+    // console.log(`⚠️ FALLBACK: Cache vazio. Buscando diretamente do Google Calendar para ${local}/${month}.`);
+    
+    const startDate = new Date(targetYear, targetMonth - 1, 1);
+    const endDate = new Date(targetYear, targetMonth, 0);
+    
     const events = await calendar.events.list({
       calendarId: calendarIds[local],
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
-      fields: 'items(id,summary,start,end,extendedProperties)' // Otimiza a resposta
+      fields: 'items(id,summary,start,end,extendedProperties)'
     });
     
-    // ✅ PROCESSA OS EVENTOS ANTES DE ENVIAR (igual ao server.js antigo)
     const eventosProcessados = (events.data.items || []).map((event) => {
       const props = event.extendedProperties?.private || {};
       const isManaged = props.managedBy === 'sistema-edital-dac';
-      const isContestable = isManaged && props.status === 'pending_evaluation';
+      const isContestable = props.status === 'pending_evaluation';
       
       return {
         id: event.id,
         summary: event.summary,
-        // ✅ EXTRAI dateTime ou date com fallback
         start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
         end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
         isContestable: isContestable
       };
-    }).filter(e => e.start && e.end); // Remove eventos sem data válida
+    }).filter(e => e.start && e.end);
     
+    // console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados do FALLBACK para ${local}/${month}.`);
     res.json({ eventos: eventosProcessados });
-    console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados para ${local}/${month}.`);
+    
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
-    // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
-    console.log("⚠️ Retornando lista vazia de eventos devido a erro na autenticação");
-    res.json({ eventos: [] });
+    res.status(500).json({ error: "Erro ao buscar eventos do calendário." });
   }
 });
 
@@ -1857,8 +1880,6 @@ app.use((req, res) => {
 
 
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
-// A rotina cron já está aqui, mas vamos garantir que ela seja chamada.
-// A função atualizarCache será chamada uma vez na inicialização e a cada 5 minutos.
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}` );
   cron.schedule("*/5 * * * *", atualizarCache);
