@@ -12,7 +12,7 @@ const AppVertical = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ evento: null });
+  const [resumo, setResumo] = useState({ evento: [] }); // Array para múltiplos eventos (máx 6)
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -240,14 +240,25 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     // Slots que o usuário JÁ CONFIRMOU nesta sessão
     const localSlots = [];
   stageOrder.forEach((etapa) => {
-// ✅ VALIDAÇÃO COMPLETA: Verifica se existe E se tem todas as propriedades necessárias
-if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
-  if (resumo[etapa].date.split("T")[0] === dateString) {
-    localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
-  }
-}
-// ...
-
+    if (etapa === 'evento') {
+      // Para eventos, processa o array
+      if (resumo.evento && Array.isArray(resumo.evento)) {
+        resumo.evento.forEach(evt => {
+          if (evt && evt.date && evt.start && evt.end) {
+            if (evt.date.split("T")[0] === dateString) {
+              localSlots.push({ start: evt.start, end: evt.end, isContestable: true });
+            }
+          }
+        });
+      }
+    } else {
+      // Para outras etapas, processa normalmente
+      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+        if (resumo[etapa].date.split("T")[0] === dateString) {
+          localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
+        }
+      }
+    }
   });
   
   const result = [...backendSlots, ...localSlots];
@@ -287,21 +298,51 @@ const newEnd = toMinutes(newEntry.end);
     }
   }
 
-  // ✅ VALIDAÇÃO: Verifica duplicação para evento
-  if (etapa === "evento" && resumo.evento && resumo.evento.date === newEntry.date && resumo.evento.start === newEntry.start && resumo.evento.end === newEntry.end) return;
-
-  setResumo((prev) => {
-    const novoResumo = { ...prev };
-    novoResumo[etapa] = newEntry; // ✅ TRATA EVENTO IGUAL AOS OUTROS
-
-    if (etapa !== "evento") {
+  // ✅ NOVA LÓGICA: Trata eventos como array
+  if (etapa === "evento") {
+    // Verifica se já atingiu o limite de 6 eventos
+    if (resumo.evento.length >= 6) {
+      setAlertMessage({ type: 'warning', text: "Você já atingiu o limite de 6 eventos!" });
+      setTimeout(() => setAlertMessage(null), 4000);
+      return;
+    }
+    
+    // Verifica duplicação
+    const isDuplicate = resumo.evento.some(evt => 
+      evt.date === newEntry.date && evt.start === newEntry.start && evt.end === newEntry.end
+    );
+    
+    if (isDuplicate) return;
+    
+    // Adiciona o novo evento ao array
+    setResumo((prev) => ({
+      ...prev,
+      evento: [...prev.evento, newEntry]
+    }));
+    
+    // Abre o modal de confirmação se ainda não atingiu o limite
+    if (resumo.evento.length < 5) { // Menos de 6 após adicionar este
+      setShowConfirmNextEventModal(true);
+    } else {
+      // Se atingiu 6 eventos, fecha tudo
       setSelectedStage(null);
       setSelectedDate(null);
       setStageTimes({ startTime: null, endTime: null });
+      setAlertMessage({ type: 'success', text: "Limite de 6 eventos atingido!" });
+      setTimeout(() => setAlertMessage(null), 4000);
     }
+  } else {
+    // Para outras etapas (ensaio, montagem, desmontagem)
+    setResumo((prev) => {
+      const novoResumo = { ...prev };
+      novoResumo[etapa] = newEntry;
+      return novoResumo;
+    });
     
-    return novoResumo;
-  });
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
 };
 
 
@@ -350,7 +391,13 @@ const newEnd = toMinutes(newEntry.end);
       const novoResumo = { ...resumo };
       // Processa as remoções
       pendingRemovals.forEach(r => {
-        delete novoResumo[r.etapa]; // ✅ TRATA EVENTO IGUAL AOS OUTROS
+        if (r.etapa === 'evento' && r.idx !== undefined) {
+          // Remove um evento específico do array
+          novoResumo.evento = novoResumo.evento.filter((_, index) => index !== r.idx);
+        } else {
+          // Remove outras etapas normalmente
+          delete novoResumo[r.etapa];
+        }
       });
       setResumo(novoResumo);
 
@@ -358,7 +405,7 @@ const newEnd = toMinutes(newEntry.end);
       setAlertMessage({ type: 'success', text: "Cancelamento confirmado!" });
 
       // Verifica se o resumo ficou vazio após a remoção
-      const resumoVazio = !novoResumo.ensaio && !novoResumo.montagem && !novoResumo.desmontagem && !novoResumo.evento;
+      const resumoVazio = !novoResumo.ensaio && !novoResumo.montagem && !novoResumo.desmontagem && (!novoResumo.evento || novoResumo.evento.length === 0);
       if (resumoVazio) {
         setFirstStepDone(false); // Reseta o fluxo se tudo foi cancelado
       }
@@ -375,9 +422,20 @@ const handleSendEmail = async () => {
   try {
     const etapas = [];
     stageOrder.forEach(etapa => {
-      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
-        // ✅ VALIDAÇÃO: Verifica se todas as propriedades existem
-        etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
+      if (etapa === 'evento') {
+        // Para eventos, processa o array
+        if (resumo.evento && Array.isArray(resumo.evento)) {
+          resumo.evento.forEach(evt => {
+            if (evt.date && evt.start && evt.end) {
+              etapas.push({ nome: etapa, inicio: `${evt.date.split("T")[0]}T${evt.start}:00`, fim: `${evt.date.split("T")[0]}T${evt.end}:00` });
+            }
+          });
+        }
+      } else {
+        // Para outras etapas, processa normalmente
+        if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+          etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
+        }
       }
     });
 
@@ -400,10 +458,22 @@ const handleSendEmail = async () => {
 
       // Lógica corrigida para associar os eventIds
       const novoResumoComIds = { ...resumo };
+      
+      // Contador para eventos múltiplos
+      let eventoIndex = 0;
 
       result.eventos.forEach(eventoCriado => {
-        if (novoResumoComIds[eventoCriado.etapa]) {
-          novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
+        if (eventoCriado.etapa === 'evento') {
+          // Para eventos, adiciona o eventId ao item correspondente no array
+          if (novoResumoComIds.evento && novoResumoComIds.evento[eventoIndex]) {
+            novoResumoComIds.evento[eventoIndex].eventId = eventoCriado.id;
+            eventoIndex++;
+          }
+        } else {
+          // Para outras etapas, funciona como antes
+          if (novoResumoComIds[eventoCriado.etapa]) {
+            novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
+          }
         }
       });
 
@@ -426,7 +496,7 @@ const handleSendEmail = async () => {
   }
 };
 
-  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento;
+  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
 
   const handleGoToSecondStep = async () => {
     try {
@@ -626,7 +696,7 @@ const handleSendEmail = async () => {
 	                </p>
                 <div className="flex flex-col space-y-3">
                   {stageOrder.map((etapa) => {
-                    const isDisabled = (etapa === "desmontagem" && !resumo.evento);
+                    const isDisabled = (etapa === "desmontagem" && (!resumo.evento || resumo.evento.length === 0));
                     const isSelected = selectedStage === etapa;
 
                     return (
@@ -663,9 +733,8 @@ const handleSendEmail = async () => {
               disabledDates={blockedDates} // Passando as datas bloqueadas
               eventDates={Object.keys(backendOcupados)}
               mainEventDatesSelected={(() => {
-                if (!resumo.evento || !resumo.evento.date) return [];
-                const d = new Date(resumo.evento.date);
-                return isNaN(d.getTime()) ? [] : [d];
+                if (!resumo.evento || !Array.isArray(resumo.evento) || resumo.evento.length === 0) return [];
+                return resumo.evento.map(evt => new Date(evt.date)).filter(d => !isNaN(d.getTime()));
               })()}
             />
                                 <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
@@ -717,20 +786,35 @@ const handleSendEmail = async () => {
                 <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
                 <ul className="space-y-3 text-sm text-gray-600">
                   {stageOrder.flatMap((etapa) => {
-                    if (resumo[etapa]) {
-                      const item = resumo[etapa];
-                      // ✅ VALIDAÇÃO: Verifica se o item tem todas as propriedades necessárias
-                      if (!item || !item.date || !item.start || !item.end) return null;
-                      return (
-                        <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                          <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
-                          <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-                        </li>
-                      );
+                    if (etapa === 'evento') {
+                      // Para eventos, exibe todos os itens do array
+                      if (resumo.evento && Array.isArray(resumo.evento) && resumo.evento.length > 0) {
+                        return resumo.evento.map((evt, idx) => {
+                          if (!evt || !evt.date || !evt.start || !evt.end) return null;
+                          return (
+                            <li key={`evento-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                              <div><span className="font-semibold text-gray-800">Evento {idx + 1}:</span> {new Date(evt.date).toLocaleDateString("pt-BR")} | {evt.start} - {evt.end}</div>
+                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa: 'evento', idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+                            </li>
+                          );
+                        });
+                      }
+                    } else {
+                      // Para outras etapas, exibe normalmente
+                      if (resumo[etapa]) {
+                        const item = resumo[etapa];
+                        if (!item || !item.date || !item.start || !item.end) return null;
+                        return (
+                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                            <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+                          </li>
+                        );
+                      }
                     }
                     return [];
                   })}
-                  {!resumo.evento && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
+                  {(!resumo.evento || resumo.evento.length === 0) && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
                 </ul>
 
                 {pendingRemovals.length > 0 && (
