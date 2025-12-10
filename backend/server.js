@@ -1238,7 +1238,11 @@ app.delete("/api/inscricao/:id", async (req, res) => {
           await calendar.events.delete({ calendarId: calendarIds[local], eventId });
           console.log(`   ✅ Evento ${eventId} deletado.`);
         } catch (err) {
-          console.error(`   ❌ Falha ao deletar evento ${eventId}:`, err.message);
+          console.error(`   ❌ Falha ao deletar evento ${eventId} no Google Calendar:`, err.message);
+          // Adiciona log detalhado para diagnóstico
+          if (err.code === 403) {
+            console.error(`   ⚠️ ERRO 403: Permissão negada. Verifique se as credenciais têm permissão de escrita/deleção no Google Calendar.`);
+          }
           // Continua para o próximo, não impede a exclusão no DB
         }
       }
