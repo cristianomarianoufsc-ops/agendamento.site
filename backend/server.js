@@ -172,6 +172,15 @@ const calendarIds = {
 // --- 3. CONFIGURACAO DO NODEMAILER (SMTP Gmail) ---
 let transporter = null;
 
+// --- 3.1. CONFIGURACAO DO RESEND ---
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+if (resend) {
+  console.log('✅ Serviço de e-mail Resend configurado com sucesso!');
+} else {
+  console.warn('⚠️ Variável RESEND_API_KEY não encontrada. O Resend está desabilitado.');
+}
+
 if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -1484,11 +1493,36 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
   };
 
   try {
-    // ⚠️ TEMPORARIAMENTE DESABILITADO: Envio de e-mail comentado
     console.log(`✅ Tentando enviar e-mail de confirmação da Etapa 1 para: ${email}`);
+
+    if (resend) {
+      // Tenta enviar via Resend
+      const fromEmail = process.env.EMAIL_USER || 'noreply@agendamento.site';
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: [email],
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      });
+
+      if (error) {
+        console.error(`❌ Erro ao enviar e-mail via Resend para ${email}:`, error);
+        // Continua para o fallback do Nodemailer
+      } else {
+        console.log(`✅✅✅ E-mail enviado com sucesso via Resend! ID: ${data.id}`);
+        return true;
+      }
+    }
+
+    // Fallback para Nodemailer (se Resend falhou ou não está configurado)
+    if (!transporter) {
+      console.error('❌ Erro: Transporter de e-mail não configurado. O envio de e-mail falhou.');
+      return false;
+    }
+
     await transporter.sendMail(mailOptions);
     console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
-    return true; // Retorna sucesso para não quebrar o fluxo
+    return true;
   } catch (error) {
     console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
     return false;
