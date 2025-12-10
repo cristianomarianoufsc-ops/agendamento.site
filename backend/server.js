@@ -21,6 +21,7 @@ import bcrypt from "bcrypt";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
+import pdfGeneratorRouter from './pdfGenerator.js';
 
 // Define __dirname para ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -1860,7 +1861,10 @@ app.get("/api/download-zip/:id", async (req, res) => {
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
 // Servir arquivos estáticos (CSS, JS, Imagens)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '..', 'dist')));
+
+// --- Rota para geração de PDF ---
+app.use('/api', pdfGeneratorRouter);
 
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
 app.use((req, res) => {
