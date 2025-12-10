@@ -1592,7 +1592,7 @@ app.use("/slides-content", express.static("slides-edital-ufsc"));
 app.get("/api/consolidate-agenda-pdf", async (req, res) => {
   try {
     // 1. Buscar todas as inscrições
-    const result = await query('SELECT * FROM inscricoes ORDER BY finalScore DESC NULLS LAST');
+    const result = await query('SELECT * FROM inscricoes ORDER BY finalscore DESC NULLS LAST');
     const inscricoes = result.rows;
 
     // 2. Classificar e contar
