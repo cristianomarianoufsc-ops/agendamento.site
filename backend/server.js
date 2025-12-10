@@ -185,8 +185,8 @@ if (resend) {
 if (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY) {
   transporter = nodemailer.createTransport({
     host: 'smtp-relay.brevo.com',
-    port: 587,
-    secure: false,
+    port: 465, // Tentando porta 465
+    secure: true, // Ativando modo seguro para porta 465
     auth: {
       user: process.env.BREVO_SMTP_USER,
       pass: process.env.BREVO_SMTP_KEY
