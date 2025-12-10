@@ -190,7 +190,11 @@ if (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY) {
     auth: {
       user: process.env.BREVO_SMTP_USER,
       pass: process.env.BREVO_SMTP_KEY
-    }
+    },
+    // Aumentar o timeout para evitar "Connection timeout" no Render
+    // O Render pode ter latência na conexão externa
+    connectionTimeout: 30000, // 30 segundos
+    socketTimeout: 30000, // 30 segundos
   });
   console.log('✅ Servidor de e-mail Brevo SMTP configurado com sucesso!');
   console.log('   Host: smtp-relay.brevo.com');
