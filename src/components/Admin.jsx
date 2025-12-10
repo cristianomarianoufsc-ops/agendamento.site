@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import jsPDF from "jspdf";
 import "jspdf-autotable";
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
