@@ -1183,14 +1183,44 @@ app.post("/api/create-events", async (req, res) => {
 // --- ROTA PARA LIMPEZA GERAL (FORÇADA) ---
 app.post("/api/cleanup/force", async (req, res) => {
   try {
-    // 1. Deletar todas as avaliações (a tabela assessments deve ter ON DELETE CASCADE para inscricoes)
-    // Se não tiver, deletamos explicitamente.
+    // 1. Buscar todas as inscrições para obter os eventIds do Google Calendar
+    const allInscricoes = await query('SELECT * FROM inscricoes');
+    const allEventIdsToDelete = [];
+    const localMap = {}; // Mapeia eventId para o local (calendarId)
+
+    const addId = (id, local) => { if (id) { allEventIdsToDelete.push(id); localMap[id] = local; } };
+    const addJsonIds = (json, local) => {
+      try {
+        JSON.parse(json).forEach(e => addId(e.eventId, local));
+      } catch (e) { /* ignore */ }
+    };
+
+    allInscricoes.rows.forEach(inscricao => {
+      const local = inscricao.local;
+      addId(inscricao.ensaio_eventId, local);
+      addId(inscricao.montagem_eventId, local);
+      addId(inscricao.desmontagem_eventId, local);
+      addJsonIds(inscricao.eventos_json, local);
+    });
+
+    // 2. Deletar eventos do Google Calendar
+    if (allEventIdsToDelete.length > 0) {
+      console.log(`🗑️ Tentando deletar ${allEventIdsToDelete.length} eventos do Google Calendar na Limpeza Geral.`);
+      const deletePromises = allEventIdsToDelete.map(eventId => {
+        const local = localMap[eventId];
+        if (calendarIds[local]) {
+          return calendar.events.delete({ calendarId: calendarIds[local], eventId })
+            .then(() => console.log(`   ✅ Evento ${eventId} deletado do Calendar.`))
+            .catch(err => console.error(`   ❌ Falha ao deletar evento ${eventId} do Calendar:`, err.message));
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(deletePromises);
+    }
+
+    // 3. Deletar todas as avaliações e inscrições do banco de dados
     await query('DELETE FROM assessments');
     console.log("🗑️ Todas as avaliações deletadas.");
-
-    // 2. Deletar todas as inscrições
-    // O ideal seria deletar os eventos do Google Calendar antes, mas para uma limpeza geral forçada,
-    // o foco é limpar o banco de dados rapidamente.
     await query('DELETE FROM inscricoes');
     console.log("🗑️ Todas as inscrições deletadas.");
 
