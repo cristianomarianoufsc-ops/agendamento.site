@@ -6,8 +6,7 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fs from "fs";
-import PDFKit from "pdfkit";
-const PDFDocument = PDFKit.default || PDFKit;
+import PDFDocument from "pdfkit";
 import cron from "node-cron";
 import dotenv from "dotenv";
 import { google } from "googleapis";
@@ -165,8 +164,8 @@ function getRequiredAssessments() {
 
 // --- 2. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 const calendarIds = {
-  teatro: "oto.bezerra@ufsc.br",
-  igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com", // ID fornecido pelo usuário (parece correto)
+  teatro: "cristianomariano.ufsc@gmail.com",
+  igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
 };
 
 // --- 3. CONFIGURACAO DO NODEMAILER (SMTP Gmail) ---
@@ -254,20 +253,15 @@ async function getEvaluationCriteria() {
 }
 
 // --- 5. CACHE DE EVENTOS DO CALENDÁRIO ---
-console.log("✅ CRON JOB ATIVO: O cache será atualizado a cada 5 minutos.");
 let cacheEventos = {};
 async function atualizarCache() {
-  const timestamp = new Date().toLocaleString('pt-BR');
-  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
-  
   try {
     const agora = new Date();
     const start = agora.toISOString();
-    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    const end = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     for (const local in calendarIds) {
       try {
-        console.log(`  📅 Buscando eventos para: ${local}`);
         const events = await calendar.events.list({
           calendarId: calendarIds[local],
           timeMin: start,
@@ -275,16 +269,13 @@ async function atualizarCache() {
           singleEvents: true,
           orderBy: 'startTime',
         });
-        const numEventos = events.data.items ? events.data.items.length : 0;
         cacheEventos[local] = events.data.items || [];
-        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
       } catch (err) {
-        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
+        console.warn(`⚠️ Erro ao atualizar cache para ${local}:`, err.message);
       }
     }
-    console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
   } catch (err) {
-    console.error(`❌ [${timestamp}] Erro ao atualizar cache:`, err.message);
+    console.error("❌ Erro ao atualizar cache:", err.message);
   }
 }
 
@@ -462,39 +453,6 @@ app.post('/api/auth/viewer', async (req, res) => {
     } catch (error) {
         console.error('Erro na autenticacao do avaliador:', error);
         res.status(500).json({ error: 'Erro interno do servidor.' });
-    }
-});
-
-// ✅ NOVA ROTA: Autenticação do Administrador
-app.post('/api/auth/admin', async (req, res) => {
-    const { password } = req.body;
-    
-    if (!password) {
-        return res.status(400).json({ success: false, message: 'Senha é obrigatória.' });
-    }
-    
-    try {
-        // Busca a senha do admin na configuração
-        const result = await query('SELECT config_json FROM config WHERE id = 1');
-        
-        let adminPassword = 'admin.dac.ufsc'; // Senha padrão
-        
-        if (result.rows.length > 0) {
-            const config = JSON.parse(result.rows[0].config_json);
-            if (config.adminPassword) {
-                adminPassword = config.adminPassword;
-            }
-        }
-        
-        // Comparação simples da senha
-        if (password === adminPassword) {
-            res.json({ success: true, message: 'Acesso administrativo autorizado.' });
-        } else {
-            res.status(403).json({ success: false, message: 'Senha incorreta.' });
-        }
-    } catch (error) {
-        console.error('Erro na autenticação do admin:', error);
-        res.status(500).json({ success: false, message: 'Erro interno do servidor.' });
     }
 });
 
@@ -1157,11 +1115,7 @@ app.post("/api/create-events", async (req, res) => {
         etapasComId.push({ ...etapa, eventId: response.data.id });
         eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
       } catch (err) {
-        console.error(`❌ Falha ao criar evento "${event.summary}" no calendário ${calendarIds[local]}:`, err.message);
-        // Se a igrejinha falhar, é provável que seja um erro de permissão.
-        // Vamos retornar um erro 500 para o frontend para que o usuário saiba que a operação falhou.
-        // É crucial que o erro seja propagado para evitar inconsistências.
-        return res.status(500).json({ success: false, error: `Falha ao criar evento no calendário ${local}. Verifique as permissões do Google Calendar.`, details: err.message });
+        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
       }
     }
     try {
@@ -1190,53 +1144,9 @@ app.post("/api/create-events", async (req, res) => {
         `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
       );
-         console.log("💾 Inscrição salva no banco com sucesso!");
+      console.log("💾 Inscrição salva no banco com sucesso!");
       
-      // ✅ NOVO: Tentar salvar na planilha do Google Sheets
-      try {
-        const configResult = await query("SELECT config_json FROM config WHERE id = 1");
-        if (configResult.rows.length > 0) {
-          const config = JSON.parse(configResult.rows[0].config_json);
-          const sheetId = config.sheetId;
-          
-          if (sheetId) {
-            console.log(`✅ Google Sheets: sheetId encontrado na config: ${sheetId}`);
-            // A ordem das colunas deve ser: Timestamp, Nome, Email, Telefone, Evento, Local, Ensaio Início, Ensaio Fim, Montagem Início, Montagem Fim, Desmontagem Início, Desmontagem Fim, Eventos JSON
-            const row = [
-              new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), // Timestamp
-              dbPayload.nome,
-              dbPayload.email,
-              dbPayload.telefone,
-              dbPayload.evento_nome,
-              dbPayload.local,
-              dbPayload.ensaio_inicio || '',
-              dbPayload.ensaio_fim || '',
-              dbPayload.montagem_inicio || '',
-              dbPayload.montagem_fim || '',
-              dbPayload.desmontagem_inicio || '',
-              dbPayload.desmontagem_fim || '',
-              dbPayload.eventos_json,
-            ];
-            
-            await sheets.spreadsheets.values.append({
-              spreadsheetId: sheetId,
-              range: 'A:Z', // Range amplo para cobrir todas as colunas
-              valueInputOption: 'USER_ENTERED',
-              resource: {
-                values: [row],
-              },
-            });
-            console.log("✅ Linha adicionada ao Google Sheets com sucesso!");
-          } else {
-            console.log("⚠️ sheetId não encontrado na configuração. Pulando salvamento no Google Sheets.");
-          }
-        }
-      } catch (sheetError) {
-        console.error("❌ Erro ao adicionar linha ao Google Sheets:", sheetError.message);
-        // Não propagar o erro para o usuário, pois a inscrição já foi salva no banco.
-      }
-      
-      // Envia o e-mail de confirmação da Etapa 11pa 11
+      // Envia o e-mail de confirmação da Etapa 1
       await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
 
       res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
@@ -1280,13 +1190,6 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
     return res.status(400).json({ error: "Local não encontrado." });
   }
   try {
-    console.log(`\n\n🔍 REQUISIÇÃO: /api/occupied-slots/${local}/${month}`);
-    // A rota está buscando diretamente do Google Calendar, e não do cache.
-    // Isso pode sobrecarregar a API e não refletir o cache atualizado.
-    // Vamos usar o cache se a data estiver dentro do período de cache (12 meses).
-    // Para fins de debug, vamos manter a busca direta por enquanto, mas adicionar um log.
-    console.log(`⚠️ ATENÇÃO: A rota /api/occupied-slots está buscando diretamente do Google Calendar para o mês ${month}.`);
-    
     const [year, monthNum] = month.split('-');
     const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
     const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
@@ -1316,7 +1219,6 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
     }).filter(e => e.start && e.end); // Remove eventos sem data válida
     
     res.json({ eventos: eventosProcessados });
-    console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados para ${local}/${month}.`);
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
     // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
@@ -1589,10 +1491,6 @@ app.get("/api/slides-viewer", async (req, res) => {
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
 
-
-// --- ROTAS DE CONFIGURAÇÃO ---
-
-
 // --- ROTAS DE CONFIGURAÇÃO ---
 
 // --- 24. ROTA: GERAR PDF COM DADOS DO GOOGLE SHEETS ---
@@ -1791,10 +1689,18 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     if (respostaForms) {
       doc.font('Helvetica').fontSize(10);
       for (const [key, value] of Object.entries(respostaForms)) {
-        // Normalizar key para comparação
-        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (normalizedKey.includes('carimbo') || !value || String(value).trim() === "") continue;
-        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${value}`);
+        // Ignorar carimbo de data/hora
+        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
+        
+        // Tratar valores vazios de forma mais flexível
+        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
+        
+        // Se o valor for uma URL do Drive, exibir como link
+        const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
+        const finalValue = isDriveLink ? "ANEXO (Verificar no ZIP ou Planilha)" : displayValue;
+
+        // Escrever o rótulo e o valor
+        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${finalValue}`);
       }
     } else {
       doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
@@ -1950,8 +1856,6 @@ app.use((req, res) => {
 
 
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
-// A rotina cron já está aqui, mas vamos garantir que ela seja chamada.
-// A função atualizarCache será chamada uma vez na inicialização e a cada 5 minutos.
 app.listen(port, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${port}` );
   cron.schedule("*/5 * * * *", atualizarCache);
