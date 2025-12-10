@@ -514,12 +514,12 @@ const Admin = ({ viewOnly = false }) => {
     let naoAvaliadas = 0;
     const listaAprovadas = [];
     const listaReprovadas = [];
-    const listaNaoAvaliadas = [];
-
-    inscricoes.forEach(inscricao => {
-      const nota = parseFloat(inscricao.finalScore); // Converter para número para garantir a comparação
+    const listaNaoAvaliadas = [];    inscricoes.forEach(inscricao => {
+      // Tratar null/undefined/string vazia como 0 para parseFloat, mas manter a lógica de não avaliado
+      const rawScore = inscricao.finalScore;
+      const nota = parseFloat(rawScore); // Converter para número para garantir a comparação
       
-      if (isNaN(nota)) {
+      if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) { // Se for null, undefined, string vazia ou NaN após parseFloat
         naoAvaliadas++;
         listaNaoAvaliadas.push(inscricao);
       } else if (nota > 0) {
