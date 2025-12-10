@@ -1587,6 +1587,101 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
+// --- 24. ROTA: GERAR PDF DE CONSOLIDAÇÃO DA AGENDA FINAL ---
+app.get("/api/consolidate-agenda-pdf", async (req, res) => {
+  try {
+    // 1. Buscar todas as inscrições
+    const result = await query('SELECT * FROM inscricoes ORDER BY finalScore DESC NULLS LAST');
+    const inscricoes = result.rows;
+
+    // 2. Classificar e contar
+    let aprovadas = 0;
+    let reprovadas = 0;
+    let naoAvaliadas = 0;
+    const listaAprovadas = [];
+    const listaReprovadas = [];
+    const listaNaoAvaliadas = [];
+
+    inscricoes.forEach(inscricao => {
+      const nota = inscricao.finalscore; // O nome da coluna no DB é finalscore (minúsculo)
+      
+      if (nota === null || nota === undefined) {
+        naoAvaliadas++;
+        listaNaoAvaliadas.push(inscricao);
+      } else if (nota > 0) {
+        aprovadas++;
+        listaAprovadas.push(inscricao);
+      } else {
+        reprovadas++;
+        listaReprovadas.push(inscricao);
+      }
+    });
+
+    // 3. Configurar o PDF
+    const doc = new PDFDocument({ margin: 50 });
+    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    
+    doc.pipe(res);
+
+    // 4. Conteúdo do PDF
+    doc.fontSize(24).text('Simulação de Consolidação da Agenda Final', { align: 'center' });
+    doc.fontSize(12).text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
+    doc.moveDown();
+
+    // Resumo
+    doc.fontSize(16).text('Resumo da Classificação', { underline: true });
+    doc.moveDown(0.5);
+    doc.fontSize(12).text(`Total de Inscrições: ${inscricoes.length}`);
+    doc.text(`Aprovadas (Nota > 0): ${aprovadas}`);
+    doc.text(`Reprovadas (Nota <= 0): ${reprovadas}`);
+    doc.text(`Não Avaliadas: ${naoAvaliadas}`);
+    doc.moveDown();
+
+    // Lista de Aprovadas
+    doc.addPage().fontSize(18).text('✅ Inscrições Aprovadas', { underline: true });
+    doc.moveDown();
+    listaAprovadas.forEach((inscricao, index) => {
+      const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : 'N/A';
+      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      doc.moveDown(0.2);
+    });
+    if (listaAprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição aprovada nesta simulação.');
+
+    // Lista de Reprovadas
+    doc.addPage().fontSize(18).text('❌ Inscrições Reprovadas', { underline: true });
+    doc.moveDown();
+    listaReprovadas.forEach((inscricao, index) => {
+      const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : '0.00';
+      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      doc.moveDown(0.2);
+    });
+    if (listaReprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição reprovada nesta simulação.');
+
+    // Lista de Não Avaliadas
+    doc.addPage().fontSize(18).text('⚠️ Inscrições Não Avaliadas', { underline: true });
+    doc.moveDown();
+    listaNaoAvaliadas.forEach((inscricao, index) => {
+      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: N/A`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      doc.moveDown(0.2);
+    });
+    if (listaNaoAvaliadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição não avaliada.');
+
+    doc.end();
+
+  } catch (error) {
+    console.error("❌ Erro ao gerar PDF de consolidação:", error);
+    res.status(500).send("Erro ao gerar PDF de consolidação.");
+  }
+});
+
+// --- ROTAS DE CONFIGURAÇÃO ---
+
 
 // --- ROTAS DE CONFIGURAÇÃO ---
 
