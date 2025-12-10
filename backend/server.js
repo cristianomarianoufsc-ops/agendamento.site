@@ -28,8 +28,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configura dotenv para ler .env do diretório backend (desenvolvimento)
-// Em produção (Render), as variáveis vêm do Environment Variables
-dotenv.config({ path: path.join(__dirname, '.env') });
+// EM PRODUÇÃO (RENDER), ESTA LINHA DEVE SER COMENTADA PARA USAR AS VARIAVEIS DO SISTEMA
+// dotenv.config({ path: path.join(__dirname, '.env') });
 
 // DEBUG: Mostrar quais variáveis de e-mail estão disponíveis
 console.log('\ud83d\udd0d DEBUG - Variáveis de ambiente:');
@@ -169,19 +169,38 @@ const calendarIds = {
   igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
 };
 
-// --- 3. CONFIGURACAO DO NODEMAILER (SMTP Gmail) ---
+// --- 3. CONFIGURACAO DO NODEMAILER (SMTP) ---
 let transporter = null;
 
-// --- 3.1. CONFIGURACAO DO RESEND ---
+// --- 3.1. CONFIGURACAO DO RESEND (API) ---
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 if (resend) {
-  console.log('✅ Serviço de e-mail Resend configurado com sucesso!');
+  console.log('✅ Serviço de e-mail Resend (API) configurado com sucesso!');
 } else {
   console.warn('⚠️ Variável RESEND_API_KEY não encontrada. O Resend está desabilitado.');
 }
 
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+// --- 3.2. CONFIGURACAO DO BREVO SMTP (RECOMENDADO) ---
+if (process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY) {
+  transporter = nodemailer.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.BREVO_SMTP_USER,
+      pass: process.env.BREVO_SMTP_KEY
+    }
+  });
+  console.log('✅ Servidor de e-mail Brevo SMTP configurado com sucesso!');
+  console.log('   Host: smtp-relay.brevo.com');
+  console.log('   User:', process.env.BREVO_SMTP_USER);
+  if (process.env.EMAIL_REMETENTE_VALIDADO) {
+    console.log('   Remetente:', process.env.EMAIL_REMETENTE_VALIDADO);
+  }
+} 
+// --- 3.3. FALLBACK: GMAIL SMTP ---
+else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -191,9 +210,11 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
   });
   console.log('✅ Servidor de e-mail (Gmail SMTP) configurado com sucesso!');
   console.log('   De:', process.env.EMAIL_USER);
-  // NÃO usar verify() para evitar travamento no Render
+  console.warn('⚠️ ATENÇÃO: Gmail SMTP tem baixa deliverability (35%). Recomendamos usar Brevo SMTP.');
 } else {
-  console.warn('⚠️ Variáveis EMAIL_USER/EMAIL_PASS não encontradas. O envio de e-mails está desabilitado.');
+  console.warn('⚠️ Nenhuma configuração SMTP encontrada.');
+  console.warn('   Configure BREVO_SMTP_USER e BREVO_SMTP_KEY para usar Brevo (recomendado)');
+  console.warn('   Ou configure EMAIL_USER e EMAIL_PASS para usar Gmail (não recomendado)');
 }
 
 // FUNCOES PARA GERAÇÃO DE SENHA E ENVIO DE EMAIL
@@ -1222,7 +1243,7 @@ app.post("/api/create-events", async (req, res) => {
 res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
 
 	      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
-		      sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+		      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
     } catch (err) {
       console.error("❌ Erro ao salvar inscrição no banco:", err.message);
       res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
@@ -1454,7 +1475,9 @@ app.get("/api/assessments/:inscriptionId", async (req, res) => {
 });
 
 // --- 21. FUNÇÃO DE ENVIO DE E-MAIL DE CONFIRMAÇÃO (ETAPA 1) ---
-async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapas) {
+async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) {
+  const { email, name, telefone } = userData;
+  const nome = name;
   if (!transporter) {
     console.warn("⚠️ Transporter de e-mail não configurado. Pular envio de e-mail da Etapa 1.");
     return false;
@@ -1472,20 +1495,32 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
     return `<li><strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
   }).join('');
 
+  // Determinar o remetente baseado na configuração disponível
+  let fromEmail = process.env.EMAIL_REMETENTE_VALIDADO || process.env.EMAIL_USER || 'noreply@agendamento.site';
+  
+  // Se estiver usando Brevo SMTP, mas não definiu o remetente validado, usa o login SMTP como fallback
+  if (process.env.BREVO_SMTP_USER && !process.env.EMAIL_REMETENTE_VALIDADO) {
+    fromEmail = process.env.BREVO_SMTP_USER;
+  }
+  
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'noreply@agendamento.site',
+    from: `"Sistema de Agendamento UFSC" <${fromEmail}>`,
     to: email,
     subject: `✅ Confirmação da 1ª Etapa: ${evento_nome}`,
     html: `
-      <div style="font-family: sans-serif; line-height: 1.6;">
-        <h2>Olá, ${nome}!</h2>
-        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
-        <p><strong>Local:</strong> ${locaisNomes[local] || local}</p>
-        <p><strong>Resumo dos horários solicitados:</strong></p>
-        <ul>
-          ${etapasHtml}
-        </ul>
-        <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
+	      <div style="font-family: sans-serif; line-height: 1.6;">
+	        <h2>Olá, ${nome}!</h2>
+	        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
+	        
+	        <h3>Detalhes da Inscrição (Etapa 1):</h3>
+	        <ul>
+	          <li><strong>Nome do Proponente:</strong> ${nome}</li>
+	          <li><strong>E-mail:</strong> ${email}</li>
+	          ${telefone ? `<li><strong>Telefone:</strong> ${telefone}</li>` : ''}
+	          <li><strong>Local Solicitado:</strong> ${locaisNomes[local] || local}</li>
+	        </u	        <ul>
+	          ${etapasHtml}
+	        </ul>    <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
         <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
         <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
       </div>
@@ -1521,7 +1556,8 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
     }
 
     await transporter.sendMail(mailOptions);
-    console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
+    const smtpService = process.env.BREVO_SMTP_USER ? 'Brevo SMTP' : 'Gmail SMTP';
+    console.log(`✅✅✅ E-mail enviado com sucesso via ${smtpService}!`);
     return true;
   } catch (error) {
     console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
