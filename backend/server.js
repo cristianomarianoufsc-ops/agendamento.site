@@ -1199,6 +1199,7 @@ app.post("/api/create-events", async (req, res) => {
           const sheetId = config.sheetId;
           
           if (sheetId) {
+            console.log(`✅ Google Sheets: sheetId encontrado na config: ${sheetId}`);
             // A ordem das colunas deve ser: Timestamp, Nome, Email, Telefone, Evento, Local, Ensaio Início, Ensaio Fim, Montagem Início, Montagem Fim, Desmontagem Início, Desmontagem Fim, Eventos JSON
             const row = [
               new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), // Timestamp
