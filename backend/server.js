@@ -456,6 +456,23 @@ app.post('/api/auth/viewer', async (req, res) => {
     }
 });
 
+// --- ROTA PARA AUTENTICAÇÃO DO ADMINISTRADOR ---
+app.post('/api/auth/admin', async (req, res) => {
+    const { password } = req.body;
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin.dac.ufsc'; // Senha padrão se não estiver em ENV
+
+    if (!password) {
+        return res.status(400).json({ error: 'A senha é obrigatória.' });
+    }
+
+    // Comparação simples da senha
+    if (password === adminPassword) {
+        res.json({ success: true, message: 'Acesso de administrador autorizado.' });
+    } else {
+        res.status(403).json({ success: false, message: 'Acesso negado. Senha incorreta.' });
+    }
+});
+
 // NOVO: Endpoint unificado para SALVAR a configuração
 app.post("/api/config", async (req, res) => {
   try {
