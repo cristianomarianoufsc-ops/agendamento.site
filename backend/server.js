@@ -165,7 +165,7 @@ function getRequiredAssessments() {
 // --- 2. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 const calendarIds = {
   teatro: "oto.bezerra@ufsc.br",
-  igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
+  igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com", // ID fornecido pelo usuário (parece correto)
 };
 
 // --- 3. CONFIGURACAO DO NODEMAILER (SMTP Gmail) ---
@@ -1156,7 +1156,11 @@ app.post("/api/create-events", async (req, res) => {
         etapasComId.push({ ...etapa, eventId: response.data.id });
         eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
       } catch (err) {
-        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
+        console.error(`❌ Falha ao criar evento "${event.summary}" no calendário ${calendarIds[local]}:`, err.message);
+        // Se a igrejinha falhar, é provável que seja um erro de permissão.
+        // Vamos retornar um erro 500 para o frontend para que o usuário saiba que a operação falhou.
+        // É crucial que o erro seja propagado para evitar inconsistências.
+        return res.status(500).json({ success: false, error: `Falha ao criar evento no calendário ${local}. Verifique as permissões do Google Calendar.`, details: err.message });
       }
     }
     try {
