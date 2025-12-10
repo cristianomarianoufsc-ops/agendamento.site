@@ -545,7 +545,7 @@ const Admin = ({ viewOnly = false }) => {
     content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
 
     // Lista de Aprovadas
-    content += `## Inscrições Aprovadas\n\n`;
+    content += `## ✅ Inscrições Aprovadas\n\n`;
     if (listaAprovadas.length === 0) {
       content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
     } else {
@@ -559,7 +559,7 @@ const Admin = ({ viewOnly = false }) => {
     }
 
     // Lista de Reprovadas
-    content += `## Inscrições Reprovadas\n\n`;
+    content += `## ❌ Inscrições Reprovadas\n\n`;
     if (listaReprovadas.length === 0) {
       content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
     } else {
@@ -573,7 +573,7 @@ const Admin = ({ viewOnly = false }) => {
     }
 
     // Lista de Não Avaliadas
-    content += `## Inscrições Não Avaliadas\n\n`;
+    content += `## ⚠️ Inscrições Não Avaliadas\n\n`;
     if (listaNaoAvaliadas.length === 0) {
       content += `Nenhuma inscrição não avaliada.\n\n`;
     } else {
