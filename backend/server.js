@@ -1588,8 +1588,8 @@ app.get("/api/slides-viewer", async (req, res) => {
 // --- 23. ROTA PARA SERVIR OS ARQUIVOS HTML DOS SLIDES ---
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
-// --- 24. ROTA: GERAR PDF DE CONSOLIDAÇÃO DA AGENDA FINAL ---
-app.get("/api/consolidate-agenda-pdf", async (req, res) => {
+// --- 24. ROTA: GERAR RELATÓRIO DE CONSOLIDAÇÃO DA AGENDA FINAL (PLANO B - TEXTO) ---
+app.get("/api/consolidate-agenda-text", async (req, res) => {
   try {
     // 1. Buscar todas as inscrições
     const result = await query('SELECT * FROM inscricoes ORDER BY finalscore DESC NULLS LAST');
@@ -1604,7 +1604,7 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
     const listaNaoAvaliadas = [];
 
     inscricoes.forEach(inscricao => {
-      const nota = inscricao.finalscore; // O nome da coluna no DB é finalscore (minúsculo)
+      const nota = inscricao.finalscore;
       
       if (nota === null || nota === undefined) {
         naoAvaliadas++;
@@ -1618,75 +1618,71 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
       }
     });
 
-    // 3. Configurar o PDF
-    const doc = new PDFDocument({ margin: 50 });
-    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.pdf`;
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-    
-    doc.pipe(res);
-
-    // 4. Conteúdo do PDF
-    doc.fontSize(24).text('Simulação de Consolidação da Agenda Final', { align: 'center' });
-    doc.fontSize(12).text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, { align: 'center' });
-    doc.moveDown();
+    // 3. Gerar o conteúdo em Markdown
+    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
+    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
 
     // Resumo
-    doc.fontSize(16).text('Resumo da Classificação', { underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(`Total de Inscrições: ${inscricoes.length}`);
-    doc.text(`Aprovadas (Nota > 0): ${aprovadas}`);
-    doc.text(`Reprovadas (Nota <= 0): ${reprovadas}`);
-    doc.text(`Não Avaliadas: ${naoAvaliadas}`);
-    doc.moveDown();
+    content += `## Resumo da Classificação\n\n`;
+    content += `| Categoria | Quantidade |\n`;
+    content += `| :--- | :--- |\n`;
+    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
+    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
+    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
+    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
 
     // Lista de Aprovadas
-    doc.addPage().fontSize(18).text('✅ Inscrições Aprovadas', { underline: true });
-    doc.moveDown();
-    listaAprovadas.forEach((inscricao, index) => {
-      const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : 'N/A';
-      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
-      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
-      doc.moveDown(0.2);
-    });
-    if (listaAprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição aprovada nesta simulação.');
+    content += `## ✅ Inscrições Aprovadas\n\n`;
+    if (listaAprovadas.length === 0) {
+      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
+    } else {
+      listaAprovadas.forEach((inscricao, index) => {
+        const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : 'N/A';
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
 
     // Lista de Reprovadas
-    doc.addPage().fontSize(18).text('❌ Inscrições Reprovadas', { underline: true });
-    doc.moveDown();
-    listaReprovadas.forEach((inscricao, index) => {
-      const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : '0.00';
-      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
-      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
-      doc.moveDown(0.2);
-    });
-    if (listaReprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição reprovada nesta simulação.');
+    content += `## ❌ Inscrições Reprovadas\n\n`;
+    if (listaReprovadas.length === 0) {
+      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
+    } else {
+      listaReprovadas.forEach((inscricao, index) => {
+        const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : '0.00';
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
 
     // Lista de Não Avaliadas
-    doc.addPage().fontSize(18).text('⚠️ Inscrições Não Avaliadas', { underline: true });
-    doc.moveDown();
-    listaNaoAvaliadas.forEach((inscricao, index) => {
-      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
-      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: N/A`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
-      doc.moveDown(0.2);
-    });
-    if (listaNaoAvaliadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição não avaliada.');
+    content += `## ⚠️ Inscrições Não Avaliadas\n\n`;
+    if (listaNaoAvaliadas.length === 0) {
+      content += `Nenhuma inscrição não avaliada.\n\n`;
+    } else {
+      listaNaoAvaliadas.forEach((inscricao, index) => {
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
 
-    doc.end();
+    // 4. Enviar o arquivo Markdown
+    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.md`;
+    
+    res.setHeader('Content-Type', 'text/markdown');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
+    res.send(content);
 
   } catch (error) {
-    console.error("❌ Erro ao gerar PDF de consolidação:", error);
-    // Adicionar um tratamento para garantir que a resposta seja enviada mesmo em caso de erro
-    if (!res.headersSent) {
-      res.status(500).send("Erro ao gerar PDF de consolidação.");
-    }
+    console.error("❌ Erro ao gerar relatório de consolidação (Texto):", error);
+    res.status(500).send("Erro ao gerar relatório de consolidação (Texto).");
   }
 });
 
