@@ -1,3 +1,5 @@
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -505,21 +507,19 @@ const Admin = ({ viewOnly = false }) => {
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = () => {
-    // Plano C: Gerar o relatório em Markdown diretamente no frontend
-    const inscricoes = unificados; // Usar a lista de inscrições já carregada
-
-    // 1. Classificar e contar
+    // 1. Classificar e contar (MANTIDO)
+    const inscricoes = unificados;
     let aprovadas = 0;
     let reprovadas = 0;
     let naoAvaliadas = 0;
     const listaAprovadas = [];
     const listaReprovadas = [];
-    const listaNaoAvaliadas = [];    inscricoes.forEach(inscricao => {
-      // Tratar null/undefined/string vazia como 0 para parseFloat, mas manter a lógica de não avaliado
+    const listaNaoAvaliadas = [];
+    inscricoes.forEach(inscricao => {
       const rawScore = inscricao.finalScore;
-      const nota = parseFloat(rawScore); // Converter para número para garantir a comparação
+      const nota = parseFloat(rawScore);
       
-      if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) { // Se for null, undefined, string vazia ou NaN após parseFloat
+      if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) {
         naoAvaliadas++;
         listaNaoAvaliadas.push(inscricao);
       } else if (nota > 0) {
@@ -531,71 +531,142 @@ const Admin = ({ viewOnly = false }) => {
       }
     });
 
-    // 2. Gerar o conteúdo em Markdown
-    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
-    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
+    // 2. Inicializar jsPDF
+    const doc = new jsPDF();
+    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.pdf`;
+    let y = 10; // Posição Y inicial
 
-    // Resumo
-    content += `## Resumo da Classificação\n\n`;
-    content += `| Categoria | Quantidade |\n`;
-    content += `| :--- | :--- |\n`;
-    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
-    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
+    // Configurações de Estilo
+    const primaryColor = '#1e40af'; // Azul escuro (Tailwind blue-800)
+    const secondaryColor = '#3b82f6'; // Azul claro (Tailwind blue-500)
+    const headerColor = '#f3f4f6'; // Cinza claro (Tailwind gray-100)
+    const approvedColor = '#dcfce7'; // Verde claro (Tailwind green-100)
+    const rejectedColor = '#fee2e2'; // Vermelho claro (Tailwind red-100)
+    const pendingColor = '#fffbeb'; // Amarelo claro (Tailwind yellow-100)
+
+    // Título
+    doc.setFontSize(18);
+    doc.setTextColor(primaryColor);
+    doc.text("Simulação de Consolidação da Agenda Final", 14, y);
+    y += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 14, y);
+    y += 10;
+
+    // Resumo da Classificação
+    doc.setFontSize(14);
+    doc.setTextColor(primaryColor);
+    doc.text("Resumo da Classificação", 14, y);
+    y += 5;
+
+    const summaryData = [
+        ["Total de Inscrições", inscricoes.length],
+        ["Aprovadas (Nota > 0)", aprovadas],
+        ["Reprovadas (Nota <= 0)", reprovadas],
+        ["Não Avaliadas", naoAvaliadas],
+    ];
+
+    doc.autoTable({
+        startY: y,
+        head: [['Categoria', 'Quantidade']],
+        body: summaryData,
+        theme: 'grid',
+        styles: {
+            font: 'helvetica',
+            fontSize: 10,
+            cellPadding: 3,
+        },
+        headStyles: {
+            fillColor: [30, 64, 175], // primaryColor RGB
+            textColor: 255,
+            fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+            fillColor: [243, 244, 246], // headerColor RGB
+        },
+        margin: { top: 10, left: 14, right: 14 },
+        didDrawPage: (data) => {
+            // Rodapé
+            doc.setFontSize(8);
+            doc.text("Relatório Gerado Automaticamente - agendamento.site", data.settings.margin.left, doc.internal.pageSize.height - 5);
+        }
+    });
+    y = doc.autoTable.previous.finalY + 10;
+
+    // Função auxiliar para gerar tabelas de inscrições
+    const generateInscricaoTable = (title, list, color, isApproved) => {
+        doc.addPage();
+        y = 10;
+        doc.setFontSize(14);
+        doc.setTextColor(primaryColor);
+        doc.text(title, 14, y);
+        y += 5;
+
+        if (list.length === 0) {
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Nenhuma inscrição ${title.toLowerCase().includes('aprovadas') ? 'aprovada' : title.toLowerCase().includes('reprovadas') ? 'reprovada' : 'não avaliada'}.`, 14, y + 5);
+            y += 15;
+            return;
+        }
+
+        const headers = ["ID", "Evento", "Local", "Proponente", "Nota Final"];
+        const body = list.map(inscricao => [
+            inscricao.id,
+            inscricao.evento_nome || 'Evento Sem Nome',
+            inscricao.local,
+            inscricao.nome || 'Desconhecido',
+            isApproved 
+                ? (inscricao.finalScore !== null ? parseFloat(inscricao.finalScore).toFixed(2) : 'N/A')
+                : '0.00'
+        ]);
+
+        doc.autoTable({
+            startY: y,
+            head: [headers],
+            body: body,
+            theme: 'striped',
+            styles: {
+                font: 'helvetica',
+                fontSize: 8,
+                cellPadding: 2,
+            },
+            headStyles: {
+                fillColor: [59, 130, 246], // secondaryColor RGB
+                textColor: 255,
+                fontStyle: 'bold',
+            },
+            bodyStyles: {
+                fillColor: color,
+            },
+            margin: { top: 10, left: 14, right: 14 },
+            columnStyles: {
+                0: { cellWidth: 15 }, // ID
+                2: { cellWidth: 20 }, // Local
+                4: { cellWidth: 15 }, // Nota Final
+            },
+            didDrawPage: (data) => {
+                // Rodapé
+                doc.setFontSize(8);
+                doc.text("Relatório Gerado Automaticamente - agendamento.site", data.settings.margin.left, doc.internal.pageSize.height - 5);
+            }
+        });
+        y = doc.autoTable.previous.finalY + 10;
+    };
 
     // Lista de Aprovadas
-    content += `## ✅ Inscrições Aprovadas\n\n`;
-    if (listaAprovadas.length === 0) {
-      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
-    } else {
-      listaAprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
+    generateInscricaoTable("✅ Inscrições Aprovadas", listaAprovadas, approvedColor, true);
 
     // Lista de Reprovadas
-    content += `## ❌ Inscrições Reprovadas\n\n`;
-    if (listaReprovadas.length === 0) {
-      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
-    } else {
-      listaReprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
+    generateInscricaoTable("❌ Inscrições Reprovadas", listaReprovadas, rejectedColor, false);
 
     // Lista de Não Avaliadas
-    content += `## ⚠️ Inscrições Não Avaliadas\n\n`;
-    if (listaNaoAvaliadas.length === 0) {
-      content += `Nenhuma inscrição não avaliada.\n\n`;
-    } else {
-      listaNaoAvaliadas.forEach((inscricao, index) => {
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
+    generateInscricaoTable("⚠️ Inscrições Não Avaliadas", listaNaoAvaliadas, pendingColor, false);
+
 
     // 3. Forçar o download do arquivo
-    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.md`;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    doc.save(filename);
   };
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
