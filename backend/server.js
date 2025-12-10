@@ -1485,9 +1485,9 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
 
   try {
     // ⚠️ TEMPORARIAMENTE DESABILITADO: Envio de e-mail comentado
-    console.log(`⚠️ Envio de e-mail DESABILITADO (temporário) para: ${email}`);
-    // await transporter.sendMail(mailOptions);
-    // console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
+    console.log(`✅ Tentando enviar e-mail de confirmação da Etapa 1 para: ${email}`);
+    await transporter.sendMail(mailOptions);
+    console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
     return true; // Retorna sucesso para não quebrar o fluxo
   } catch (error) {
     console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
