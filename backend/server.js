@@ -1202,6 +1202,62 @@ app.delete("/api/cancel-events/:local", async (req, res) => {
 });
 
 // --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
+
+// --- ROTA PARA EXCLUIR INSCRIÇÃO ---
+app.delete("/api/inscricao/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Buscar a inscrição para obter os eventIds do Google Calendar
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Inscrição não encontrada." });
+    }
+    const inscricao = result.rows[0];
+
+    // 2. Cancelar eventos no Google Calendar (se existirem)
+    const eventIdsToDelete = [];
+    const local = inscricao.local;
+
+    // Funções auxiliares para adicionar IDs
+    const addId = (id) => { if (id) eventIdsToDelete.push(id); };
+    const addJsonIds = (json) => {
+      try {
+        JSON.parse(json).forEach(e => addId(e.eventId));
+      } catch (e) { /* ignore */ }
+    };
+
+    addId(inscricao.ensaio_eventId);
+    addId(inscricao.montagem_eventId);
+    addId(inscricao.desmontagem_eventId);
+    addJsonIds(inscricao.eventos_json);
+
+    if (eventIdsToDelete.length > 0 && calendarIds[local]) {
+      console.log(`🗑️ Tentando deletar ${eventIdsToDelete.length} eventos do Google Calendar para a inscrição #${id}`);
+      for (const eventId of eventIdsToDelete) {
+        try {
+          await calendar.events.delete({ calendarId: calendarIds[local], eventId });
+          console.log(`   ✅ Evento ${eventId} deletado.`);
+        } catch (err) {
+          console.error(`   ❌ Falha ao deletar evento ${eventId}:`, err.message);
+          // Continua para o próximo, não impede a exclusão no DB
+        }
+      }
+    }
+
+    // 3. Excluir a inscrição e avaliações relacionadas no PostgreSQL
+    // ON DELETE CASCADE na tabela assessments deve cuidar das avaliações
+    await query('DELETE FROM inscricoes WHERE id = $1', [id]);
+    
+    console.log(`✅ Inscrição #${id} excluída com sucesso do banco de dados.`);
+    res.json({ success: true, message: "Inscrição excluída com sucesso." });
+
+  } catch (error) {
+    console.error("❌ Erro ao excluir inscrição:", error);
+    res.status(500).json({ error: "Erro interno ao excluir inscrição." });
+  }
+});
+
+// --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
 app.get("/api/occupied-slots/:local/:month", async (req, res) => {
   const { local, month } = req.params;
   if (!calendarIds[local]) {
