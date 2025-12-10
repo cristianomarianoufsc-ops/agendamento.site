@@ -164,7 +164,7 @@ function getRequiredAssessments() {
 
 // --- 2. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 const calendarIds = {
-  teatro: "cristianomariano.ufsc@gmail.com",
+  teatro: "oto.bezerra@ufsc.br",
   igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
 };
 
