@@ -517,9 +517,9 @@ const Admin = ({ viewOnly = false }) => {
     const listaNaoAvaliadas = [];
 
     inscricoes.forEach(inscricao => {
-      const nota = inscricao.finalScore; // Usar finalScore do estado do React
+      const nota = parseFloat(inscricao.finalScore); // Converter para número para garantir a comparação
       
-      if (nota === null || nota === undefined) {
+      if (isNaN(nota)) {
         naoAvaliadas++;
         listaNaoAvaliadas.push(inscricao);
       } else if (nota > 0) {
