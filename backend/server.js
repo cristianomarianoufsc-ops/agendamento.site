@@ -1179,6 +1179,33 @@ app.post("/api/create-events", async (req, res) => {
 });
 
 // --- 17. ROTA PARA CANCELAR MÚLTIPLOS EVENTOS ---
+
+// --- ROTA PARA LIMPEZA GERAL (FORÇADA) ---
+app.post("/api/cleanup/force", async (req, res) => {
+  try {
+    // 1. Deletar todas as avaliações (a tabela assessments deve ter ON DELETE CASCADE para inscricoes)
+    // Se não tiver, deletamos explicitamente.
+    await query('DELETE FROM assessments');
+    console.log("🗑️ Todas as avaliações deletadas.");
+
+    // 2. Deletar todas as inscrições
+    // O ideal seria deletar os eventos do Google Calendar antes, mas para uma limpeza geral forçada,
+    // o foco é limpar o banco de dados rapidamente.
+    await query('DELETE FROM inscricoes');
+    console.log("🗑️ Todas as inscrições deletadas.");
+
+    // 3. Limpar o cache de eventos (se houver)
+    // O cache de eventos é limpo na inicialização, mas é bom garantir.
+    // O cache de eventos é um objeto global, não precisa de código aqui.
+
+    res.json({ success: true, message: "Limpeza geral concluída com sucesso." });
+  } catch (error) {
+    console.error("❌ Erro ao executar limpeza geral:", error);
+    res.status(500).json({ error: "Erro interno ao executar a limpeza geral." });
+  }
+});
+
+// --- 17. ROTA PARA CANCELAR MÚLTIPLOS EVENTOS ---
 app.delete("/api/cancel-events/:local", async (req, res) => {
     const { local } = req.params;
     const { eventIds } = req.body;
