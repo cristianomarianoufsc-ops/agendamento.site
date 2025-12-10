@@ -1189,10 +1189,53 @@ app.post("/api/create-events", async (req, res) => {
         `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
       );
-      console.log("💾 Inscrição salva no banco com sucesso!");
+         console.log("💾 Inscrição salva no banco com sucesso!");
       
-
-      // Envia o e-mail de confirmação da Etapa 1
+      // ✅ NOVO: Tentar salvar na planilha do Google Sheets
+      try {
+        const configResult = await query("SELECT config_json FROM config WHERE id = 1");
+        if (configResult.rows.length > 0) {
+          const config = JSON.parse(configResult.rows[0].config_json);
+          const sheetId = config.sheetId;
+          
+          if (sheetId) {
+            console.log(`✅ Google Sheets: sheetId encontrado na config: ${sheetId}`);
+            // A ordem das colunas deve ser: Timestamp, Nome, Email, Telefone, Evento, Local, Ensaio Início, Ensaio Fim, Montagem Início, Montagem Fim, Desmontagem Início, Desmontagem Fim, Eventos JSON
+            const row = [
+              new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), // Timestamp
+              dbPayload.nome,
+              dbPayload.email,
+              dbPayload.telefone,
+              dbPayload.evento_nome,
+              dbPayload.local,
+              dbPayload.ensaio_inicio || '',
+              dbPayload.ensaio_fim || '',
+              dbPayload.montagem_inicio || '',
+              dbPayload.montagem_fim || '',
+              dbPayload.desmontagem_inicio || '',
+              dbPayload.desmontagem_fim || '',
+              dbPayload.eventos_json,
+            ];
+            
+            await sheets.spreadsheets.values.append({
+              spreadsheetId: sheetId,
+              range: 'A:Z', // Range amplo para cobrir todas as colunas
+              valueInputOption: 'USER_ENTERED',
+              resource: {
+                values: [row],
+              },
+            });
+            console.log("✅ Linha adicionada ao Google Sheets com sucesso!");
+          } else {
+            console.log("⚠️ sheetId não encontrado na configuração. Pulando salvamento no Google Sheets.");
+          }
+        }
+      } catch (sheetError) {
+        console.error("❌ Erro ao adicionar linha ao Google Sheets:", sheetError.message);
+        // Não propagar o erro para o usuário, pois a inscrição já foi salva no banco.
+      }
+      
+      // Envia o e-mail de confirmação da Etapa 11pa 11
       await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
 
       res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });

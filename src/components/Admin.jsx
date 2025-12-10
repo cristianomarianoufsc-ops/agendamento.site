@@ -666,7 +666,7 @@ const Admin = ({ viewOnly = false }) => {
                         <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
                       </>
                     )}
-                    {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'   ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
+
                   </div>
                 </div>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
