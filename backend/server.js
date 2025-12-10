@@ -1832,10 +1832,21 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
         
         // Se o valor for uma URL do Drive, exibir como link
         const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
-        const finalValue = isDriveLink ? "ANEXO (Verificar no ZIP ou Planilha)" : displayValue;
+        
+        // Escrever o rótulo
+        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: `, { continued: true });
 
-        // Escrever o rótulo e o valor
-        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: ${finalValue}`);
+        if (isDriveLink) {
+          // Se for link, exibe o texto "LINK PARA ANEXO" como um link clicável
+          doc.fillColor('blue').text("LINK PARA ANEXO", { 
+            link: value, 
+            underline: true, 
+            continued: false 
+          }).fillColor('black'); // Volta a cor para preto
+        } else {
+          // Caso contrário, exibe o valor normalmente
+          doc.text(displayValue, { continued: false });
+        }
       }
     } else {
       doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
