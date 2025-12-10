@@ -74,7 +74,7 @@ const Admin = ({ viewOnly = false }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
-  const [sharedPassword, setSharedPassword] = useState(''); // ✅ NOVO: Senha única para todos os avaliadores
+   // ✅ NOVO: Senha única para todos os avaliadores
   
   // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
   const [adminPassword, setAdminPassword] = useState('');
@@ -454,21 +454,17 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleSaveEvaluators = async () => {
-    if (!sharedPassword || sharedPassword.trim() === '') {
-      alert("Por favor, defina uma Senha Unica para todos os avaliadores.");
-      return;
-    }
     const evaluatorsToSave = evaluators.map(e => ({ name: e.name }));
     try {
       const response = await fetch("/api/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: sharedPassword }),
+        body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: "dac.ufsc2026" }),
       });
       const data = await response.json();
       if (response.ok) {
         alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
         fetchEvaluators();
-        setSharedPassword('');
+
       } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
     } catch (error) {
       console.error("Erro ao salvar avaliadores:", error);
@@ -1093,10 +1089,7 @@ const Admin = ({ viewOnly = false }) => {
                       <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
                     </div>
                   </div>
-                  <div className="mb-4">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Senha Unica para Todos os Avaliadores</label>
-                    <input type="password" placeholder="Digite a senha unica" className="p-2 border rounded-md w-full" value={sharedPassword} onChange={(e) => setSharedPassword(e.target.value)} />
-                  </div>
+
                   <div className="space-y-2">
                     <label className="block font-semibold text-gray-600 mb-2 text-sm">Avaliadores Atuais</label>
                     {evaluators.length > 0 ? (
