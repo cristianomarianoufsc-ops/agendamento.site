@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, 
-  AlertTriangle, CheckCircle, Search, Sheet, Theater, Church, Eye, 
+  AlertTriangle, CheckCircle, Search, Sheet, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
@@ -79,6 +79,7 @@ const Admin = ({ viewOnly = false }) => {
   // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
+  const [showAdminPassword, setShowAdminPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -519,15 +520,25 @@ const Admin = ({ viewOnly = false }) => {
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Painel Administrativo</h2>
             <p className="text-gray-600">Insira a senha para acessar</p>
           </div>
-          <input
-            type="password"
-            placeholder="Senha de administrador"
-            value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-blue-500 focus:border-blue-500"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
-            autoFocus
-          />
+          <div className="relative mb-6">
+            <input
+              type={showAdminPassword ? "text" : "password"}
+              placeholder="Senha de administrador"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setShowAdminPassword(!showAdminPassword)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label={showAdminPassword ? "Esconder senha" : "Mostrar senha"}
+            >
+              {showAdminPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
           <button
             onClick={handleAdminLogin}
             className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
