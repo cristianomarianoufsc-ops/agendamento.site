@@ -1646,8 +1646,10 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
     doc.moveDown();
     listaAprovadas.forEach((inscricao, index) => {
       const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : 'N/A';
-      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
+      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
       doc.moveDown(0.2);
     });
     if (listaAprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição aprovada nesta simulação.');
@@ -1657,8 +1659,10 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
     doc.moveDown();
     listaReprovadas.forEach((inscricao, index) => {
       const nota = inscricao.finalscore !== null ? inscricao.finalscore.toFixed(2) : '0.00';
-      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
+      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: ${nota}`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
       doc.moveDown(0.2);
     });
     if (listaReprovadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição reprovada nesta simulação.');
@@ -1667,8 +1671,10 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
     doc.addPage().fontSize(18).text('⚠️ Inscrições Não Avaliadas', { underline: true });
     doc.moveDown();
     listaNaoAvaliadas.forEach((inscricao, index) => {
-      doc.fontSize(12).text(`${index + 1}. ${inscricao.evento_nome} (${inscricao.local}) - Nota: N/A`, { continued: false });
-      doc.fontSize(10).text(`Proponente: ${inscricao.nome} | ID: ${inscricao.id}`);
+      const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+      const proponenteNome = inscricao.nome || 'Proponente Desconhecido';
+      doc.fontSize(12).text(`${index + 1}. ${eventoNome} (${inscricao.local}) - Nota: N/A`, { continued: false });
+      doc.fontSize(10).text(`Proponente: ${proponenteNome} | ID: ${inscricao.id}`);
       doc.moveDown(0.2);
     });
     if (listaNaoAvaliadas.length === 0) doc.fontSize(12).text('Nenhuma inscrição não avaliada.');
@@ -1677,7 +1683,10 @@ app.get("/api/consolidate-agenda-pdf", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao gerar PDF de consolidação:", error);
-    res.status(500).send("Erro ao gerar PDF de consolidação.");
+    // Adicionar um tratamento para garantir que a resposta seja enviada mesmo em caso de erro
+    if (!res.headersSent) {
+      res.status(500).send("Erro ao gerar PDF de consolidação.");
+    }
   }
 });
 
