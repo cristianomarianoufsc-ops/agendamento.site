@@ -1210,10 +1210,10 @@ app.post("/api/create-events", async (req, res) => {
       );
       console.log("💾 Inscrição salva no banco com sucesso!");
       
-// Envia o e-mail de confirmação da Etapa 1
-	      await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
 
-      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+	      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
+		      sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
     } catch (err) {
       console.error("❌ Erro ao salvar inscrição no banco:", err.message);
       res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
