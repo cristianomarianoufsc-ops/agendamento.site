@@ -504,7 +504,7 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
-  const handleConsolidateAgenda = () => {
+  const handleConsolidateAgenda = async () => {
     // Plano C: Gerar o relatório em Markdown diretamente no frontend
     const inscricoes = unificados; // Usar a lista de inscrições já carregada
 
@@ -585,17 +585,39 @@ const Admin = ({ viewOnly = false }) => {
       content += `\n`;
     }
 
-    // 3. Forçar o download do arquivo
-    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.md`;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // 3. Enviar o conteúdo Markdown para o backend para conversão em PDF
+    setIsDownloading(true);
+    try {
+      const response = await fetch("/api/generate-pdf", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ markdown: content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao gerar PDF: ${response.statusText}`);
+      }
+
+      // 4. Receber o PDF e forçar o download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      alert("✅ PDF da Agenda Final Consolidada gerado com sucesso!");
+
+    } catch (err) {
+      console.error("Erro no download do PDF:", err);
+      alert(`❌ Falha ao gerar PDF: ${err.message}. Verifique o console para detalhes.`);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
@@ -750,8 +772,22 @@ const Admin = ({ viewOnly = false }) => {
                         </button>
 
                         {/* ✅ BOTÃO CONSOLIDAR AGENDA */}
-                        <button onClick={handleConsolidateAgenda} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm">
-                          <CheckCircle size={16} /> Consolidar Agenda Final
+                        <button 
+                          onClick={handleConsolidateAgenda} 
+                          disabled={isDownloading}
+                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
+                        >
+                          {isDownloading ? (
+                            <>
+                              <Loader className="animate-spin" size={16} />
+                              Gerando PDF...
+                            </>
+                          ) : (
+                            <>
+                              <FileText size={16} />
+                              Consolidar Agenda Final (PDF)
+                            </>
+                          )}
                         </button>
                         
                         {/* ✅ BOTÃO LIMPEZA GERAL */}
