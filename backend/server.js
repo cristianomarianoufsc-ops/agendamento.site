@@ -277,49 +277,6 @@ async function sendEvaluatorCredentials(email, password) {
 	}
 }
 
-async function sendStep1ConfirmationEmail(email, name, eventName, local, etapas) {
-  if (!transporter) {
-    console.error('❌ Erro: Transporter de e-mail não configurado. Verifique EMAIL_USER e EMAIL_PASSWORD no .env');
-    return false;
-  }
-
-  const etapasHtml = etapas.map(etapa => `
-    <li>
-      <strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong>
-      De ${new Date(etapa.inicio).toLocaleString('pt-BR')}
-      até ${new Date(etapa.fim).toLocaleString('pt-BR')}
-    </li>
-  `).join('');
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
-    to: email,
-    subject: `Pré-Agendamento Registrado - ${eventName} - ${local}`,
-    html: `
-      <h2>Confirmação de Pré-Agendamento (Etapa 1)</h2>
-      <p>Prezado(a) ${name},</p>
-      <p>Recebemos seu pré-agendamento para o evento <strong>${eventName}</strong> no local <strong>${local}</strong>.</p>
-      <p><strong>Detalhes do Pré-Agendamento:</strong></p>
-      <ul>
-        ${etapasHtml}
-      </ul>
-      <p><strong>IMPORTANTE:</strong> Este é apenas um **pré-agendamento** da data e horário no calendário. Sua inscrição ainda precisa ser **concluída** na Etapa 2 (Formulário de Inscrição) e, posteriormente, **avaliada** pela comissão.</p>
-      <p>Você deve agora prosseguir para a **Etapa 2** para preencher o formulário completo de inscrição.</p>
-      <p>Em caso de dúvidas, entre em contato com a organização.</p>
-      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
-    `
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ E-mail de confirmação da Etapa 1 enviado com sucesso para:', email);
-    return true;
-  } catch (error) {
-    console.error('❌ Erro ao enviar e-mail de confirmação da Etapa 1 para', email, ':', error);
-    return false;
-  }
-}
-
 // --- 4. FUNCOES UTILITARIAS ---`}
 function normalizeKey(key = "") {
   return key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
