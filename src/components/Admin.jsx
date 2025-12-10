@@ -607,6 +607,7 @@ const Admin = ({ viewOnly = false }) => {
       a.href = url;
       a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(a);
+      a.click(); // <-- Ação de clique para iniciar o download
       a.remove();
       window.URL.revokeObjectURL(url);
       
