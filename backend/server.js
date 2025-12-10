@@ -188,6 +188,52 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
 }
 
 // FUNCOES PARA GERAÇÃO DE SENHA E ENVIO DE EMAIL
+
+async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
+  if (!transporter) {
+    console.error('❌ Erro: Transporter de e-mail não configurado. Verifique EMAIL_USER e EMAIL_PASSWORD no .env');
+    return false;
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    to: email,
+    subject: `Confirmação de Inscrição: ${inscricao.evento_nome || 'Evento'} - #${inscricao.id}`,
+    html: `
+      <h2>Confirmação de Inscrição</h2>
+      <p>Prezado(a) ${inscricao.nome},</p>
+      <p>Sua inscrição para o evento <strong>${inscricao.evento_nome || 'sem nome'}</strong> no local <strong>${inscricao.local || 'sem local'}</strong> foi processada.</p>
+      <p>Em anexo, você encontrará o PDF com o resumo de sua inscrição e os detalhes fornecidos na Etapa 2 (Formulário).</p>
+      <p><strong>Detalhes Principais:</strong></p>
+      <ul>
+        <li><strong>Inscrição ID:</strong> #${inscricao.id}</li>
+        <li><strong>Nome do Evento:</strong> ${inscricao.evento_nome || 'N/A'}</li>
+        <li><strong>Local:</strong> ${inscricao.local || 'N/A'}</li>
+        <li><strong>E-mail de Contato:</strong> ${email}</li>
+      </ul>
+      <p>Em caso de dúvidas, entre em contato com a organização.</p>
+      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+    `,
+    attachments: [
+      {
+        filename: filename,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }
+    ]
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log('✅ PDF de Inscrição enviado com sucesso para:', email);
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao enviar PDF por e-mail para', email, ':', error);
+    return false;
+  }
+}
+
+// FUNCOES PARA GERAÇÃO DE SENHA E ENVIO DE EMAIL
 function generateRandomPassword(length = 6) {
   const chars = '0123456789'; // Apenas dígitos
   let password = '';
@@ -1787,6 +1833,12 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
       res.send(pdfBuffer);
+
+      // NOVO: Enviar o PDF por e-mail
+      const emailDestino = respostaForms ? (respostaForms[Object.keys(respostaForms).find(k => k.toLowerCase().includes("mail"))] || inscricao.email) : inscricao.email;
+      if (emailDestino) {
+        sendPdfByEmail(emailDestino, filename, pdfBuffer, inscricao);
+      }
     });
     
     // Título
