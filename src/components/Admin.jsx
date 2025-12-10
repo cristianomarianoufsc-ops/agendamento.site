@@ -80,6 +80,7 @@ const Admin = ({ viewOnly = false }) => {
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
   const [showAdminPassword, setShowAdminPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha
+  const [showEvaluatorPassword, setShowEvaluatorPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha do avaliador
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -565,14 +566,24 @@ const Admin = ({ viewOnly = false }) => {
             onChange={(e) => setEvaluatorEmail(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-blue-500 focus:border-blue-500"
           />
-          <input // NOVO CAMPO DE SENHA
-            type="password"
-            placeholder="Sua Senha"
-            value={evaluatorPassword}
-            onChange={(e) => setEvaluatorPassword(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-blue-500 focus:border-blue-500"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleViewerLogin(); }}
-          />
+          <div className="relative mb-6">
+            <input // NOVO CAMPO DE SENHA
+              type={showEvaluatorPassword ? "text" : "password"}
+              placeholder="Sua Senha"
+              value={evaluatorPassword}
+              onChange={(e) => setEvaluatorPassword(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleViewerLogin(); }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowEvaluatorPassword(!showEvaluatorPassword)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
+              aria-label={showEvaluatorPassword ? "Esconder senha" : "Mostrar senha"}
+            >
+              {showEvaluatorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
           <button
             onClick={handleViewerLogin}
             className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors"
