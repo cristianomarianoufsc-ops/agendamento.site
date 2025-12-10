@@ -505,7 +505,97 @@ const Admin = ({ viewOnly = false }) => {
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = () => {
-    window.open('/api/consolidate-agenda-text', '_blank');
+    // Plano C: Gerar o relatório em Markdown diretamente no frontend
+    const inscricoes = unificados; // Usar a lista de inscrições já carregada
+
+    // 1. Classificar e contar
+    let aprovadas = 0;
+    let reprovadas = 0;
+    let naoAvaliadas = 0;
+    const listaAprovadas = [];
+    const listaReprovadas = [];
+    const listaNaoAvaliadas = [];
+
+    inscricoes.forEach(inscricao => {
+      const nota = inscricao.finalScore; // Usar finalScore do estado do React
+      
+      if (nota === null || nota === undefined) {
+        naoAvaliadas++;
+        listaNaoAvaliadas.push(inscricao);
+      } else if (nota > 0) {
+        aprovadas++;
+        listaAprovadas.push(inscricao);
+      } else {
+        reprovadas++;
+        listaReprovadas.push(inscricao);
+      }
+    });
+
+    // 2. Gerar o conteúdo em Markdown
+    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
+    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
+
+    // Resumo
+    content += `## Resumo da Classificação\n\n`;
+    content += `| Categoria | Quantidade |\n`;
+    content += `| :--- | :--- |\n`;
+    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
+    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
+    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
+    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
+
+    // Lista de Aprovadas
+    content += `## ✅ Inscrições Aprovadas\n\n`;
+    if (listaAprovadas.length === 0) {
+      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
+    } else {
+      listaAprovadas.forEach((inscricao, index) => {
+        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
+
+    // Lista de Reprovadas
+    content += `## ❌ Inscrições Reprovadas\n\n`;
+    if (listaReprovadas.length === 0) {
+      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
+    } else {
+      listaReprovadas.forEach((inscricao, index) => {
+        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
+
+    // Lista de Não Avaliadas
+    content += `## ⚠️ Inscrições Não Avaliadas\n\n`;
+    if (listaNaoAvaliadas.length === 0) {
+      content += `Nenhuma inscrição não avaliada.\n\n`;
+    } else {
+      listaNaoAvaliadas.forEach((inscricao, index) => {
+        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
+        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
+        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+      });
+      content += `\n`;
+    }
+
+    // 3. Forçar o download do arquivo
+    const filename = `Agenda_Final_Simulacao_${new Date().toISOString().slice(0, 10)}.md`;
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
