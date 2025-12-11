@@ -278,4 +278,14 @@ app.listen(PORT, () => {
   authenticateGoogle();
 });
 
+// Middleware de fallback para roteamento do lado do cliente (SPA)
+app.use((req, res, next) => {
+  // Ignora rotas de API
+  if (req.url.startsWith('/api')) {
+    return next();
+  }
+  // Envia o index.html para todas as outras rotas (fallback)
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 
