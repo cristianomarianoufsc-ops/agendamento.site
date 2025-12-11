@@ -189,11 +189,7 @@ async function getInscricaoCompleta(id) {
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rota catch-all para roteamento do lado do cliente (SPA)
-// Esta rota deve ser a última, após todas as rotas de API
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
 
 
 
@@ -280,4 +276,9 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
   authenticateGoogle();
+});
+
+// Rota catch-all final para roteamento do lado do cliente (SPA)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
