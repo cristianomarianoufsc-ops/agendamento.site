@@ -100,14 +100,19 @@ async function getInscricaoCompleta(id) {
 
       let headerRowIndex = -1;
       for (let i = 0; i < rows.length; i++) {
-        const firstCell = rows[i][0];
-        if (firstCell && typeof firstCell === 'string') {
-          const normalizedFirstCell = normalizeKey(firstCell);
-          console.log(`🔍 [DEBUG-SHEETS] Verificando linha ${i + 1}. Primeira célula normalizada: "${normalizedFirstCell.substring(0, 30)}..."`);
-          if (normalizedFirstCell.includes('carimbo') || normalizedFirstCell.includes('timestamp')) {
-            headerRowIndex = i;
-            break;
+        const row = rows[i];
+        const isHeaderRow = row.some(cell => {
+          if (cell && typeof cell === 'string') {
+            const normalizedCell = normalizeKey(cell);
+            return normalizedCell.includes('carimbo') || normalizedCell.includes('timestamp');
           }
+          return false;
+        });
+
+        if (isHeaderRow) {
+          headerRowIndex = i;
+          console.log(`🔍 [DEBUG-SHEETS] Cabeçalho encontrado na linha ${i + 1} após varrer todas as colunas.`);
+          break;
         }
       }
 
