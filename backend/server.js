@@ -752,7 +752,7 @@ app.get("/api/inscricoes", async (req, res) => {
         let headerRowIndex = -1;
         for (let i = 0; i < rows.length; i++) {
           // A linha de cabeçalho do Forms sempre contém o campo "Carimbo de Data/Hora"
-          if (rows[i].some(cell => normalizeKey(cell).includes('carimbo de data/hora'))) {
+          if (rows[i].some(cell => typeof cell === 'string' && normalizeKey(cell).includes('carimbo de data/hora'))) {
             headerRowIndex = i;
             break;
           }
