@@ -728,7 +728,16 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
-      const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
+      // Tenta buscar a configuração do banco de dados
+      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
+      let config = {};
+      if (configResult.rows.length > 0) {
+        config = JSON.parse(configResult.rows[0].config_json);
+      } else {
+        // Fallback para o arquivo local se não estiver no banco (desenvolvimento)
+        config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
+      }
+
       if (config.sheetId) {
         const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
         const rows = (response.data.values || []);
@@ -739,6 +748,7 @@ app.get("/api/inscricoes", async (req, res) => {
       }
     } catch (e) {
       console.warn("⚠️ [UNIFY] Aviso: Não foi possível buscar dados da planilha.", e.message);
+      console.warn("⚠️ [UNIFY] Detalhes do erro:", e.stack);
     }
 
     const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
