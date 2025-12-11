@@ -17,22 +17,14 @@ const HomePage = () => {
     enableExternalEdital: true,
     enableRehearsal: true,
     buttonExternalEditalText: "Edital Externo", // NOVO CAMPO
-  });
-  const [loading, setLoading] = useState(true);
-
+  });  const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetch("/api/config" )
       .then(res => res.json())
       .then(data => {
-        setConfig(data);
-        setLoading(false);
-      })
+        setConfig(data);        setLoading(false);      })
       .catch(err => {
-        console.error("Erro ao buscar configurações da página inicial:", err);
-        setLoading(false);
-      });
-  }, []);
-
+        console.error("Erro ao buscar configurações da página inicial:", err);        setLoading(false);      });  }, []);
   // Componente de botão reutilizável para evitar repetição
   const ActionButton = ({ to, label, color, enabled }) => {
     const disabledStyle = {
@@ -62,8 +54,7 @@ const HomePage = () => {
         <a href="#" onClick={(e) => e.preventDefault()} style={finalStyle}>
           {label}
         </a>
-      );
-    }
+      );    }
 
     return <Link to={to} style={finalStyle}>{label}</Link>;
   };
@@ -95,11 +86,10 @@ const HomePage = () => {
         </a>
       </div>
 
-      {/* Conteúdo Principal Centralizado */}
-      <div style={{ textAlign: 'center', marginTop: '5rem', padding: '1rem' }}>
+      {/* Conteúdo Principal Centralizado */}      <div style={{ textAlign: 'center', marginTop: '5rem', padding: '1rem' }}>
         <h1 style={{ fontSize: '2.5rem', color: '#333' }}>Sistema de Agendamento DAC</h1>
-      <p style={{ fontSize: '1.2rem', color: '#666' }}>O que você gostaria de fazer?</p>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', marginTop: '2.5rem' }}>
+        <p style={{ fontSize: '1.2rem', color: '#666' }}>O que você gostaria de fazer?</p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', marginTop: '2.5rem' }}>
         
         <ActionButton
           to="#" // Rota do edital interno, se existir
@@ -121,10 +111,10 @@ const HomePage = () => {
           color="#16a34a"
           enabled={config.enableRehearsal}
         />
+        </div>
       </div>
     </div>
-  );
-};
+  );};
 
 
 
