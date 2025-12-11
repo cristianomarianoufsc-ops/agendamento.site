@@ -50,25 +50,11 @@ async function authenticateGoogle() {
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      let credentials;
-      try {
-        // 1. Tenta parsear como JSON (se o usuário colocou o conteúdo na variável)
-        credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      } catch (e) {
-        // 2. Se falhar, assume que é um caminho de arquivo e tenta ler o arquivo
-        try {
-          const fileContent = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf-8');
-          credentials = JSON.parse(fileContent);
-        } catch (fileError) {
-          console.error('❌ ERRO AO TENTAR LER ARQUIVO DE CREDENCIAIS:', fileError.message);
-          throw new Error('O conteúdo de GOOGLE_APPLICATION_CREDENTIALS não é um JSON válido nem um caminho de arquivo acessível.');
-        }
-      }
-
-      auth = new google.auth.GoogleAuth({
-        credentials,
+      const { auth: fileAuth } = await google.auth.getClient({
+        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
+      auth = fileAuth;
     } else {
       throw new Error('Nenhuma credencial do Google encontrada.');
     }
