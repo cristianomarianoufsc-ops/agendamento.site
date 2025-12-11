@@ -5,17 +5,10 @@ import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRi
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal";
 import jsPDF from "jspdf";
-import "jspdf-autotable"; 
+
 
 const AppVertical = () => {
   // ESTADOS
-
-  // Garante que o jspdf-autotable se anexe ao jsPDF
-  useEffect(() => {
-    if (jsPDF && typeof window !== 'undefined') {
-      window.jsPDF = jsPDF;
-    }
-  }, []);
   const [localSelecionado, setLocalSelecionado] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -514,12 +507,12 @@ const handleSendEmail = async () => {
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
 
-  const handleDownloadPDF = () => {
-    console.log("handleDownloadPDF: Função chamada.");
+  const handleDownloadPDF = async () => {
     try {
+      // Importação local para garantir que o autotable se anexe ao jsPDF
+      // Importação dinâmica para garantir que o autotable se anexe ao jsPDF
+      await import("jspdf-autotable"); 
       const doc = new jsPDF();
-      console.log("handleDownloadPDF: Objeto jsPDF (doc) criado com sucesso.");
-      console.log("handleDownloadPDF: Verificando doc.autoTable. Tipo:", typeof doc.autoTable);
       
       // Título
     
@@ -605,9 +598,8 @@ const handleSendEmail = async () => {
     
     // Salvar PDF
     doc.save(`Inscricao_1Etapa_${userData.eventName.replace(/\s+/g, '_')}.pdf`);
-    console.log("handleDownloadPDF: PDF salvo com sucesso.");
   } catch (error) {
-    console.error("handleDownloadPDF: Erro durante a geração do PDF:", error);
+    console.error("Erro ao gerar PDF:", error);
     alert("Erro ao gerar PDF. Verifique o console para mais detalhes.");
   }
   };
