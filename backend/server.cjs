@@ -50,11 +50,21 @@ async function authenticateGoogle() {
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      const { auth: fileAuth } = await google.auth.getClient({
-        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-      });
-      auth = fileAuth;
+      try {
+        // Tenta parsear como JSON (se o usuário colocou o conteúdo na variável)
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
+        });
+      } catch (e) {
+        // Se falhar, tenta ler como caminho de arquivo (comportamento original)
+        const { auth: fileAuth } = await google.auth.getClient({
+          keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          scopes: ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
+        });
+        auth = fileAuth;
+      }
     } else {
       throw new Error('Nenhuma credencial do Google encontrada.');
     }
