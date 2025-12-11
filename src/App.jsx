@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
-import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown } from "lucide-react";
+import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import Modal from "./components/Modal"; 
+import Modal from "./components/Modal";
+import jsPDF from "jspdf";
+import "jspdf-autotable"; 
 
 const AppVertical = () => {
   // ESTADOS
@@ -505,6 +507,93 @@ const handleSendEmail = async () => {
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Comprovante de Inscrição - 1ª Etapa", 105, 20, { align: "center" });
+    
+    // Informações do local
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Local: ${locaisNomes[localSelecionado]}`, 20, 35);
+    
+    // Dados do responsável
+    doc.setFont("helvetica", "bold");
+    doc.text("Dados do Responsável:", 20, 45);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${userData.name}`, 20, 52);
+    doc.text(`E-mail: ${userData.email}`, 20, 59);
+    doc.text(`Telefone: ${userData.phone}`, 20, 66);
+    doc.text(`Nome do Evento: ${userData.eventName}`, 20, 73);
+    
+    // Tabela de agendamentos
+    doc.setFont("helvetica", "bold");
+    doc.text("Agendamentos Solicitados:", 20, 85);
+    
+    const tableData = [];
+    
+    // Adicionar ensaio
+    if (resumo.ensaio) {
+      tableData.push([
+        "Ensaio",
+        new Date(resumo.ensaio.date).toLocaleDateString("pt-BR"),
+        `${resumo.ensaio.start} - ${resumo.ensaio.end}`
+      ]);
+    }
+    
+    // Adicionar montagem
+    if (resumo.montagem) {
+      tableData.push([
+        "Montagem",
+        new Date(resumo.montagem.date).toLocaleDateString("pt-BR"),
+        `${resumo.montagem.start} - ${resumo.montagem.end}`
+      ]);
+    }
+    
+    // Adicionar eventos
+    if (resumo.evento && resumo.evento.length > 0) {
+      resumo.evento.forEach((evt, idx) => {
+        tableData.push([
+          `Evento ${idx + 1}`,
+          new Date(evt.date).toLocaleDateString("pt-BR"),
+          `${evt.start} - ${evt.end}`
+        ]);
+      });
+    }
+    
+    // Adicionar desmontagem
+    if (resumo.desmontagem) {
+      tableData.push([
+        "Desmontagem",
+        new Date(resumo.desmontagem.date).toLocaleDateString("pt-BR"),
+        `${resumo.desmontagem.start} - ${resumo.desmontagem.end}`
+      ]);
+    }
+    
+    doc.autoTable({
+      startY: 90,
+      head: [["Etapa", "Data", "Horário"]],
+      body: tableData,
+      theme: "striped",
+      headStyles: { fillColor: [37, 99, 235] },
+      margin: { left: 20, right: 20 }
+    });
+    
+    // Rodapé
+    const finalY = doc.lastAutoTable.finalY || 90;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 20, finalY + 15);
+    doc.text("Este é um comprovante de inscrição da 1ª etapa.", 20, finalY + 22);
+    doc.text("Prossiga para a 2ª etapa para completar sua solicitação.", 20, finalY + 29);
+    
+    // Salvar PDF
+    doc.save(`Inscricao_1Etapa_${userData.eventName.replace(/\s+/g, '_')}.pdf`);
+  };
+
   const handleGoToSecondStep = async () => {
     try {
       const res = await fetch("/api/config");
@@ -839,6 +928,9 @@ const handleSendEmail = async () => {
                   ) : (
                     <div className="space-y-3">
                       <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Etapa 1 Concluída!</div>
+                      <button onClick={handleDownloadPDF} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
+                        <Download size={20}/> Baixar Comprovante em PDF
+                      </button>
                       <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
                         Ir para a 2ª Etapa <ArrowRight size={20}/>
                       </button>
