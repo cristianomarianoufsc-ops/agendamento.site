@@ -279,6 +279,7 @@ app.listen(PORT, () => {
 });
 
 // Middleware de fallback para roteamento do lado do cliente (SPA)
+// Deve ser o último app.use/app.get/app.post, etc.
 app.use((req, res, next) => {
   // Ignora rotas de API
   if (req.url.startsWith('/api')) {
@@ -287,5 +288,7 @@ app.use((req, res, next) => {
   // Envia o index.html para todas as outras rotas (fallback)
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+
 
 
