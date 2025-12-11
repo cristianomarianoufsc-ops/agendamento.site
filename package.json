@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "Sistema de Agendamento de Espaços Culturais - UFSC",
 
-  "main": "backend/server.cjs",
+  "main": "backend/server.js",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 & node backend/server.cjs",
-    "start": "node backend/server.cjs",
+    "dev": "vite --host 0.0.0.0 & node backend/server.js",
+    "start": "node backend/server.js",
     "build": "VITE_API_URL=$VITE_API_URL npx vite build",
     "postbuild": "rm -rf backend/public && cp -r dist backend/public",
     "preview": "vite preview"
