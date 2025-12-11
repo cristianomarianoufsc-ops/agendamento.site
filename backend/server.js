@@ -739,16 +739,26 @@ app.get("/api/inscricoes", async (req, res) => {
       }
 
       if (config.sheetId) {
+        console.log(`\n🔍 [DEBUG-SHEETS] Tentando buscar dados da planilha com ID: ${config.sheetId}`);
         const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
         const rows = (response.data.values || []);
+        
+        console.log(`🔍 [DEBUG-SHEETS] Resposta da API - Número de linhas recebidas: ${rows.length}`);
+        if (rows.length > 0) {
+          console.log(`🔍 [DEBUG-SHEETS] Cabeçalhos (primeira linha): ${rows[0].join(', ')}`);
+        }
+
         if (rows.length > 1) {
           const headers = rows[0];
           formsDataRows = rows.slice(1).map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
+          console.log(`✅ [DEBUG-SHEETS] Dados da planilha processados com sucesso. Total de linhas de dados: ${formsDataRows.length}`);
+        } else {
+          console.log("❌ [DEBUG-SHEETS] A planilha não contém dados (apenas cabeçalho ou está vazia).");
         }
       }
     } catch (e) {
-      console.warn("⚠️ [UNIFY] Aviso: Não foi possível buscar dados da planilha.", e.message);
-      console.warn("⚠️ [UNIFY] Detalhes do erro:", e.stack);
+      console.error("❌ [UNIFY] ERRO CRÍTICO ao buscar dados da planilha:", e.message);
+      console.error("❌ [UNIFY] Detalhes do erro:", e.stack);
     }
 
     const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
