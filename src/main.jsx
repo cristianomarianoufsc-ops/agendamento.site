@@ -73,8 +73,31 @@ const HomePage = () => {
   }
 
   return (
-    <div style={{ textAlign: 'center', marginTop: '5rem', fontFamily: 'sans-serif', padding: '1rem' }}>
-      <h1 style={{ fontSize: '2.5rem', color: '#333' }}>Sistema de Agendamento DAC</h1>
+    <div style={{ fontFamily: 'sans-serif' }}>
+      {/* Botão de Acesso à Área Administrativa no Canto Superior Direito */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+        <a 
+          href="/admin" 
+          target="_blank" 
+          style={{ 
+            padding: '0.5rem 1rem', 
+            color: '#2563eb', 
+            textDecoration: 'none', 
+            borderRadius: '4px', 
+            fontWeight: 'bold',
+            border: '1px solid #2563eb',
+            transition: 'background-color 0.3s, color 0.3s'
+          }}
+          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; e.currentTarget.style.color = 'white'; }}
+          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#2563eb'; }}
+        >
+          Área Administrativa
+        </a>
+      </div>
+
+      {/* Conteúdo Principal Centralizado */}
+      <div style={{ textAlign: 'center', marginTop: '5rem', padding: '1rem' }}>
+        <h1 style={{ fontSize: '2.5rem', color: '#333' }}>Sistema de Agendamento DAC</h1>
       <p style={{ fontSize: '1.2rem', color: '#666' }}>O que você gostaria de fazer?</p>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', marginTop: '2.5rem' }}>
         
@@ -102,6 +125,7 @@ const HomePage = () => {
     </div>
   );
 };
+
 
 
 // 3. Defina todas as rotas da sua aplicação aqui
