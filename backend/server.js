@@ -755,15 +755,36 @@ app.get("/api/inscricoes", async (req, res) => {
       const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
       const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
       
+      // 1. Procurar pela correspondência em cada linha da planilha
+      // IMPORTANTE: Procurar pelas chaves de e-mail e telefone EM CADA LINHA INDIVIDUALMENTE
+      // porque o Google Forms pode ter variações nos nomes das colunas
       const match = formsDataRows.find(rowData => {
         let emailForms = '', telForms = '';
-        for (const key in rowData) {
-            const normalizedKey = normalizeKey(key);
-            if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
-            if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+
+        // 2. Identificar as chaves de E-mail e Telefone NESTA LINHA ESPECÍFICA
+        const rowKeys = Object.keys(rowData);
+        const rowEmailKey = rowKeys.find(key => normalizeKey(key).includes('mail'));
+        const rowPhoneKey = rowKeys.find(key => normalizeKey(key).includes('fone') || normalizeKey(key).includes('telefone'));
+
+        // 3. Extrair e normalizar os dados usando as chaves identificadas
+        if (rowEmailKey) {
+          emailForms = (rowData[rowEmailKey] || "").trim().toLowerCase();
         }
-        return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        if (rowPhoneKey) {
+          telForms = (rowData[rowPhoneKey] || "").replace(/\D/g, "");
+        }
+
+        // 4. Lógica de correspondência
+        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        
+        // Se o problema persistir, o usuário pode descomentar o log abaixo para debug no Render
+        // if (isMatch) {
+        //   console.log(`✅ [UNIFY] Match encontrado para Inscrição #${inscricao.id}. Email: ${emailForms}, Telefone: ${telForms}.`);
+        // }
+        
+        return isMatch;
       });
+
 
       let proponenteTipo = 'Não identificado';
       if (match) {
