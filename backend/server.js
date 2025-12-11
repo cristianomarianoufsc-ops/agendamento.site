@@ -185,8 +185,9 @@ if (resend) {
 // --- 3.2. CONFIGURACAO DO BREVO API (RECOMENDADO) ---
 let brevoApi = null;
 if (process.env.BREVO_API_KEY) {
-  brevoApi = SibApiV3Sdk.ApiClient.instance;
-  brevoApi.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+  const apiClient = SibApiV3Sdk.ApiClient.instance;
+  apiClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
+  brevoApi = new SibApiV3Sdk.TransactionalEmailsApi(apiClient);
   console.log('✅ Serviço de e-mail Brevo API configurado com sucesso!');
 } else {
   console.warn('⚠️ Variável BREVO_API_KEY não encontrada. O Brevo API está desabilitado.');
