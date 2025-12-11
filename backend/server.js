@@ -1475,8 +1475,8 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
 
   const etapasHtml = etapas.map(etapa => {
     const dataFormatada = new Date(etapa.inicio).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-    const horaInicio = new Date(etapa.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-    const horaFim = new Date(etapa.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const horaInicio = new Date(etapa.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo', hour12: false });
+    const horaFim = new Date(etapa.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo', hour12: false });
     return `<li><strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
   }).join('');
 
