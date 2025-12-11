@@ -2,7 +2,7 @@
   "name": "agendamento-ufsc",
   "version": "1.0.0",
   "description": "Sistema de Agendamento de Espaços Culturais - UFSC",
-  "type": "module",
+
   "main": "backend/server.cjs",
   "scripts": {
     "dev": "vite --host 0.0.0.0 & node backend/server.cjs",
