@@ -5,6 +5,7 @@ import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRi
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal";
 import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 
 const AppVertical = () => {
@@ -507,11 +508,8 @@ const handleSendEmail = async () => {
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = () => {
     try {
-      // Importação local para garantir que o autotable se anexe ao jsPDF
-      // Importação dinâmica para garantir que o autotable se anexe ao jsPDF
-      await import("jspdf-autotable"); 
       const doc = new jsPDF();
       
       // Título
