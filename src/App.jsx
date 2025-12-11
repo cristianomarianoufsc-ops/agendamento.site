@@ -515,7 +515,13 @@ const handleSendEmail = async () => {
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
 
   const handleDownloadPDF = () => {
-    const doc = new jsPDF();
+    console.log("handleDownloadPDF: Função chamada.");
+    try {
+      const doc = new jsPDF();
+      console.log("handleDownloadPDF: Objeto jsPDF (doc) criado com sucesso.");
+      console.log("handleDownloadPDF: Verificando doc.autoTable. Tipo:", typeof doc.autoTable);
+      
+      // Título
     
     // Título
     doc.setFontSize(18);
@@ -599,6 +605,11 @@ const handleSendEmail = async () => {
     
     // Salvar PDF
     doc.save(`Inscricao_1Etapa_${userData.eventName.replace(/\s+/g, '_')}.pdf`);
+    console.log("handleDownloadPDF: PDF salvo com sucesso.");
+  } catch (error) {
+    console.error("handleDownloadPDF: Erro durante a geração do PDF:", error);
+    alert("Erro ao gerar PDF. Verifique o console para mais detalhes.");
+  }
   };
 
   const handleGoToSecondStep = async () => {
