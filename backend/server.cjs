@@ -50,11 +50,11 @@ async function authenticateGoogle() {
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      const { auth: fileAuth } = await google.auth.getClient({
-        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+      auth = new google.auth.GoogleAuth({
+        credentials,
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
-      auth = fileAuth;
     } else {
       throw new Error('Nenhuma credencial do Google encontrada.');
     }
@@ -190,7 +190,8 @@ async function getInscricaoCompleta(id) {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Rota catch-all para roteamento do lado do cliente (SPA)
-app.get(/^\/(?!api).*/, (req, res) => {
+// Esta rota deve ser a última, após todas as rotas de API
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
