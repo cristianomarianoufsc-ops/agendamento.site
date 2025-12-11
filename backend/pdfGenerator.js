@@ -132,7 +132,8 @@ function generatePdfFromMarkdown(markdownContent, res) {
             } else if (title === 'Inscrições Reprovadas') {
                 mode = 'reprovadas';
             } else if (title === 'Inscrições Não Avaliadas') {
-                mode = 'nao_avaliadas';
+                // A seção 'Não Avaliadas' será ignorada conforme solicitação do usuário.
+                // No entanto, precisamos renderizar as colunas Aprovadas/Reprovadas antes de ignorar.
                 
                 // --- RENDERIZAÇÃO EM DUAS COLUNAS AQUI ---
                 const margin = 50;
@@ -153,10 +154,8 @@ function generatePdfFromMarkdown(markdownContent, res) {
                 doc.y = finalY;
                 doc.moveDown(1);
 
-                // Renderiza o título "Inscrições Não Avaliadas"
-                doc.moveDown(0.5);
-                addFormattedText(doc, title, { size: 14, bold: true, color: '#004AAD' });
-                doc.moveDown(0.5);
+                // Define o modo para 'ignorar' para o restante do conteúdo
+                mode = 'ignorar';
             }
             return;
         }
@@ -166,31 +165,9 @@ function generatePdfFromMarkdown(markdownContent, res) {
             aprovadasLines.push(line);
         } else if (mode === 'reprovadas') {
             reprovadasLines.push(line);
-        } else if (mode === 'nao_avaliadas') {
-            // A seção 'Não Avaliadas' é renderizada linha por linha, como antes
-            // Listas (Não Avaliadas)
-            if (line.match(/^\d+\.\s*\*\*(.*?)\*\*/)) {
-                const match = line.match(/^\d+\.\s*\*\*(.*?)\*\* \((.*?)\) - Nota: (.*)$/);
-                if (match) {
-                    const [, eventoNome, local, nota] = match;
-                    addFormattedText(doc, `\u2022 ${eventoNome} (${local}) - Nota: ${nota}`, { size: 10, bold: true });
-                }
-                return;
-            }
-            
-            // Sub-item da lista
-            if (line.startsWith('*Proponente:')) {
-                const text = line.replace(/\*/g, '').trim();
-                addFormattedText(doc, `  ${text}`, { size: 9, color: 'gray' });
-                doc.moveDown(0.2);
-                return;
-            }
-
-            // Parágrafos simples
-            if (line.length > 0) {
-                addFormattedText(doc, line, { size: 10 });
-                doc.moveDown(0.5);
-            }
+        } else if (mode === 'ignorar') {
+            // Ignora o conteúdo da seção "Inscrições Não Avaliadas"
+            return;
         }
 
         // Tabela (apenas no modo 'header')
