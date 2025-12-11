@@ -4,7 +4,7 @@ import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal";
-import jsPDF from "jspdf";
+import { jsPDF } from "jspdf";
 import "jspdf-autotable"; 
 
 const AppVertical = () => {
