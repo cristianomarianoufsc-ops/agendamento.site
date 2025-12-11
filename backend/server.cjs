@@ -118,7 +118,7 @@ async function getInscricaoCompleta(id) {
         if (firstCell && typeof firstCell === 'string') {
           const normalizedFirstCell = normalizeKey(firstCell);
           console.log(`🔍 [DEBUG-SHEETS] Verificando linha ${i + 1}. Primeira célula normalizada: "${normalizedFirstCell.substring(0, 30)}..."`);
-          if (normalizedFirstCell.includes('carimbo de data/hora')) {
+          if (normalizedFirstCell.includes('carimbo') || normalizedFirstCell.includes('timestamp')) {
             headerRowIndex = i;
             break;
           }
