@@ -50,26 +50,25 @@ async function authenticateGoogle() {
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Tenta autenticar usando o caminho do arquivo (comportamento padrão)
+      let credentials;
       try {
-        const { auth: fileAuth } = await google.auth.getClient({
-          keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-          scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-        });
-        auth = fileAuth;
+        // 1. Tenta parsear como JSON (se o usuário colocou o conteúdo na variável)
+        credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
       } catch (e) {
-        // Se falhar, tenta autenticar usando o conteúdo da variável como JSON
+        // 2. Se falhar, assume que é um caminho de arquivo e tenta ler o arquivo
         try {
-          const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-          auth = new google.auth.GoogleAuth({
-            credentials,
-            scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-          });
-        } catch (jsonError) {
-          console.error('❌ ERRO AO TENTAR PARSEAR JSON:', jsonError.message);
-          throw e; // Lança o erro original de keyFile
+          const fileContent = fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf-8');
+          credentials = JSON.parse(fileContent);
+        } catch (fileError) {
+          console.error('❌ ERRO AO TENTAR LER ARQUIVO DE CREDENCIAIS:', fileError.message);
+          throw new Error('O conteúdo de GOOGLE_APPLICATION_CREDENTIALS não é um JSON válido nem um caminho de arquivo acessível.');
         }
       }
+
+      auth = new google.auth.GoogleAuth({
+        credentials,
+        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
+      });
     } else {
       throw new Error('Nenhuma credencial do Google encontrada.');
     }
