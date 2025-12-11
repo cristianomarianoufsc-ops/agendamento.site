@@ -50,12 +50,22 @@ async function authenticateGoogle() {
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
     } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Assume que o conteúdo é o JSON da Service Account
-      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
-      });
+      // Plano B: Salvar o conteúdo da variável de ambiente em um arquivo temporário
+      // e usar o caminho do arquivo para autenticação.
+      const tempFilePath = path.join('/tmp', 'google-credentials.json');
+      try {
+        fs.writeFileSync(tempFilePath, process.env.GOOGLE_APPLICATION_CREDENTIALS);
+        console.log('🔑 Credenciais salvas em arquivo temporário:', tempFilePath);
+        
+        const { auth: fileAuth } = await google.auth.getClient({
+          keyFile: tempFilePath,
+          scopes: ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.readonly"],
+        });
+        auth = fileAuth;
+      } catch (e) {
+        console.error('❌ ERRO NO PLANO B (Arquivo Temporário):', e.message);
+        throw new Error('Falha ao autenticar com GOOGLE_APPLICATION_CREDENTIALS. Verifique o formato do JSON.');
+      }
     } else {
       throw new Error('Nenhuma credencial do Google encontrada.');
     }
