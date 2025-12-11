@@ -748,12 +748,25 @@ app.get("/api/inscricoes", async (req, res) => {
           console.log(`🔍 [DEBUG-SHEETS] Cabeçalhos (primeira linha): ${rows[0].join(', ')}`);
         }
 
-        if (rows.length > 1) {
-          const headers = rows[0];
-          formsDataRows = rows.slice(1).map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
-          console.log(`✅ [DEBUG-SHEETS] Dados da planilha processados com sucesso. Total de linhas de dados: ${formsDataRows.length}`);
+        // --- NOVA LÓGICA: Encontrar a linha de cabeçalho correta ---
+        let headerRowIndex = -1;
+        for (let i = 0; i < rows.length; i++) {
+          // A linha de cabeçalho do Forms sempre contém o campo "Carimbo de Data/Hora"
+          if (rows[i].some(cell => normalizeKey(cell).includes('carimbo de data/hora'))) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex !== -1) {
+          const headers = rows[headerRowIndex];
+          formsDataRows = rows.slice(headerRowIndex + 1)
+            .filter(row => row.length > 0 && row.some(cell => cell && String(cell).trim() !== '')) // Filtra linhas completamente vazias
+            .map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
+          
+          console.log(`✅ [DEBUG-SHEETS] Cabeçalho encontrado na linha ${headerRowIndex + 1}. Total de linhas de dados processadas: ${formsDataRows.length}`);
         } else {
-          console.log("❌ [DEBUG-SHEETS] A planilha não contém dados (apenas cabeçalho ou está vazia).");
+          console.log("❌ [DEBUG-SHEETS] Não foi possível encontrar a linha de cabeçalho ('Carimbo de Data/Hora') na planilha.");
         }
       }
     } catch (e) {
