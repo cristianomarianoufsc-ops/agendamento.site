@@ -808,7 +808,7 @@ app.get("/api/inscricoes", async (req, res) => {
         }
 
         return emailMatch || telMatch;
-      });entar o log abaixo para debug no Render
+      });
         // if (isMatch) {
         //   console.log(`✅ [UNIFY] Match encontrado para Inscrição #${inscricao.id}. Email: ${emailForms}, Telefone: ${telForms}.`);
         // }
