@@ -13,7 +13,6 @@ import { google } from "googleapis";
 import pkg from 'pg';
 const { Pool } = pkg;
 import nodemailer from "nodemailer";
-import * as SibApiV3Sdk from '@sendinblue/client';
 import { Resend } from 'resend';
 import { parse } from "csv-parse/sync";
 import archiver from "archiver";
@@ -183,11 +182,8 @@ if (resend) {
 }
 
 // --- 3.2. CONFIGURACAO DO BREVO API (RECOMENDADO) ---
-let brevoApi = null;
-if (process.env.BREVO_API_KEY) {
-  const apiClient = SibApiV3Sdk.ApiClient.instance;
-  apiClient.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-  brevoApi = new SibApiV3Sdk.TransactionalEmailsApi(apiClient);
+let brevoApiKey = process.env.BREVO_API_KEY || null;
+if (brevoApiKey) {
   console.log('✅ Serviço de e-mail Brevo API configurado com sucesso!');
 } else {
   console.warn('⚠️ Variável BREVO_API_KEY não encontrada. O Brevo API está desabilitado.');
@@ -1511,22 +1507,35 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   console.log(`✅ Tentando enviar e-mail de confirmação da Etapa 1 para: ${email}`);
 
   // --- 1. Tenta Brevo API (Prioridade) ---
-  if (brevoApi) {
+  if (brevoApiKey) {
     try {
-      const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-      const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+      const payload = {
+        sender: { email: remetente, name: "Sistema de Agendamento UFSC" },
+        to: [{ email: email, name: nome }],
+        subject: subject,
+        htmlContent: htmlContent
+      };
       
-      sendSmtpEmail.sender = { email: remetente, name: "Sistema de Agendamento UFSC" };
-      sendSmtpEmail.to = [{ email: email, name: nome }];
-      sendSmtpEmail.subject = subject;
-      sendSmtpEmail.htmlContent = htmlContent;
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey
+        },
+        body: JSON.stringify(payload)
+      });
       
-      const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
-      console.log(`✅✅✅ E-mail enviado com sucesso via Brevo API! ID: ${data.body.messageId}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`HTTP ${response.status}: ${JSON.stringify(error)}`);
+      }
+      
+      const data = await response.json();
+      console.log(`✅✅✅ E-mail enviado com sucesso via Brevo API REST! ID: ${data.messageId}`);
       return true;
       
     } catch (error) {
-      console.error(`❌ Erro ao enviar e-mail via Brevo API para ${email}:`, error.response?.text || error.message);
+      console.error(`❌ Erro ao enviar e-mail via Brevo API REST para ${email}:`, error.message);
       // Continua para o fallback
     }
   }
