@@ -19,8 +19,207 @@ function addFormattedText(doc, text, style = {}) {
        });
 }
 
+// Função para renderizar um bloco de texto (lista de inscrições) em uma posição específica
+function renderInscricoesBlock(doc, title, contentLines, x, y, width) {
+    doc.y = y;
+    doc.x = x;
+
+    // Título da Seção
+    doc.fillColor('#004AAD')
+       .fontSize(14)
+       .font('Helvetica-Bold')
+       .text(title, x, doc.y, { width: width });
+    doc.moveDown(0.5);
+
+    doc.fillColor('black')
+       .fontSize(10)
+       .font('Helvetica');
+
+    contentLines.forEach(line => {
+        line = line.trim();
+        if (line.length === 0) return;
+
+        // Item principal da lista
+        if (line.match(/^\d+\.\s*\*\*(.*?)\*\*/)) {
+            const match = line.match(/^\d+\.\s*\*\*(.*?)\*\* \((.*?)\) - Nota: (.*)$/);
+            if (match) {
+                const [, eventoNome, local, nota] = match;
+                doc.font('Helvetica-Bold').text(`\u2022 ${eventoNome} (${local}) - Nota: ${nota}`, { continued: false, width: width });
+                doc.font('Helvetica'); // Volta ao normal
+            }
+            return;
+        }
+        
+        // Sub-item da lista (Proponente)
+        if (line.startsWith('*Proponente:')) {
+            const text = line.replace(/\*/g, '').trim();
+            doc.fillColor('gray').fontSize(9).text(`  ${text}`, { width: width });
+            doc.fillColor('black').fontSize(10); // Volta ao normal
+            doc.moveDown(0.2);
+            return;
+        }
+
+        // Parágrafos simples (ex: "Nenhuma inscrição aprovada...")
+        doc.text(line, { width: width });
+        doc.moveDown(0.5);
+    });
+}
+
 // Função principal de conversão de Markdown para PDF
 function generatePdfFromMarkdown(markdownContent, res) {
+    const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        info: {
+            Title: 'Agenda Final Consolidada',
+            Author: 'Sistema de Agendamento UFSC',
+        }
+    });
+
+    // Configurar o cabeçalho de resposta para PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="Agenda_Final_Consolidada.pdf"');
+
+    // Pipe o PDF para a resposta HTTP
+    doc.pipe(res);
+
+    // --- Lógica de Parsing de Markdown ---
+    const lines = markdownContent.split('\n');
+    let inTable = false;
+    let tableHeaders = [];
+    let tableRows = [];
+    
+    let mode = 'header'; // 'header', 'aprovadas', 'reprovadas', 'nao_avaliadas'
+    let aprovadasLines = [];
+    let reprovadasLines = [];
+    let naoAvaliadasLines = [];
+
+    // Título Principal
+    addFormattedText(doc, 'Agenda Final Consolidada', { size: 18, bold: true, align: 'center' });
+    doc.moveDown(0.5);
+
+    lines.forEach(line => {
+        line = line.trim();
+
+        if (line.startsWith('# Simulação de Consolidação da Agenda Final')) {
+            return;
+        }
+
+        if (line.startsWith('Gerado em:')) {
+            addFormattedText(doc, line, { size: 8, color: 'gray' });
+            doc.moveDown(1);
+            return;
+        }
+
+        // Títulos de Seção (##)
+        if (line.startsWith('##')) {
+            if (inTable) {
+                renderTable(doc, tableHeaders, tableRows);
+                inTable = false;
+                tableHeaders = [];
+                tableRows = [];
+            }
+            
+            const title = line.replace(/##\s*/, '').trim();
+            
+            if (title === 'Resumo da Classificação') {
+                mode = 'header';
+                doc.moveDown(0.5);
+                addFormattedText(doc, title, { size: 14, bold: true, color: '#004AAD' });
+                doc.moveDown(0.5);
+            } else if (title === 'Inscrições Aprovadas') {
+                mode = 'aprovadas';
+            } else if (title === 'Inscrições Reprovadas') {
+                mode = 'reprovadas';
+            } else if (title === 'Inscrições Não Avaliadas') {
+                mode = 'nao_avaliadas';
+                
+                // --- RENDERIZAÇÃO EM DUAS COLUNAS AQUI ---
+                const margin = 50;
+                const totalWidth = doc.page.width - 2 * margin;
+                const columnWidth = (totalWidth / 2) - 10; // 10 é o espaço entre colunas
+                const startX = margin;
+                const startY = doc.y;
+                
+                // Coluna Esquerda: Aprovadas
+                renderInscricoesBlock(doc, 'Inscrições Aprovadas', aprovadasLines, startX, startY, columnWidth);
+                
+                // Coluna Direita: Reprovadas
+                const reprovadasX = startX + columnWidth + 20; // 10 de espaço + 10 de margem
+                renderInscricoesBlock(doc, 'Inscrições Reprovadas', reprovadasLines, reprovadasX, startY, columnWidth);
+                
+                // Ajustar a posição Y para continuar após a coluna mais longa
+                const finalY = Math.max(doc.y, doc.page.height - doc.page.margins.bottom);
+                doc.y = finalY;
+                doc.moveDown(1);
+
+                // Renderiza o título "Inscrições Não Avaliadas"
+                doc.moveDown(0.5);
+                addFormattedText(doc, title, { size: 14, bold: true, color: '#004AAD' });
+                doc.moveDown(0.5);
+            }
+            return;
+        }
+
+        // Coleta de Conteúdo
+        if (mode === 'aprovadas') {
+            aprovadasLines.push(line);
+        } else if (mode === 'reprovadas') {
+            reprovadasLines.push(line);
+        } else if (mode === 'nao_avaliadas') {
+            // A seção 'Não Avaliadas' é renderizada linha por linha, como antes
+            // Listas (Não Avaliadas)
+            if (line.match(/^\d+\.\s*\*\*(.*?)\*\*/)) {
+                const match = line.match(/^\d+\.\s*\*\*(.*?)\*\* \((.*?)\) - Nota: (.*)$/);
+                if (match) {
+                    const [, eventoNome, local, nota] = match;
+                    addFormattedText(doc, `\u2022 ${eventoNome} (${local}) - Nota: ${nota}`, { size: 10, bold: true });
+                }
+                return;
+            }
+            
+            // Sub-item da lista
+            if (line.startsWith('*Proponente:')) {
+                const text = line.replace(/\*/g, '').trim();
+                addFormattedText(doc, `  ${text}`, { size: 9, color: 'gray' });
+                doc.moveDown(0.2);
+                return;
+            }
+
+            // Parágrafos simples
+            if (line.length > 0) {
+                addFormattedText(doc, line, { size: 10 });
+                doc.moveDown(0.5);
+            }
+        }
+
+        // Tabela (apenas no modo 'header')
+        if (mode === 'header' && line.startsWith('|') && line.endsWith('|')) {
+            const cells = line.split('|').map(c => c.trim()).filter(c => c.length > 0);
+            
+            if (!inTable) {
+                tableHeaders = cells;
+                inTable = true;
+                return;
+            } else if (cells.every(c => c.startsWith(':') || c.startsWith('-'))) {
+                return;
+            } else {
+                tableRows.push(cells);
+                return;
+            }
+        } else {
+            if (inTable) {
+                renderTable(doc, tableHeaders, tableRows);
+                inTable = false;
+                tableHeaders = [];
+                tableRows = [];
+            }
+        }
+    });
+
+    // Finalizar o documento
+    doc.end();
+}
     const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
@@ -104,31 +303,11 @@ function generatePdfFromMarkdown(markdownContent, res) {
             }
         }
 
-        // Listas (Aprovadas, Reprovadas, Não Avaliadas)
-        if (line.match(/^\d+\.\s*\*\*(.*?)\*\*/)) {
-            const match = line.match(/^\d+\.\s*\*\*(.*?)\*\* \((.*?)\) - Nota: (.*)$/);
-            if (match) {
-                const [, eventoNome, local, nota] = match;
-                addFormattedText(doc, `\u2022 ${eventoNome} (${local}) - Nota: ${nota}`, { size: 10, bold: true });
-            }
-            return;
-        }
-        
-        // Sub-item da lista
-        if (line.startsWith('*Proponente:')) {
-            const text = line.replace(/\*/g, '').trim();
-            addFormattedText(doc, `  ${text}`, { size: 9, color: 'gray' });
-            doc.moveDown(0.2);
-            return;
-        }
-
-        // Parágrafos simples
-        if (line.length > 0) {
-            addFormattedText(doc, line, { size: 10 });
-            doc.moveDown(0.5);
-        }
-    });
-
+        // O código de renderização de listas e parágrafos foi movido para dentro da lógica de modo
+// e para a nova função renderInscricoesBlock.
+// A lógica original de parsing de Markdown será substituída pela nova lógica de coleta e renderização.
+// Apenas a lógica de renderização da última tabela (se houver) é mantida.
+    
     // Renderizar a última tabela se o arquivo terminar com uma
     if (inTable) {
         renderTable(doc, tableHeaders, tableRows);
