@@ -780,8 +780,7 @@ app.get("/api/inscricoes", async (req, res) => {
       
       // 1. Procurar pela correspondência em cada linha da planilha
       // IMPORTANTE: Procurar pelas chaves de e-mail e telefone EM CADA LINHA INDIVIDUALMENTE
-      // porque o Google Forms pode ter variações nos nomes das colunas
-      const match = formsDataRows.find(rowData => {
+      // porque o Google Forms pode ter variações nos nomes das col      const match = formsDataRows.find((rowData, index) => {
         let emailForms = '', telForms = '';
 
         // 2. Identificar as chaves de E-mail e Telefone NESTA LINHA ESPECÍFICA
@@ -798,9 +797,18 @@ app.get("/api/inscricoes", async (req, res) => {
         }
 
         // 4. Lógica de correspondência
-        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        const emailMatch = emailEtapa1 && emailForms && emailEtapa1 === emailForms;
+        const telMatch = telEtapa1 && telForms && telEtapa1 === telForms;
         
-        // Se o problema persistir, o usuário pode descomentar o log abaixo para debug no Render
+        // Log de diagnóstico de unificação (para a primeira inscrição)
+        if (inscricao.id === 1) { 
+          console.log(`\n🔍 [DEBUG-UNIFY] Inscrição #${inscricao.id} (Etapa 1): Email: ${emailEtapa1}, Tel: ${telEtapa1}`);
+          console.log(`🔍 [DEBUG-UNIFY] Linha Forms #${index + 1} (Etapa 2): Email: ${emailForms}, Tel: ${telForms}`);
+          console.log(`🔍 [DEBUG-UNIFY] Match: Email: ${emailMatch}, Tel: ${telMatch}`);
+        }
+
+        return emailMatch || telMatch;
+      });entar o log abaixo para debug no Render
         // if (isMatch) {
         //   console.log(`✅ [UNIFY] Match encontrado para Inscrição #${inscricao.id}. Email: ${emailForms}, Telefone: ${telForms}.`);
         // }
