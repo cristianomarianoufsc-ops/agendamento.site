@@ -155,7 +155,7 @@ await initializeTables();
 // ===================================================================
 function getRequiredAssessments() {
   try {
-    const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+    const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
     if (config.requiredAssessments) {
       return parseInt(config.requiredAssessments, 10);
     }
@@ -439,7 +439,7 @@ app.get("/api/config", async (req, res) => {
 
     // 2. Fallback: tenta buscar do arquivo local (desenvolvimento)
     if (fs.existsSync("config.json")) {
-      const savedConfig = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      const savedConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
       const fullConfig = { ...defaultConfig, ...savedConfig };
       console.log("✅ Configurações carregadas do arquivo local (fallback).");
       return res.json(fullConfig);
@@ -669,7 +669,7 @@ app.get("/api/inscricoes", async (req, res) => {
       
       let requiredAssessmentsForScore = 3;
       try {
-        const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+        const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
         if (config.requiredAssessments) {
           requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
         }
@@ -728,7 +728,7 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
-      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
       if (config.sheetId) {
         const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
         const rows = (response.data.values || []);
@@ -776,7 +776,7 @@ app.get("/api/inscricoes", async (req, res) => {
 
     let requiredAssessments = 3;
     try {
-      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
       if (config.requiredAssessments) {
         requiredAssessments = parseInt(config.requiredAssessments, 10);
       }
@@ -1090,7 +1090,7 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
       
       let requiredAssessmentsForScore = 3;
       try {
-        const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+        const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
         if (config.requiredAssessments) {
           requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
         }
@@ -1606,7 +1606,7 @@ app.get("/api/slides-viewer", async (req, res) => {
         
         let requiredAssessmentsForScore = 3;
         try {
-          const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+          const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf-8"));
           if (config.requiredAssessments) {
             requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
           }
