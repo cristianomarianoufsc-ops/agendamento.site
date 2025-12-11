@@ -278,7 +278,4 @@ app.listen(PORT, () => {
   authenticateGoogle();
 });
 
-// Rota catch-all final para roteamento do lado do cliente (SPA)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+
