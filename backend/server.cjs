@@ -189,6 +189,16 @@ async function getInscricaoCompleta(id) {
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Fallback for client-side routing: serve index.html for all other GET requests
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api')) {
+    // Se for uma rota de API que não foi tratada, retorna 404
+    return res.status(404).send('API endpoint not found');
+  }
+  // Para todas as outras rotas (frontend), serve o index.html para o React Router lidar
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 
 
 
