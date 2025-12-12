@@ -18,6 +18,14 @@ const Modal = ({ user, onClose }) => {
   return ReactDOM.createPortal( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}> <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="bg-white rounded-2xl shadow-xl p-6 m-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"> <Contact size={24} /> Contatos de {user?.nome || "Usuário"} </h3> <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"> <X size={20} /> </button> </div> <div className="space-y-4 text-gray-700"> <p><strong>Nome:</strong> {user?.nome}</p> <div> <p><strong>Telefone(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> {findFormsPhone(user?.formsData) ? ( <li>{findFormsPhone(user.formsData)} (Etapa 2)</li> ) : ( <li>{user?.telefone || "N/A"} (Etapa 1)</li> )} </ul> </div> <div> <p><strong>E-mail(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> <li>{user?.email || "N/A"} (Etapa 1)</li> {user?.formsData && findFormsEmail(user.formsData) && findFormsEmail(user.formsData).toLowerCase() !== user?.email?.toLowerCase() && ( <li>{findFormsEmail(user.formsData)} (Etapa 2)</li> )} </ul> </div> </div> </motion.div> </motion.div>, document.getElementById("modal-root") );
 };
 
+// Função auxiliar para extrair o ID do Google Forms ou Sheets
+const extractIdFromUrl = (url) => {
+  if (!url) return "";
+  // Expressão regular para extrair o ID de forms/d/e/.../viewform ou spreadsheets/d/.../edit
+  const match = url.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : url; // Retorna o ID ou a URL original se não encontrar
+};
+
 // --- COMPONENTE PRINCIPAL ---
 const Admin = ({ viewOnly = false }) => {
   // --- ESTADOS ---
@@ -981,15 +989,7 @@ const Admin = ({ viewOnly = false }) => {
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
-                  // Função auxiliar para extrair o ID do Google Forms ou Sheets
-const extractIdFromUrl = (url) => {
-  if (!url) return "";
-  // Expressão regular para extrair o ID de forms/d/e/.../viewform ou spreadsheets/d/.../edit
-  const match = url.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : url; // Retorna o ID ou a URL original se não encontrar
-};
-
-<h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
+                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
                     <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
