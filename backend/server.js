@@ -226,8 +226,10 @@ if (credentials) {
   console.error('❌ Google APIs não autenticadas. Credenciais não fornecidas.');
 }
 
-const sheets = google.sheets({ version: 'v4', auth });
-const calendar = google.calendar({ version: 'v3', auth });
+// Declarações globais para as APIs do Google (serão inicializadas de forma assíncrona)
+let sheets = null;
+let calendar = null;
+let drive = null;
 
 const calendarIds = {
   teatro: "oto.bezerra@ufsc.br",
@@ -410,46 +412,53 @@ async function atualizarCache() {
   }
 }
 
-
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
-    // Se a variável de ambiente contém JSON, faz o parse
-    try {
-      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-      console.log('🔑 Service Account:', credentials.client_email);
-      auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-      });
-    } catch (e) {
-      console.log('🔑 Não é JSON, usando como caminho de arquivo');
-      // Se não for JSON, assume que é um caminho de arquivo
-      const { auth: fileAuth } = await google.auth.getClient({
-        keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-      });
-      auth = fileAuth;
-    }
-  } else {
-    console.log('🔑 Usando credentials.json local (desenvolvimento)');
-    // Desenvolvimento: usa o arquivo local
-    const credData = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
-    console.log('🔑 Service Account:', credData.client_email);
+// --- 6. INICIALIZAÇÃO DAS GOOGLE APIS (VERSÃO ATUALIZADA) ---
+// Função assíncrona para inicializar as Google APIs
+async function initializeGoogleAPIs() {
+  try {
+    let auth = null;
     
-    // ✅ Usar GoogleAuth com credentials direto
-    auth = new google.auth.GoogleAuth({
-      credentials: credData,
-      scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
-    });
-  }
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
+      // Se a variável de ambiente contém JSON, faz o parse
+      try {
+        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+        console.log('🔑 Service Account:', credentials.client_email);
+        auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
+        });
+      } catch (e) {
+        console.log('🔑 Não é JSON, usando como caminho de arquivo');
+        // Se não for JSON, assume que é um caminho de arquivo
+        const { auth: fileAuth } = await google.auth.getClient({
+          keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
+        });
+        auth = fileAuth;
+      }
+    } else {
+      console.log('🔑 Usando credentials.json local (desenvolvimento)');
+      // Desenvolvimento: usa o arquivo local
+      const credData = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
+      console.log('🔑 Service Account:', credData.client_email);
+      
+      // ✅ Usar GoogleAuth com credentials direto
+      auth = new google.auth.GoogleAuth({
+        credentials: credData,
+        scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
+      });
+    }
 
-  calendar = google.calendar({ version: 'v3', auth });
-  sheets = google.sheets({ version: 'v4', auth });
-  drive = google.drive({ version: 'v3', auth });
-  console.log('✅ Google APIs autenticadas com sucesso!');
-} catch (error) {
-  console.error('❌ Erro ao inicializar Google APIs:', error.message);
-  process.exit(1);
+    // Atualiza as variáveis globais
+    calendar = google.calendar({ version: 'v3', auth });
+    sheets = google.sheets({ version: 'v4', auth });
+    drive = google.drive({ version: 'v3', auth });
+    console.log('✅ Google APIs autenticadas com sucesso!');
+  } catch (error) {
+    console.error('❌ Erro ao inicializar Google APIs:', error.message);
+    process.exit(1);
+  }
 }
 
 // --- 7. CONFIGURAÇÃO DO EXPRESS ---
@@ -2254,8 +2263,23 @@ app.use((req, res) => {
 
 
 // --- 24. INICIALIZAÇÃO DO SERVIDOR ---
-app.listen(port, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${port}` );
-  cron.schedule("*/5 * * * *", atualizarCache);
-  atualizarCache();
-});
+// Inicializa as Google APIs antes de iniciar o servidor
+async function startServer() {
+  try {
+    // Inicializa as Google APIs
+    await initializeGoogleAPIs();
+    
+    // Inicia o servidor Express
+    app.listen(port, () => {
+      console.log(`🚀 Servidor rodando em http://localhost:${port}`);
+      cron.schedule("*/5 * * * *", atualizarCache);
+      atualizarCache();
+    });
+  } catch (error) {
+    console.error('❌ Erro ao iniciar o servidor:', error.message);
+    process.exit(1);
+  }
+}
+
+// Chama a função de inicialização
+startServer();
