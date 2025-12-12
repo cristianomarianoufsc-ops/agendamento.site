@@ -183,7 +183,9 @@ async function getRequiredAssessments() {
 let credentials = null;
 if (process.env.GOOGLE_CREDENTIALS_JSON) {
   try {
-    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    // A chave privada (private_key) pode ter quebras de linha que precisam ser restauradas
+    const jsonString = process.env.GOOGLE_CREDENTIALS_JSON.replace(/\\n/g, '\n');
+    credentials = JSON.parse(jsonString);
     console.log('✅ Credenciais do Google lidas da variável de ambiente.');
   } catch (e) {
     console.error('❌ Erro ao parsear GOOGLE_CREDENTIALS_JSON:', e.message);
@@ -203,27 +205,6 @@ if (!credentials) {
   } catch (e) {
     console.error('❌ Erro ao ler credentials.json local:', e.message);
   }
-}
-
-// Autenticação com as credenciais encontradas
-let auth = null;
-if (credentials) {
-  auth = new google.auth.JWT(
-    credentials.client_email,
-    null,
-    credentials.private_key,
-    ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets']
-  );
-  auth.authorize((err) => {
-    if (err) {
-      console.error('❌ Erro ao autenticar Google APIs:', err);
-    } else {
-      console.log('✅ Google APIs autenticadas com sucesso!');
-      console.log('🔑 Service Account:', credentials.client_email);
-    }
-  });
-} else {
-  console.error('❌ Google APIs não autenticadas. Credenciais não fornecidas.');
 }
 
 // Declarações globais para as APIs do Google (serão inicializadas de forma assíncrona)
@@ -422,7 +403,9 @@ async function initializeGoogleAPIs() {
       console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
       // Se a variável de ambiente contém JSON, faz o parse
       try {
-        const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+        // A chave privada (private_key) pode ter quebras de linha que precisam ser restauradas
+        const jsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS.replace(/\\n/g, '\n');
+        const credentials = JSON.parse(jsonString);
         console.log('🔑 Service Account:', credentials.client_email);
         auth = new google.auth.GoogleAuth({
           credentials,
@@ -769,6 +752,7 @@ app.get("/api/inscricoes", async (req, res) => {
     const requiredAssessmentsForScore = await getRequiredAssessments();
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
+      let finalScore = null;
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       
       if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
@@ -1185,6 +1169,7 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
     const requiredAssessmentsForScore = await getRequiredAssessments();
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
+      let finalScore = null;
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       
       if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
@@ -1714,8 +1699,9 @@ app.get("/api/slides-viewer", async (req, res) => {
       const totalEvaluators = totalEvaluatorsResult.rows[0].count;
 
       const inscriptionsWithScores = inscriptions.map(inscription => {
-        const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
-        let finalScore = null;
+      let finalScore = null;
+      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
+
         
         let requiredAssessmentsForScore = 3;
         try {
