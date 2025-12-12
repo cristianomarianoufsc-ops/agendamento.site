@@ -530,6 +530,47 @@ app.post('/api/auth/viewer', async (req, res) => {
     }
 });
 
+// --- ROTA PARA BUSCAR DADOS DO FORMS (DINÂMICO) ---
+app.get('/api/forms-data', async (req, res) => {
+  try {
+    // ID da planilha fixo, conforme solicitado pelo usuário
+    const FIXED_SHEET_ID = '1Fh8G2vQ1Tu4_qXghW6q5X2noxvUAuJA0m70pAwxka-s';
+
+    // Acessa a API do Google Sheets
+    const response = await sheets.spreadsheets.values.get({ 
+      spreadsheetId: FIXED_SHEET_ID, 
+      range: "A:ZZ" 
+    });
+    
+    const rows = (response.data.values || []);
+    
+    if (rows.length <= 1) {
+      return res.json([]); // Retorna array vazio se só tiver cabeçalho ou estiver vazia
+    }
+
+    const headers = rows[0];
+    // Mapeia as linhas de dados para objetos com base nos cabeçalhos
+    const formsData = rows.slice(1).map(row => {
+      const rowData = {};
+      headers.forEach((header, index) => {
+        rowData[header] = row[index] || "";
+      });
+      return rowData;
+    });
+
+    res.json(formsData);
+
+  } catch (e) {
+    console.error('❌ Erro ao buscar dados do Forms/Sheets:', e.message);
+    // Verifica se o erro é de permissão (403) ou credenciais inválidas
+    if (e.code === 403) {
+      res.status(403).json({ error: 'Erro de permissão. Verifique se a conta de serviço tem acesso à planilha.' });
+    } else {
+      res.status(500).json({ error: 'Erro interno ao buscar dados da planilha.' });
+    }
+  }
+});
+
 // --- ROTA PARA AUTENTICAÇÃO DO ADMINISTRADOR ---
 app.post('/api/auth/admin', async (req, res) => {
     const { password } = req.body;
