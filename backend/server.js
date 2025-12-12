@@ -675,10 +675,13 @@ app.get("/api/inscricoes", async (req, res) => {
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       let requiredAssessmentsForScore = 3;
       try {
-        const config = await getConfigFromDB();
-        if (config.requiredAssessments) {
-          requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
-        }
+        // A função map é síncrona, então precisamos de uma função assíncrona auto-executável
+        await (async () => {
+          const config = await getConfigFromDB();
+          if (config.requiredAssessments) {
+            requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
+          }
+        })();
       } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
@@ -732,6 +735,8 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
+      // A rota é async, mas o bloco try/catch não é um escopo de função.
+      // O erro original não estava aqui, mas a lógica de await está correta.
       const config = await getConfigFromDB();
       if (config.sheetId) {
         const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
@@ -1092,10 +1097,13 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       let requiredAssessmentsForScore = 3;
       try {
-        const config = await getConfigFromDB();
-        if (config.requiredAssessments) {
-          requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
-        }
+        // A função map é síncrona, então precisamos de uma função assíncrona auto-executável
+        await (async () => {
+          const config = await getConfigFromDB();
+          if (config.requiredAssessments) {
+            requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
+          }
+        })();
       } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
