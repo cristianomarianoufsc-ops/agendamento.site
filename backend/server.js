@@ -148,7 +148,7 @@ async function initializeTables() {
 }
 
 // Chamar inicialização de tabelas
-// await initializeTables(); // Comentado para teste local sem DB
+await initializeTables();
 
 // ===================================================================
 // ✅ FUNÇÃO AUXILIAR PARA LER CONFIGURAÇÃO DO BANCO DE DADOS
@@ -671,12 +671,18 @@ app.get("/api/inscricoes", async (req, res) => {
       }
     });
 
-    const requiredAssessmentsForScore = await getRequiredAssessments();
-
     const inscriptionsWithScores = inscriptions.map(inscription => {
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
-      
-      if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
+      let requiredAssessmentsForScore = 3;
+      try {
+        // A função map é síncrona, então precisamos de uma função assíncrona auto-executável
+        await (async () => {
+          const config = await getConfigFromDB();
+          if (config.requiredAssessments) {
+            requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
+          }
+        })();
+      } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
         assessmentsForScore.forEach(assessment => {
@@ -1087,12 +1093,18 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
     const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
     const totalEvaluators = totalEvaluatorsResult.rows[0].count;
 
-    const requiredAssessmentsForScore = await getRequiredAssessments();
-
     const inscriptionsWithScores = inscriptions.map(inscription => {
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
-      
-      if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
+      let requiredAssessmentsForScore = 3;
+      try {
+        // A função map é síncrona, então precisamos de uma função assíncrona auto-executável
+        await (async () => {
+          const config = await getConfigFromDB();
+          if (config.requiredAssessments) {
+            requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
+          }
+        })();
+      } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
         assessmentsForScore.forEach(assessment => {
