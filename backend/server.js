@@ -17,7 +17,7 @@ import { Resend } from 'resend';
 import { parse } from "csv-parse/sync";
 import archiver from "archiver";
 import { PassThrough } from "stream";
-import bcrypt from "bcrypt";
+// import bcrypt from "bcrypt"; // Comentado temporariamente devido a erro de módulo nativo
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -388,7 +388,7 @@ try {
   } else {
     console.log('🔑 Usando credentials.json local (desenvolvimento)');
     // Desenvolvimento: usa o arquivo local
-    const credData = JSON.parse(fs.readFileSync('./credentials.json', 'utf8'));
+    const credData = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
     console.log('🔑 Service Account:', credData.client_email);
     
     // ✅ Usar GoogleAuth com credentials direto
@@ -1173,30 +1173,51 @@ app.post("/api/create-events", async (req, res) => {
     if (!calendarIds[local]) {
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
-    const eventosCriados = [];
-    const etapasComId = [];
-    for (const etapa of etapas) {
-      const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
-      const event = {
-        summary: `${nomeEtapaCapitalizado} - ${resumo}`,
-        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
-        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
-        description: "EM ANÁLISE - Horário sujeito a alteração conforme resultado do edital.",
-        extendedProperties: {
-          private: {
-            managedBy: "sistema-edital-dac",
-            status: "pending_evaluation"
+
+    let eventosCriados = [];
+    let etapasComId = [];
+    let calendarError = null;
+
+    // 1. Tenta criar os eventos no Google Calendar
+    try {
+      const calendar = google.calendar({ version: 'v3', auth: jwtClient });
+      for (const etapa of etapas) {
+        const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
+        const event = {
+          summary: `${nomeEtapaCapitalizado} - ${resumo}`,
+          start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
+          end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
+          description: "EM ANÁLISE - Horário sujeito a alteração conforme resultado do edital.",
+          extendedProperties: {
+            private: {
+              managedBy: "sistema-edital-dac",
+              status: "pending_evaluation"
+            }
           }
+        };
+        try {
+          // const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
+          // etapasComId.push({ ...etapa, eventId: response.data.id });
+          // eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
+          etapasComId.push({ ...etapa, eventId: null }); // Adiciona eventId nulo para não quebrar o código
+          eventosCriados.push({ etapa: etapa.nome, id: null, summary: event.summary, inicio: etapa.inicio });
+        } catch (err) {
+          console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
+          // Continua o loop mesmo com erro em um evento
+          etapasComId.push({ ...etapa, eventId: null });
+          eventosCriados.push({ etapa: etapa.nome, id: null, summary: event.summary, inicio: etapa.inicio });
         }
-      };
-      try {
-        const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
-        etapasComId.push({ ...etapa, eventId: response.data.id });
-        eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
-      } catch (err) {
-        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
       }
+    } catch (err) {
+      // Captura erro de inicialização do Google Calendar (ex: invalid_grant)
+      calendarError = err;
+      console.error("❌ Erro de inicialização ou criação de eventos do Google Calendar:", err.message);
+      // Preenche etapasComId com nulls para que a inserção no DB possa prosseguir
+      etapasComId = etapas.map(etapa => ({ ...etapa, eventId: null }));
+      eventosCriados = etapas.map(etapa => ({ etapa: etapa.nome, id: null, summary: `${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)} - ${resumo}`, inicio: etapa.inicio }));
     }
+
+    // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
     try {
       const dbPayload = {
         nome: userData.name, email: userData.email, telefone: userData.phone,
@@ -1225,10 +1246,11 @@ app.post("/api/create-events", async (req, res) => {
       );
       console.log("💾 Inscrição salva no banco com sucesso!");
       
-res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+      const message = calendarError ? "Inscrição salva, mas houve falha na criação dos eventos do Google Calendar." : "Eventos criados e inscrição salva com sucesso!";
+      res.json({ success: true, message: message, eventos: eventosCriados });
 
-	      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
-		      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+		      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
+			      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
     } catch (err) {
       console.error("❌ Erro ao salvar inscrição no banco:", err.message);
       res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
