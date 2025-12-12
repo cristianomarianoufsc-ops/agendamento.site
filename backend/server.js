@@ -151,11 +151,25 @@ async function initializeTables() {
 await initializeTables();
 
 // ===================================================================
-// ✅ FUNÇÃO AUXILIAR PARA PEGAR O NÚMERO DE AVALIAÇÕES REQUERIDAS
+// ✅ FUNÇÃO AUXILIAR PARA LER CONFIGURAÇÃO DO BANCO DE DADOS
 // ===================================================================
-function getRequiredAssessments() {
+async function getConfigFromDB() {
   try {
-    const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+    const result = await query("SELECT config_json FROM config WHERE id = 1");
+    if (result.rows.length > 0) {
+      return JSON.parse(result.rows[0].config_json);
+    }
+  } catch (e) {
+    console.error("❌ Erro ao ler configuração do banco de dados:", e.message);
+  }
+  return {}; // Retorna objeto vazio se não encontrar ou houver erro
+}
+
+// ✅ FUNÇÃO AUXILIAR PARA PEGAR O NÚMERO DE AVALIAÇÕES REQUERIDAS
+// Esta função agora é assíncrona e lê do banco de dados
+async function getRequiredAssessments() {
+  try {
+    const config = await getConfigFromDB();
     if (config.requiredAssessments) {
       return parseInt(config.requiredAssessments, 10);
     }
@@ -437,13 +451,7 @@ app.get("/api/config", async (req, res) => {
       console.warn("⚠️ Erro ao buscar configurações do banco:", dbError.message);
     }
 
-    // 2. Fallback: tenta buscar do arquivo local (desenvolvimento)
-    if (fs.existsSync("config.json")) {
-      const savedConfig = JSON.parse(fs.readFileSync("config.json", "utf-8"));
-      const fullConfig = { ...defaultConfig, ...savedConfig };
-      console.log("✅ Configurações carregadas do arquivo local (fallback).");
-      return res.json(fullConfig);
-    }
+    // 2. Fallback: não há mais leitura de arquivo. Retorna default se não encontrar no DB.
 
     // 3. Se não encontrou em nenhum lugar, retorna configuração padrão
     console.log("ℹ️ Usando configuração padrão.");
@@ -664,18 +672,14 @@ app.get("/api/inscricoes", async (req, res) => {
     });
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
-      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
-      let finalScore = null;
-      
+      const relatedAssessments = allAssessments.filter(a => a.inscr// 2. Obter o número de avaliações requeridas (agora do banco de dados)
       let requiredAssessmentsForScore = 3;
       try {
-        const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+        const config = await getConfigFromDB();
         if (config.requiredAssessments) {
           requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
         }
-      } catch (e) { /* ignora */ }
-
-      if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
+      } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
         assessmentsForScore.forEach(assessment => {
@@ -728,7 +732,7 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
-      const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+      const config = await getConfigFromDB();
       if (config.sheetId) {
         const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
         const rows = (response.data.values || []);
@@ -1085,18 +1089,14 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
     const totalEvaluators = totalEvaluatorsResult.rows[0].count;
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
-      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
-      let finalScore = null;
-      
+      const relatedAssessments = allAssessments.filter(a => a.inscr// 2. Obter o número de avaliações requeridas (agora do banco de dados)
       let requiredAssessmentsForScore = 3;
       try {
-        const config = JSON.parse(fs.readFileSync("config.json", "utf-8"));
+        const config = await getConfigFromDB();
         if (config.requiredAssessments) {
           requiredAssessmentsForScore = parseInt(config.requiredAssessments, 10);
         }
-      } catch (e) { /* ignora */ }
-
-      if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
+      } catch (e) { /* ignora */ }     if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
         let totalScoreSum = 0;
         const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
         assessmentsForScore.forEach(assessment => {

@@ -39,8 +39,8 @@ const Admin = ({ viewOnly = false }) => {
     setBlockedDates(newBlockedDates);
     handleSaveConfig({ blockedDates: newBlockedDates });
   };
-  const [formLink, setFormLink] = useState("");
-  const [sheetLink, setSheetLink] = useState("");
+  const [formsId, setFormsId] = useState("");
+  const [sheetId, setSheetId] = useState("");
   const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços");
   const [evaluationCriteria, setEvaluationCriteria] = useState([]);
   const [evaluators, setEvaluators] = useState([]);
@@ -306,8 +306,8 @@ const Admin = ({ viewOnly = false }) => {
     if (!viewOnly) {
       fetchEvaluators();
       fetch("/api/config"   ).then(res => res.json()).then(data => {
-        if (data.formsLink) setFormLink(data.formsLink);
-        if (data.sheetLink) setSheetLink(data.sheetLink);
+        if (data.formsId) setFormsId(data.formsId);
+        if (data.sheetId) setSheetId(data.sheetId);
         if (data.pageTitle) setPageTitle(data.pageTitle);
         if (data.allowBookingOverlap) setAllowBookingOverlap(data.allowBookingOverlap);
         // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
@@ -981,12 +981,20 @@ const Admin = ({ viewOnly = false }) => {
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
+                  // Função auxiliar para extrair o ID do Google Forms ou Sheets
+const extractIdFromUrl = (url) => {
+  if (!url) return "";
+  // Expressão regular para extrair o ID de forms/d/e/.../viewform ou spreadsheets/d/.../edit
+  const match = url.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : url; // Retorna o ID ou a URL original se não encontrar
+};
+
+<h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetLink} onChange={(e) => setSheetLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
+                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
+                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
                   </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsLink: formLink, sheetLink: sheetLink })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar Links</button></div>
+                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsId: extractIdFromUrl(formsId), sheetId: extractIdFromUrl(sheetId) })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
