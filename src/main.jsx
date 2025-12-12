@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 // 1. Importe TODOS os componentes que servirão como páginas
 import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Completo)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
+import Pagina from "./pages/Pagina.jsx"; // A NOVA PÁGINA COM DADOS DO CSV
 import Admin from "./components/Admin.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -142,6 +143,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
         {/* Rota para o painel de administração SOMENTE LEITURA */}
         <Route path="/admin-viewer" element={<Admin viewOnly={true} />} />
+        
+        {/* Rota para a página de visualização do CSV */}
+        <Route path="/csv-data" element={<Pagina />} />
         
       </Routes>
     </BrowserRouter>
