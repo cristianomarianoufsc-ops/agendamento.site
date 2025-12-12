@@ -178,6 +178,57 @@ async function getRequiredAssessments() {
 }
 
 // --- 2. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
+
+// NOVO: Tenta ler as credenciais de uma variável de ambiente (para Render)
+let credentials = null;
+if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  try {
+    credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    console.log('✅ Credenciais do Google lidas da variável de ambiente.');
+  } catch (e) {
+    console.error('❌ Erro ao parsear GOOGLE_CREDENTIALS_JSON:', e.message);
+  }
+}
+
+// Se não houver variável de ambiente, tenta ler do arquivo local (para desenvolvimento)
+if (!credentials) {
+  try {
+    const credentialsPath = path.join(__dirname, 'credentials.json');
+    if (fs.existsSync(credentialsPath)) {
+      credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+      console.log('🔑 Usando credentials.json local (desenvolvimento)');
+    } else {
+      console.warn('⚠️ credentials.json não encontrado. Google APIs desabilitadas.');
+    }
+  } catch (e) {
+    console.error('❌ Erro ao ler credentials.json local:', e.message);
+  }
+}
+
+// Autenticação com as credenciais encontradas
+let auth = null;
+if (credentials) {
+  auth = new google.auth.JWT(
+    credentials.client_email,
+    null,
+    credentials.private_key,
+    ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets']
+  );
+  auth.authorize((err) => {
+    if (err) {
+      console.error('❌ Erro ao autenticar Google APIs:', err);
+    } else {
+      console.log('✅ Google APIs autenticadas com sucesso!');
+      console.log('🔑 Service Account:', credentials.client_email);
+    }
+  });
+} else {
+  console.error('❌ Google APIs não autenticadas. Credenciais não fornecidas.');
+}
+
+const sheets = google.sheets({ version: 'v4', auth });
+const calendar = google.calendar({ version: 'v3', auth });
+
 const calendarIds = {
   teatro: "oto.bezerra@ufsc.br",
   igrejinha: "c_e19d30c40d4de176bc7d4e11ada96bfaffd130b3ed499d9807c88785e2c71c05@group.calendar.google.com",
@@ -359,13 +410,7 @@ async function atualizarCache() {
   }
 }
 
-// --- 6. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
-let auth;
-let calendar;
-let sheets;
-let drive;
 
-try {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
     // Se a variável de ambiente contém JSON, faz o parse
