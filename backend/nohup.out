@@ -1,0 +1,24 @@
+node:internal/modules/cjs/loader:1244
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module '/home/ubuntu/agendamento.site/backend/node_modules/.pnpm/bcrypt@5.1.1/node_modules/bcrypt/lib/binding/napi-v3/bcrypt_lib.node'
+Require stack:
+- /home/ubuntu/agendamento.site/backend/node_modules/.pnpm/bcrypt@5.1.1/node_modules/bcrypt/bcrypt.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1244:15)
+    at Function._load (node:internal/modules/cjs/loader:1070:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:217:24)
+    at Module.require (node:internal/modules/cjs/loader:1335:12)
+    at require (node:internal/modules/helpers:136:16)
+    at Object.<anonymous> (/home/ubuntu/agendamento.site/backend/node_modules/.pnpm/bcrypt@5.1.1/node_modules/bcrypt/bcrypt.js:6:16)
+    at Module._compile (node:internal/modules/cjs/loader:1562:14)
+    at Object..js (node:internal/modules/cjs/loader:1699:10)
+    at Module.load (node:internal/modules/cjs/loader:1313:32) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/ubuntu/agendamento.site/backend/node_modules/.pnpm/bcrypt@5.1.1/node_modules/bcrypt/bcrypt.js'
+  ]
+}
+
+Node.js v22.13.0
