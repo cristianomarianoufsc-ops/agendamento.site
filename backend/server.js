@@ -672,7 +672,7 @@ app.get("/api/inscricoes", async (req, res) => {
     });
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
-      const relatedAssessments = allAssessments.filter(a => a.inscr// 2. Obter o número de avaliações requeridas (agora do banco de dados)
+      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       let requiredAssessmentsForScore = 3;
       try {
         const config = await getConfigFromDB();
@@ -1089,7 +1089,7 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
     const totalEvaluators = totalEvaluatorsResult.rows[0].count;
 
     const inscriptionsWithScores = inscriptions.map(inscription => {
-      const relatedAssessments = allAssessments.filter(a => a.inscr// 2. Obter o número de avaliações requeridas (agora do banco de dados)
+      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
       let requiredAssessmentsForScore = 3;
       try {
         const config = await getConfigFromDB();
