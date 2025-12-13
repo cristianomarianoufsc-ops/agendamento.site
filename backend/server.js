@@ -2103,11 +2103,14 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     if (respostaForms) {
       doc.font('Helvetica').fontSize(10);
       for (const [key, value] of Object.entries(respostaForms)) {
-        // Ignorar carimbo de data/hora
-        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
-        
-        // Tratar valores vazios de forma mais flexível
-        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
+	        // Ignorar carimbo de data/hora
+	        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
+	        
+	        // Tratar valores vazios de forma mais flexível
+	        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
+	        
+	        // Se o valor for "NÃO INFORMADO" e a chave não for relevante, ignorar
+	        if (displayValue === "NÃO INFORMADO" && !key.toLowerCase().includes('email') && !key.toLowerCase().includes('data')) continue;
         
         // Se o valor for uma URL do Drive, exibir como link
         const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
