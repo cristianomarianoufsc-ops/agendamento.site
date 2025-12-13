@@ -353,6 +353,12 @@ const Admin = ({ viewOnly = false }) => {
       alert("❌ Erro ao salvar configurações.");
     }
   };
+
+  // ✅ NOVA FUNÇÃO PARA ABRIR O MODAL DE DADOS DO FORMULÁRIO
+  const handleShowFormDataModal = (inscricao) => {
+    setSelectedFormData(inscricao);
+    setShowFormDataModal(true);
+  };
 // ✅ FUNÇÃO DE LOGIN DO AVALIADOR (handleViewerLogin)
   const handleViewerLogin = async () => {
     if (!evaluatorEmail || !evaluatorPassword) {
@@ -938,8 +944,9 @@ const Admin = ({ viewOnly = false }) => {
                                   <div className="flex items-center justify-center space-x-2">
                                     {!viewOnly ? (
                                       <>
-                                        <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full"><Contact size={18} /></button>
-                                        <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full"><Trash2 size={18} /></button>
+                                        <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Ver Contatos"><Contact size={18} /></button>
+                                        {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="p-2 text-indigo-500 hover:bg-indigo-100 rounded-full" title="Ver Ficha Detalhada"><FileText size={18} /></button>}
+                                        <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full" title="Excluir Inscrição"><Trash2 size={18} /></button>
                                       </>
                                     ) : (
                                       <button onClick={() => handleToggleAccordion(u.id)} className={`flex items-center justify-center gap-2 px-3 py-2 font-semibold rounded-lg text-sm w-28 ${openAccordionId === u.id ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'}`}>
