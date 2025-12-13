@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, 
-  AlertTriangle, CheckCircle, Search, Sheet, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
+  AlertTriangle, CheckCircle, Search, Sheet, Theater, Church, Eye, 
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
@@ -16,14 +16,6 @@ const Modal = ({ user, onClose }) => {
   const findFormsEmail = (formData) => { if (!formData) return null; const emailKey = Object.keys(formData).find((k) => k.toLowerCase().includes("mail")); return emailKey ? formData[emailKey] : null; };
   const findFormsPhone = (formData) => { if (!formData) return null; const telKey = Object.keys(formData).find((k) => k.toLowerCase().includes("fone")); return telKey ? formData[telKey] : null; };
   return ReactDOM.createPortal( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}> <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="bg-white rounded-2xl shadow-xl p-6 m-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"> <Contact size={24} /> Contatos de {user?.nome || "Usuário"} </h3> <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"> <X size={20} /> </button> </div> <div className="space-y-4 text-gray-700"> <p><strong>Nome:</strong> {user?.nome}</p> <div> <p><strong>Telefone(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> {findFormsPhone(user?.formsData) ? ( <li>{findFormsPhone(user.formsData)} (Etapa 2)</li> ) : ( <li>{user?.telefone || "N/A"} (Etapa 1)</li> )} </ul> </div> <div> <p><strong>E-mail(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> <li>{user?.email || "N/A"} (Etapa 1)</li> {user?.formsData && findFormsEmail(user.formsData) && findFormsEmail(user.formsData).toLowerCase() !== user?.email?.toLowerCase() && ( <li>{findFormsEmail(user.formsData)} (Etapa 2)</li> )} </ul> </div> </div> </motion.div> </motion.div>, document.getElementById("modal-root") );
-};
-
-// Função auxiliar para extrair o ID do Google Forms ou Sheets
-const extractIdFromUrl = (url) => {
-  if (!url) return "";
-  // Expressão regular para extrair o ID de forms/d/e/.../viewform ou spreadsheets/d/.../edit
-  const match = url.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : url; // Retorna o ID ou a URL original se não encontrar
 };
 
 // --- COMPONENTE PRINCIPAL ---
@@ -47,8 +39,8 @@ const Admin = ({ viewOnly = false }) => {
     setBlockedDates(newBlockedDates);
     handleSaveConfig({ blockedDates: newBlockedDates });
   };
-  const [formsId, setFormsId] = useState("");
-  const [sheetId, setSheetId] = useState("");
+  const [formLink, setFormLink] = useState("");
+  const [sheetLink, setSheetLink] = useState("");
   const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços");
   const [evaluationCriteria, setEvaluationCriteria] = useState([]);
   const [evaluators, setEvaluators] = useState([]);
@@ -82,13 +74,6 @@ const Admin = ({ viewOnly = false }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
-   // ✅ NOVO: Senha única para todos os avaliadores
-  
-  // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
-  const [showAdminPassword, setShowAdminPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha
-  const [showEvaluatorPassword, setShowEvaluatorPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha do avaliador
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -285,7 +270,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/inscricoes"   );
+      const response = await fetch("http://localhost:4000/api/inscricoes"   );
       const data = await response.json();
       setUnificados(data.inscricoes || []);
       setEvaluationCriteria(data.criteria || []);
@@ -301,7 +286,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchEvaluators = async () => {
     if (viewOnly) return;
     try {
-        const response = await fetch("/api/evaluators"   );
+        const response = await fetch("http://localhost:4000/api/evaluators"   );
         const data = await response.json();
         setEvaluators(data || []);
     } catch (error) {
@@ -313,9 +298,9 @@ const Admin = ({ viewOnly = false }) => {
     fetchData();
     if (!viewOnly) {
       fetchEvaluators();
-      fetch("/api/config"   ).then(res => res.json()).then(data => {
-        if (data.formsId) setFormsId(data.formsId);
-        if (data.sheetId) setSheetId(data.sheetId);
+      fetch("http://localhost:4000/api/config"   ).then(res => res.json()).then(data => {
+        if (data.formsLink) setFormLink(data.formsLink);
+        if (data.sheetLink) setSheetLink(data.sheetLink);
         if (data.pageTitle) setPageTitle(data.pageTitle);
         if (data.allowBookingOverlap) setAllowBookingOverlap(data.allowBookingOverlap);
         // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
@@ -340,7 +325,7 @@ const Admin = ({ viewOnly = false }) => {
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
   const handleSaveConfig = async (configData) => {
     try {
-      const response = await fetch("/api/config", {
+      const response = await fetch("http://localhost:4000/api/config", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(configData   ),
       });
@@ -357,7 +342,7 @@ const Admin = ({ viewOnly = false }) => {
       return;
     }
     try {
-      const response = await fetch("/api/auth/viewer", {
+      const response = await fetch("http://localhost:4000/api/auth/viewer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: evaluatorEmail, password: evaluatorPassword } ), // ENVIANDO SENHA
@@ -378,39 +363,6 @@ const Admin = ({ viewOnly = false }) => {
   const handleViewerLogout = () => {
     localStorage.removeItem('evaluatorEmail');
     setIsAuthenticated(false); // DEFINE COMO DESAUTENTICADO
-    window.location.reload();
-  };
-  
-  // ✅ FUNÇÃO DE LOGIN DO ADMINISTRADOR
-  const handleAdminLogin = async () => {
-    if (!adminPassword) {
-      alert("Por favor, insira a senha de administrador.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/auth/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        sessionStorage.setItem('adminAuth', 'true');
-        setIsAdminAuthenticated(true);
-        setAdminPassword(''); // Limpa o campo de senha
-      } else {
-        alert(data.message || "❌ Senha incorreta.");
-      }
-    } catch (error) {
-      alert("❌ Erro ao tentar conectar com o servidor.");
-      console.error("Erro no login admin:", error);
-    }
-  };
-  
-  // ✅ FUNÇÃO DE LOGOUT DO ADMINISTRADOR
-  const handleAdminLogout = () => {
-    sessionStorage.removeItem('adminAuth');
-    setIsAdminAuthenticated(false);
     window.location.reload();
   };
 
@@ -435,7 +387,7 @@ const Admin = ({ viewOnly = false }) => {
   const handleSaveCriteria = async () => {
     const criteriaToSave = evaluationCriteria.map((c, index) => ({ ...c, sort_order: index }));
     try {
-      const response = await fetch("/api/criteria", {
+      const response = await fetch("http://localhost:4000/api/criteria", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(criteriaToSave   ),
       });
@@ -449,11 +401,9 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
   const handleAddEvaluator = (email) => {
-    if (email && email.trim() !== '') {
-      const trimmedEmail = email.trim();
-      // Verifica se o email já existe na lista
-      if (!evaluators.some(e => e.email === trimmedEmail)) {
-        const newEvaluator = { id: `new-${Date.now()}`, email: trimmedEmail };
+    if (email && email.includes('@')) {
+      if (!evaluators.some(e => e.email === email.trim().toLowerCase())) {
+        const newEvaluator = { id: `new-${Date.now()}`, email: email.trim().toLowerCase() };
         setEvaluators(prev => [...prev, newEvaluator]);
       }
     }
@@ -464,26 +414,38 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleSaveEvaluators = async () => {
-     const evaluatorsToSave = evaluators.map(e => ({ email: e.email }));;
+    const emailsToSave = evaluators.map(e => e.email);
     try {
-      const response = await fetch("/api/evaluators", {
+      const response = await fetch("http://localhost:4000/api/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: "dac.ufsc2026" }),
+        body: JSON.stringify({ emails: emailsToSave }),
       });
       const data = await response.json();
       if (response.ok) {
-        alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
+        let message = "✅ Avaliadores processados com sucesso!\n\n";
+        if (data.results && data.results.length > 0) {
+          message += "Resultados:\n";
+          data.results.forEach(result => {
+            message += `- ${result.email}: ${result.message}\n`;
+          });
+        }
+        if (data.errors && data.errors.length > 0) {
+          message += "\nErros:\n";
+          data.errors.forEach(error => {
+            message += `- ${error.email}: ${error.error}\n`;
+          });
+        }
+        alert(message);
         fetchEvaluators();
-
       } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
     } catch (error) {
       console.error("Erro ao salvar avaliadores:", error);
-      alert("Erro ao salvar a lista de avaliadores: " + error.message);
+      alert("❌ Erro ao salvar a lista de avaliadores: " + error.message);
     }
   };
 
   const handleOpenModal = (user) => { setSelectedUser(user); setShowModal(true); };
-  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
+  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`http://localhost:4000/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
   
   // =================================================
   // ✅ FUNÇÃO PARA GERAR SLIDES
@@ -493,7 +455,7 @@ const Admin = ({ viewOnly = false }) => {
     setIsGeneratingSlides(true);
     try {
       // 1. Chamar o novo endpoint para obter os dados brutos
-      const response = await fetch("/api/admin/data-for-analysis");
+      const response = await fetch("http://localhost:4000/api/admin/data-for-analysis");
       if (!response.ok) {
         throw new Error("Falha ao buscar dados para análise.");
       }
@@ -511,171 +473,9 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
-  const handleConsolidateAgenda = async () => {
-    // Plano C: Gerar o relatório em Markdown diretamente no frontend
-    const inscricoes = unificados; // Usar a lista de inscrições já carregada
-
-    // 1. Classificar e contar
-    let aprovadas = 0;
-    let reprovadas = 0;
-    let naoAvaliadas = 0;
-    const listaAprovadas = [];
-    const listaReprovadas = [];
-    const listaNaoAvaliadas = [];    inscricoes.forEach(inscricao => {
-      // Tratar null/undefined/string vazia como 0 para parseFloat, mas manter a lógica de não avaliado
-      const rawScore = inscricao.finalScore;
-      const nota = parseFloat(rawScore); // Converter para número para garantir a comparação
-      
-      if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) { // Se for null, undefined, string vazia ou NaN após parseFloat
-        naoAvaliadas++;
-        listaNaoAvaliadas.push(inscricao);
-      } else if (nota > 0) {
-        aprovadas++;
-        listaAprovadas.push(inscricao);
-      } else {
-        reprovadas++;
-        listaReprovadas.push(inscricao);
-      }
-    });
-
-    // 2. Gerar o conteúdo em Markdown
-    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
-    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
-
-    // Resumo
-    content += `## Resumo da Classificação\n\n`;
-    content += `| Categoria | Quantidade |\n`;
-    content += `| :--- | :--- |\n`;
-    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
-    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
-
-    // Lista de Aprovadas
-    content += `## Inscrições Aprovadas\n\n`;
-    if (listaAprovadas.length === 0) {
-      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
-    } else {
-      listaAprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Reprovadas
-    content += `## Inscrições Reprovadas\n\n`;
-    if (listaReprovadas.length === 0) {
-      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
-    } else {
-      listaReprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Não Avaliadas
-    content += `## Inscrições Não Avaliadas\n\n`;
-    if (listaNaoAvaliadas.length === 0) {
-      content += `Nenhuma inscrição não avaliada.\n\n`;
-    } else {
-      listaNaoAvaliadas.forEach((inscricao, index) => {
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // 3. Enviar o conteúdo Markdown para o backend para conversão em PDF
-    setIsDownloading(true);
-    try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ markdown: content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao gerar PDF: ${response.statusText}`);
-      }
-
-      // 4. Receber o PDF e forçar o download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click(); // <-- Ação de clique para iniciar o download
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      alert("✅ PDF da Agenda Final Consolidada gerado com sucesso!");
-
-    } catch (err) {
-      console.error("Erro no download do PDF:", err);
-      alert(`❌ Falha ao gerar PDF: ${err.message}. Verifique o console para detalhes.`);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
+  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("http://localhost:4000/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
+  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("http://localhost:4000/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
-  
-  // ✅ TELA DE LOGIN PARA ADMINISTRADOR
-  if (!viewOnly && !isAdminAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-              <Settings size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Painel Administrativo</h2>
-            <p className="text-gray-600">Insira a senha para acessar</p>
-          </div>
-          <div className="relative mb-6">
-            <input
-              type={showAdminPassword ? "text" : "password"}
-              placeholder="Senha de administrador"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => setShowAdminPassword(!showAdminPassword)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label={showAdminPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              {showAdminPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-          <button
-            onClick={handleAdminLogin}
-            className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <CheckCircle size={20} />
-            Entrar
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  // ✅ TELA DE LOGIN PARA AVALIADOR
    if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -689,24 +489,14 @@ const Admin = ({ viewOnly = false }) => {
             onChange={(e) => setEvaluatorEmail(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-blue-500 focus:border-blue-500"
           />
-          <div className="relative mb-6">
-            <input // NOVO CAMPO DE SENHA
-              type={showEvaluatorPassword ? "text" : "password"}
-              placeholder="Sua Senha"
-              value={evaluatorPassword}
-              onChange={(e) => setEvaluatorPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleViewerLogin(); }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowEvaluatorPassword(!showEvaluatorPassword)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label={showEvaluatorPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              {showEvaluatorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
+          <input // NOVO CAMPO DE SENHA
+            type="password"
+            placeholder="Sua Senha"
+            value={evaluatorPassword}
+            onChange={(e) => setEvaluatorPassword(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg mb-6 focus:ring-blue-500 focus:border-blue-500"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleViewerLogin(); }}
+          />
           <button
             onClick={handleViewerLogin}
             className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors"
@@ -730,18 +520,6 @@ const Admin = ({ viewOnly = false }) => {
                 onClick={handleViewerLogout} 
                 className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors"
               >
-                Sair
-              </button>
-            </div>
-          )}
-          {!viewOnly && isAdminAuthenticated && (
-            <div className="flex items-center justify-between mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm font-semibold text-green-800">✅ Sessão Administrativa Ativa</p>
-              <button 
-                onClick={handleAdminLogout} 
-                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors flex items-center gap-1"
-              >
-                <X size={16} />
                 Sair
               </button>
             </div>
@@ -781,36 +559,15 @@ const Admin = ({ viewOnly = false }) => {
                         </button>
 
                         {/* ✅ BOTÃO CONSOLIDAR AGENDA */}
-                        <button 
-                          onClick={handleConsolidateAgenda} 
-                          disabled={isDownloading}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
-                        >
-                          {isDownloading ? (
-                            <>
-                              <Loader className="animate-spin" size={16} />
-                              Gerando PDF...
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={16} />
-                              Consolidar Agenda Final (PDF)
-                            </>
-                          )}
+                        <button onClick={() => alert('Funcionalidade em desenvolvimento.')} className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed text-sm" title="Funcionalidade em desenvolvimento">
+                          <CheckCircle size={16} /> Consolidar Agenda Final
                         </button>
                         
                         {/* ✅ BOTÃO LIMPEZA GERAL */}
                         <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
                       </>
                     )}
-                    {/* ✅ NOVO BOTÃO: VER DADOS DO CSV */}
-                    {!viewOnly && (
-                      <a href="/csv-data" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 text-sm">
-                        <Sheet size={16} /> Ver Dados do Forms (CSV)
-                      </a>
-                    )}
                     {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'   ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
-
                   </div>
                 </div>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
@@ -929,7 +686,7 @@ const Admin = ({ viewOnly = false }) => {
                                   )}
                                 </td>
 
-                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`/api/download
+                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`http://localhost:4000/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`http://localhost:4000/api/download
 -zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button></td>}
                                 <td className="px-6 py-4 text-center align-top">
                                   <div className="flex items-center justify-center space-x-2">
@@ -997,10 +754,10 @@ const Admin = ({ viewOnly = false }) => {
                 <div className="bg-white p-6 rounded-2xl shadow-md">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
+                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formLink} onChange={(e) => setFormLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
+                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetLink} onChange={(e) => setSheetLink(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
                   </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsId: extractIdFromUrl(formsId), sheetId: extractIdFromUrl(sheetId) })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
+                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsLink: formLink, sheetLink: sheetLink })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar Links</button></div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
@@ -1230,13 +987,12 @@ const Admin = ({ viewOnly = false }) => {
                     <UserCheck size={20} /> Gerenciar Avaliadores
                   </h3>
                   <div className="mb-4">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">E-mail do Avaliador</label>
+                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Adicionar E-mail de Avaliador Autorizado</label>
                     <div className="flex gap-2">
-                      <input type="email" placeholder="Ex: joao.silva@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
+                      <input type="email" placeholder="email@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
                       <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <label className="block font-semibold text-gray-600 mb-2 text-sm">Avaliadores Atuais</label>
                     {evaluators.length > 0 ? (
@@ -1265,8 +1021,6 @@ const Admin = ({ viewOnly = false }) => {
       </div>
       <AnimatePresence>
         {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
-      {/* NOVO MODAL */}
-      {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
       </AnimatePresence>
       {showSlidesViewer && slidesData && (
         <SlidesViewer
