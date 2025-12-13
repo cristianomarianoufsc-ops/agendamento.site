@@ -907,11 +907,9 @@ const Admin = ({ viewOnly = false }) => {
                                   </td>
                                 )}
                                 
-                                <td className="px-6 py-4 text-center align-top">
-                                  {viewOnly ? (
+                                <td className="px-6 py-4 text-center align-top">                                  {viewOnly ? (
                                     (() => {
-                                      const currentUserHasAssessed = u.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-                                      if (currentUserHasAssessed) {
+                                      const currentUserHasAssessed = u.evaluatorsWhoAssessed?.includes(evaluatorEmail);                                    if (currentUserHasAssessed) {
                                         return (
                                           <span className="flex items-center justify-center gap-1 text-sm text-green-600 font-semibold">
                                             <CheckCircle size={16} /> Concluído
@@ -925,18 +923,16 @@ const Admin = ({ viewOnly = false }) => {
                                           </span>
                                         );
                                       }
-                                      return <FileClock className="text-gray-400 inline-block" title="Pendente de Avaliação" />;
-                                    })()
-930	                                  ) : (
-                                    <>
-                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (                                 <CheckCircle className="text-green-500 inline-block" title="Avaliações Concluídas" />
+                                      return <FileClock className="text-gray-400 inline-block" title="Pendente de Avaliação" />;                                    })()
+                                  ) : (                              <>
+                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (
+                                        <CheckCircle className="text-green-500 inline-block" title="Avaliações Concluídas" />
                                       ) : (
                                         <span className="text-red-500 font-semibold text-lg">{`${u.assessmentsCount || 0}/${u.requiredAssessments || '?'}`}</span>
                                       )}
                                     </>
-                                  )}                             </td>
-                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">
-                                  <a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</a>
+                                  )}
+                                </td>              {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">                           <a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</a>
                                   {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold"><FileText size={16} /> Ficha Detalhada</button>}
                                   <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button>
                                 </td>}
@@ -945,8 +941,7 @@ const Admin = ({ viewOnly = false }) => {
                                       <>
                                         <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Ver Contatos"><Contact size={18} /></button>
                                         <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full" title="Excluir Inscrição"><Trash2 size={18} /></button>
-                                      </>
-                                    ) : (
+                                      </>                                 ) : (
                                       <button onClick={() => handleToggleAccordion(u.id)} className={`flex items-center justify-center gap-2 px-3 py-2 font-semibold rounded-lg text-sm w-28 ${openAccordionId === u.id ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'}`}>
                                         <Eye size={16} />{openAccordionId === u.id ? 'Fechar' : 'Avaliar'}
                                       </button>
