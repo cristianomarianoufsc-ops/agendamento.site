@@ -8,6 +8,7 @@ import {
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
 import EvaluationDrawer from './EvaluationDrawer';
+import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
 import SlidesViewer from './SlidesViewer';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -36,6 +37,8 @@ const Admin = ({ viewOnly = false }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false); // NOVO ESTADO
   const [showSlidesViewer, setShowSlidesViewer] = useState(false); // NOVO ESTADO
+  const [showFormDataModal, setShowFormDataModal] = useState(false); // ✅ NOVO ESTADO
+  const [selectedFormData, setSelectedFormData] = useState(null); // ✅ NOVO ESTADO
   const [slidesData, setSlidesData] = useState(null); // NOVO ESTADO
   const [openAccordionId, setOpenAccordionId] = useState(null);
   
