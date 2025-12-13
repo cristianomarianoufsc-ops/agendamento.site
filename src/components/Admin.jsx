@@ -1265,6 +1265,8 @@ const Admin = ({ viewOnly = false }) => {
       </div>
       <AnimatePresence>
         {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
+      {/* NOVO MODAL */}
+      {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
       </AnimatePresence>
       {showSlidesViewer && slidesData && (
         <SlidesViewer
