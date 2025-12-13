@@ -403,9 +403,23 @@ async function initializeGoogleAPIs() {
       console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
       // Se a variável de ambiente contém JSON, faz o parse
       try {
-        // A chave privada (private_key) pode ter quebras de linha que precisam ser restauradas
-        const jsonString = process.env.GOOGLE_APPLICATION_CREDENTIALS.replace(/\\n/g, '\n');
-        const credentials = JSON.parse(jsonString);
+        const envValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+        let credentials;
+        
+        // Tentar parsear direto primeiro
+        try {
+          credentials = JSON.parse(envValue);
+        } catch (firstError) {
+          // Se falhar, tentar substituir \\n por \n (caso esteja escapado)
+          try {
+            const jsonString = envValue.replace(/\\n/g, '\n');
+            credentials = JSON.parse(jsonString);
+          } catch (secondError) {
+            // Se ainda falhar, não é JSON válido
+            throw secondError;
+          }
+        }
+        
         console.log('🔑 Service Account:', credentials.client_email);
         auth = new google.auth.GoogleAuth({
           credentials,
@@ -413,6 +427,7 @@ async function initializeGoogleAPIs() {
         });
       } catch (e) {
         console.log('🔑 Não é JSON, usando como caminho de arquivo');
+        console.log('⚠️ Erro ao parsear JSON:', e.message);
         // Se não for JSON, assume que é um caminho de arquivo
         const { auth: fileAuth } = await google.auth.getClient({
           keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
