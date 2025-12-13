@@ -831,8 +831,19 @@ app.get("/api/inscricoes", async (req, res) => {
         let emailForms = '', telForms = '';
         for (const key in rowData) {
             const normalizedKey = normalizeKey(key);
-            if (normalizedKey.includes('mail')) emailForms = (rowData[key] || "").trim().toLowerCase();
-            if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) telForms = (rowData[key] || "").replace(/\D/g, "");
+            const value = (rowData[key] || "").trim();
+            
+            // Buscar email: primeiro por nome da coluna, depois por conteúdo com @
+            if (normalizedKey.includes('mail')) {
+              emailForms = value.toLowerCase();
+            } else if (!emailForms && value.includes('@') && value.includes('.')) {
+              // Se ainda não achou email e o valor parece um email, usa ele
+              emailForms = value.toLowerCase();
+            }
+            
+            if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) {
+              telForms = value.replace(/\D/g, "");
+            }
         }
         return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
       });
@@ -1994,7 +2005,16 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
 
         // Encontrar linha correspondente
         respostaForms = records.find(f => {
-          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          // Buscar coluna de email: primeiro tenta por nome, depois por conteúdo com @
+          let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          if (!emailKey) {
+            // Se não encontrou por nome, procura qualquer coluna que tenha @ (email válido)
+            emailKey = Object.keys(f).find(k => {
+              const value = (f[k] || "").trim();
+              return value.includes("@") && value.includes(".");
+            });
+          }
+          
           const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
           const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
           const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
@@ -2160,7 +2180,16 @@ app.get("/api/download-zip/:id", async (req, res) => {
         }
 
         respostaForms = records.find(f => {
-          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          // Buscar coluna de email: primeiro tenta por nome, depois por conteúdo com @
+          let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          if (!emailKey) {
+            // Se não encontrou por nome, procura qualquer coluna que tenha @ (email válido)
+            emailKey = Object.keys(f).find(k => {
+              const value = (f[k] || "").trim();
+              return value.includes("@") && value.includes(".");
+            });
+          }
+          
           const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
           const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
           const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
