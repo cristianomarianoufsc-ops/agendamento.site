@@ -927,13 +927,14 @@ const Admin = ({ viewOnly = false }) => {
                                       }
                                       return <FileClock className="text-gray-400 inline-block" title="Pendente de Avaliação" />;
                                     })()
-                                  ) : (
+930	                                  ) : (
                                     <>
-                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (
-                                        <CheckCircle className="text-green-500 inline-block" title="Avaliações Conclu                                      <span className="text-red-500 font-semibold text-lg">{`${u.assessmentsCount || 0}/${u.requiredAssessments || '?'}`}</span>
-                                      </>
-                                  )}
-                                </td>
+                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (                                 <CheckCircle className="text-green-500 inline-block" title="Avaliações Concluídas" />
+                                      ) : (
+                                        <span className="text-red-500 font-semibold text-lg">{`${u.assessmentsCount || 0}/${u.requiredAssessments || '?'}`}</span>
+                                      )}
+                                    </>
+                                  )}                             </td>
                                 {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">
                                   <a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</a>
                                   {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold"><FileText size={16} /> Ficha Detalhada</button>}
