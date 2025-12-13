@@ -936,16 +936,17 @@ const Admin = ({ viewOnly = false }) => {
                                       )}
                                     </>
                                   )}
-                                </td>
-
-                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top"><a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário</a><button onClick={(    ) => window.open(`/api/download
--zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button></td>}
+                                </t                                {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">
+                                  <a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</a>
+                                  {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold"><FileText size={16} /> Ficha Detalhada</button>}
+                                  <button onClick={(    ) => window.open(`/api/download
+936	-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button>
+                                </td>}
                                 <td className="px-6 py-4 text-center align-top">
                                   <div className="flex items-center justify-center space-x-2">
                                     {!viewOnly ? (
                                       <>
                                         <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Ver Contatos"><Contact size={18} /></button>
-                                        {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="p-2 text-indigo-500 hover:bg-indigo-100 rounded-full" title="Ver Ficha Detalhada"><FileText size={18} /></button>}
                                         <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full" title="Excluir Inscrição"><Trash2 size={18} /></button>
                                       </>
                                     ) : (
