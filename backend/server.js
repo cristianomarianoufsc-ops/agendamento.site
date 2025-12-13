@@ -831,7 +831,13 @@ app.get("/api/inscricoes", async (req, res) => {
         const rows = (response.data.values || []);
         if (rows.length > 1) {
           const headers = rows[0];
-          formsDataRows = rows.slice(1).map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
+          formsDataRows = rows.slice(1).map(row => {
+            const rowData = {};
+            headers.forEach((header, index) => {
+              rowData[header] = row[index] || "";
+            });
+            return rowData;
+          });
         }
       }
     } catch (e) {
