@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
+import { capitalize } from "./utils/stringUtils";
+
+
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "./components/Modal";
 import jsPDF from "jspdf";
@@ -310,7 +313,7 @@ const newEnd = toMinutes(newEntry.end);
 
   // ✅ NOVA LÓGICA: Trata eventos como array
   if (etapa === "evento" || etapa === "ensaio") {
-    const stageName = etapa.charAt(0).toUpperCase() + etapa.slice(1);
+    const stageName = capitalize(etapa);
     const currentStageArray = resumo[etapa] || [];
 
     // Verifica se já atingiu o limite de 6
@@ -706,7 +709,7 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
      <Modal
   isOpen={showConfirmNextEventModal}
   onClose={handleDeclineNextEvent}
-  title={`${selectedStage.charAt(0).toUpperCase() + selectedStage.slice(1)} Adicionado!`}
+  title={`${capitalize(selectedStage)} Adicionado!`}
   showDefaultButton={false}
 >
   {/* O estilo deste parágrafo foi adicionado para aumentar a fonte */}
@@ -816,7 +819,7 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
                           className={`w-full p-3 text-left rounded-lg font-semibold transition-all duration-200 flex items-center justify-between ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-md" : "border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400"}`}
                         >
                           <span>
-                            {etapa.charAt(0).toUpperCase() + etapa.slice(1)}
+                            {capitalize(etapa)}
                           </span>
                           <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
                             <ChevronDown size={20} />
@@ -901,7 +904,7 @@ if (etapa === 'evento' || etapa === 'ensaio') {
 	                      if (currentStageArray && Array.isArray(currentStageArray) && currentStageArray.length > 0) {
 	                        return currentStageArray.map((item, idx) => {
 	                          if (!item || !item.date || !item.start || !item.end) return null;
-	                          const stageName = etapa.charAt(0).toUpperCase() + etapa.slice(1);
+	                          const stageName = capitalize(etapa);
 	                          return (
 	                            <li key={`${etapa}-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
 	                              <div><span className="font-semibold text-gray-800">{stageName} {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
@@ -917,7 +920,7 @@ if (etapa === 'evento' || etapa === 'ensaio') {
 	                        if (!item || !item.date || !item.start || !item.end) return null;
 	                        return (
 	                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-	                            <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                            <div><span className="font-semibold text-gray-800">{capitalize(etapa)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
 	                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
 	                          </li>
 	                        );

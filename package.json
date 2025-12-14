@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0 & node backend/server.js",
     "start": "node backend/server.js",
     "build": "VITE_API_URL=$VITE_API_URL npx vite build",
+    "test": "vitest",
     "postbuild": "rm -rf backend/public && cp -r dist backend/public",
     "preview": "vite preview"
   },
@@ -66,7 +67,9 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^16.3.0",
-    "nodemon": "^3.1.0"
+    "jsdom": "^27.3.0",
+    "nodemon": "^3.1.0",
+    "vitest": "^4.0.15"
   },
   "engines": {
     "node": ">=18.0.0"
