@@ -2123,8 +2123,10 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
 	        // Ignorar carimbo de data/hora
 	        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
 	        
-	        // Tratar valores vazios de forma mais flexível
-	        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
+	        // Se o valor for vazio, ignora a exibição (como no EvaluationDrawer.jsx)
+	        if (String(value).trim() === "") continue;
+	        
+	        const displayValue = value;
         
         // Se o valor for uma URL do Drive, exibir como link
         const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
