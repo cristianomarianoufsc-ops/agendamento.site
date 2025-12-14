@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
-import { FileText, X } from "lucide-react";
+import { FileText, X, Printer } from "lucide-react";
 
 // --- COMPONENTE AUXILIAR: SmartInfoRow (Replicado do EvaluationDrawer) ---
 const SmartInfoRow = ({ label, value }) => {
@@ -29,6 +29,13 @@ const SmartInfoRow = ({ label, value }) => {
 
 // --- COMPONENTE PRINCIPAL: Modal para Ficha Detalhada ---
 const FormDataModal = ({ inscricao, onClose }) => {
+  const handlePrint = () => {
+    // O modal já tem um estilo que o torna o único conteúdo visível.
+    // Apenas chamamos window.print() para imprimir o conteúdo da janela.
+    // O CSS de impressão deve cuidar de esconder o fundo e o botão de fechar.
+    window.print();
+  };
+
   const renderAllFormsData = () => {
     if (!inscricao?.formsData) {
       return <div className="text-center py-4 text-gray-500">Proponente ainda não preencheu o formulário (Etapa 2).</div>;
@@ -51,9 +58,18 @@ const FormDataModal = ({ inscricao, onClose }) => {
           <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <FileText size={24} /> Ficha de Inscrição Detalhada (Etapa 2)
           </h3>
-          <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handlePrint} 
+              className="p-2 rounded-full text-gray-500 hover:bg-gray-200 transition-colors print:hidden" 
+              title="Imprimir Ficha"
+            >
+              <Printer size={20} />
+            </button>
+            <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 transition-colors print:hidden">
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <div className="space-y-4 text-gray-700">
           <div className="bg-gray-50 p-3 rounded-lg mb-4">
