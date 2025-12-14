@@ -12,7 +12,7 @@ const EnsaioPage = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ ensaio: [] }); // Alterado para array para permitir múltiplos ensaios
+  const [resumo, setResumo] = useState({ ensaio: null }); // Simplificado para ensaio
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -158,7 +158,7 @@ const EnsaioPage = () => {
 
   const handleBackToLocalSelect = () => {
     setLocalSelecionado(null); setCurrentStep("select_local"); setSelectedStage("ensaio"); setSelectedDate(null);
-    setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: [] }); // Reset para array vazio
+    setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: null });
     setUserData({ name: "", email: "", phone: "", eventName: "" }); setFirstStepDone(false);
     setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
   };
@@ -201,12 +201,9 @@ const EnsaioPage = () => {
     
     // Filtra slots locais para a etapa atual (ensaio)
     const localSlots = [];
-    // MUDANÇA: Itera sobre o array de ensaios
-    (resumo.ensaio || []).forEach(ensaio => {
-      if (ensaio.date.split("T")[0] === dateString) {
-        localSlots.push({ start: ensaio.start, end: ensaio.end });
-      }
-    });
+    if (resumo.ensaio && resumo.ensaio.date.split("T")[0] === dateString) {
+      localSlots.push({ start: resumo.ensaio.start, end: resumo.ensaio.end });
+    }
     
     return [...backendSlots, ...localSlots];
   };
@@ -232,24 +229,12 @@ const EnsaioPage = () => {
       return;
     }
 
-    // Lógica de resumo (agora como array)
-    setResumo(prevResumo => ({
-      ...prevResumo,
-      ensaio: [...(prevResumo.ensaio || []), newEntry]
-    }));
+    // Lógica de resumo (apenas ensaio)
+    setResumo({ ensaio: newEntry });
 
     // Reset de estados
     setSelectedDate(null);
     setStageTimes({ startTime: null, endTime: null });
-
-    // MUDANÇA: Pergunta se o usuário deseja agendar outro ensaio
-    if (window.confirm("Ensaio adicionado ao resumo. Deseja agendar outro ensaio?")) {
-      // Se sim, volta para a seleção de data/hora
-      setSelectedDate(null); // Volta para a seleção de data
-    } else {
-      // Se não, avança para a próxima etapa (resumo)
-      setCurrentStep("resumo");
-    }
   };
 
   const handleConfirmRemovals = async () => {
@@ -269,7 +254,7 @@ const EnsaioPage = () => {
         fetchOccupiedSlots(localSelecionado, currentMonth);
       }
 
-      setResumo({ ensaio: [] });
+      setResumo({ ensaio: null });
       setPendingRemovals([]);
       setAlertMessage({ type: 'success', text: "Cancelamento confirmado!" });
       setFirstStepDone(false);
@@ -285,11 +270,9 @@ const EnsaioPage = () => {
     try {
       const etapas = [];
       
-      // MUDANÇA: Itera sobre o array de ensaios
-      if (resumo.ensaio && resumo.ensaio.length > 0) {
-        resumo.ensaio.forEach(item => {
-          etapas.push({ nome: "ensaio", inicio: `${item.date.split("T")[0]}T${item.start}:00`, fim: `${item.date.split("T")[0]}T${item.end}:00`, isDispute: item.isDispute });
-        });
+      if (resumo.ensaio) {
+        const item = resumo.ensaio;
+        etapas.push({ nome: "ensaio", inicio: `${item.date.split("T")[0]}T${item.start}:00`, fim: `${item.date.split("T")[0]}T${item.end}:00`, isDispute: item.isDispute });
       }
 
       if (etapas.length === 0) {
@@ -308,9 +291,8 @@ const EnsaioPage = () => {
       if (result?.success && result.eventos?.[0]) {
         setAlertMessage({type: 'success', text: "Agendamento confirmado! Enviando e-mails..."});
         
-        // MUDANÇA: Não faz sentido adicionar eventId aqui, pois são múltiplos eventos.
-        // Apenas limpa o resumo após o envio.
-        setResumo({ ensaio: [] });
+        const ensaioComId = { ...resumo.ensaio, eventId: result.eventos[0].id };
+        setResumo({ ensaio: ensaioComId });
 
         fetchOccupiedSlots(localSelecionado, currentMonth);
         setFirstStepDone(true);
@@ -325,12 +307,13 @@ const EnsaioPage = () => {
     }
   };
 
-	  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio && resumo.ensaio.length > 0;
+  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio;
 
-	  const handleGoToSecondStep = () => {
-	    // MUDANÇA: Vai para a etapa de resumo
-	    setCurrentStep("resumo");
-	  };
+  const handleGoToSecondStep = () => {
+    // Lógica placeholder para a segunda etapa
+    setAlertMessage({type: 'warning', text: "A segunda etapa ainda não está implementada."});
+    setTimeout(() => setAlertMessage(null), 3000);
+  };
 
   const handleFinalize = () => {
     setShowCompletionMessage(true);
@@ -433,10 +416,10 @@ const EnsaioPage = () => {
               </motion.button>
             </div>
           </motion.div>
-	        )}
-	
-	        {currentStep === "resumo" && (
-	          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
+        )}
+
+        {currentStep === "calendar" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
             <div className="mb-8 flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-800">Reserva de Ensaio</h1>
@@ -497,8 +480,7 @@ const EnsaioPage = () => {
 	              onMonthChange={setCurrentMonth}
 	              disabledDates={blockedDates} // Passando as datas bloqueadas
 	              eventDates={Object.keys(backendOcupados)}
-		              // MUDANÇA: Mapeia todos os ensaios agendados para destacar no calendário
-		              mainEventDatesSelected={resumo.ensaio ? resumo.ensaio.map(e => new Date(e.date)) : []}
+	              mainEventDatesSelected={resumo.ensaio ? [new Date(resumo.ensaio.date)] : []}
 	            />
 		                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
