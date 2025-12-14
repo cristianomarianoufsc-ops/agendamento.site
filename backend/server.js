@@ -1096,13 +1096,14 @@ async function consolidateSchedule() {
       }
     };
 
-    addSlot('ensaio', insc.ensaio_inicio, insc.ensaio_fim, insc.ensaio_eventId);
-    addSlot('montagem', insc.montagem_inicio, insc.montagem_fim, insc.montagem_eventId);
-    addSlot('desmontagem', insc.desmontagem_inicio, insc.desmontagem_fim, insc.desmontagem_eventId);
+	    // addSlot('ensaio', insc.ensaio_inicio, insc.ensaio_fim, insc.ensaio_eventId); // Removido, pois agora está em eventos_json
+	    addSlot('montagem', insc.montagem_inicio, insc.montagem_fim, insc.montagem_eventId);
+	    addSlot('desmontagem', insc.desmontagem_inicio, insc.desmontagem_fim, insc.desmontagem_eventId);
 
-    if (insc.eventos_json) {
-      JSON.parse(insc.eventos_json).forEach(ev => addSlot('evento', ev.inicio, ev.fim, ev.eventId));
-    }
+	    if (insc.eventos_json) {
+	      // Adiciona todos os eventos extras (incluindo ensaio)
+	      JSON.parse(insc.eventos_json).forEach(ev => addSlot(ev.tipo || 'evento', ev.inicio, ev.fim, ev.eventId));
+	    }
   });
 
   // 3. Identificar os slots de tempo que estão em conflito
@@ -1275,7 +1276,10 @@ app.get("/api/master-sheet-link", (req, res) => {
 // --- 16. ROTA PARA CRIAR EVENTOS (ETAPA 1) ---
 app.post("/api/create-events", async (req, res) => {
   try {
-    const { local, resumo, etapas, userData } = req.body;
+        const { local, resumo, etapas, userData } = req.body;
+        
+        // Validação: Se houver mais de um ensaio, permite. Se houver mais de um evento, permite.
+        // A lógica de limite de agendamento para 'ensaio' será removida ao tratá-lo como 'evento' extra.
     if (!calendarIds[local]) {
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
@@ -1325,31 +1329,36 @@ app.post("/api/create-events", async (req, res) => {
 
     // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
     try {
-      const dbPayload = {
-        nome: userData.name, email: userData.email, telefone: userData.phone,
-        evento_nome: userData.eventName || resumo, local,
-        ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
-        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
-        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
-        eventos_json: '[]'
-      };
-      const eventosExtras = [];
-      etapasComId.forEach(e => {
-        const nome = e.nome.toLowerCase();
-        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
-          dbPayload[`${nome}_inicio`] = e.inicio;
-          dbPayload[`${nome}_fim`] = e.fim;
-          dbPayload[`${nome}_eventId`] = e.eventId;
-        } else if (nome === 'evento') {
-          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
-        }
-      });
-      dbPayload.eventos_json = JSON.stringify(eventosExtras);
-      
-      await query(
-        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-      );
+	      const dbPayload = {
+	        nome: userData.name, email: userData.email, telefone: userData.phone,
+	        evento_nome: userData.eventName || resumo, local,
+	        // ensaio_inicio, ensaio_fim, ensaio_eventId serão removidos
+	        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
+	        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
+	        eventos_json: '[]'
+	      };
+	      const eventosExtras = [];
+	      etapasComId.forEach(e => {
+	        const nome = e.nome.toLowerCase();
+	        
+	        // Se for ensaio ou evento, trata como evento extra
+	        if (nome === 'ensaio' || nome === 'evento') {
+	          // Adiciona o tipo para que possa ser distinguido no JSON, se necessário
+	          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId, tipo: nome });
+	        } else if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+	          // Mantém montagem e desmontagem como campos separados (se existirem)
+	          dbPayload[`${nome}_inicio`] = e.inicio;
+	          dbPayload[`${nome}_fim`] = e.fim;
+	          dbPayload[`${nome}_eventId`] = e.eventId;
+	        }
+	      });
+	      dbPayload.eventos_json = JSON.stringify(eventosExtras);
+	      
+	      // A query INSERT precisa ser atualizada para remover as colunas de ensaio
+	      await query(
+	        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+	        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+	      );
       console.log("💾 Inscrição salva no banco com sucesso!");
       
       const message = calendarError ? "Inscrição salva, mas houve falha na criação dos eventos do Google Calendar." : "Eventos criados e inscrição salva com sucesso!";
@@ -1374,23 +1383,23 @@ app.post("/api/cleanup/force", async (req, res) => {
   try {
     // 1. Buscar todas as inscrições para obter os eventIds do Google Calendar
     const allInscricoes = await query('SELECT * FROM inscricoes');
-    const allEventIdsToDelete = [];
-    const localMap = {}; // Mapeia eventId para o local (calendarId)
+	    const allEventIdsToDelete = [];
+	    const localMap = {}; // Mapeia eventId para o local (calendarId)
 
-    const addId = (id, local) => { if (id) { allEventIdsToDelete.push(id); localMap[id] = local; } };
-    const addJsonIds = (json, local) => {
-      try {
-        JSON.parse(json).forEach(e => addId(e.eventId, local));
-      } catch (e) { /* ignore */ }
-    };
+	    const addId = (id, local) => { if (id) { allEventIdsToDelete.push(id); localMap[id] = local; } };
+	    const addJsonIds = (json, local) => {
+	      try {
+	        JSON.parse(json).forEach(e => addId(e.eventId, local));
+	      } catch (e) { /* ignore */ }
+	    };
 
-    allInscricoes.rows.forEach(inscricao => {
-      const local = inscricao.local;
-      addId(inscricao.ensaio_eventId, local);
-      addId(inscricao.montagem_eventId, local);
-      addId(inscricao.desmontagem_eventId, local);
-      addJsonIds(inscricao.eventos_json, local);
-    });
+	    allInscricoes.rows.forEach(inscricao => {
+	      const local = inscricao.local;
+	      // addId(inscricao.ensaio_eventId, local); // Removido, pois agora está em eventos_json
+	      addId(inscricao.montagem_eventId, local);
+	      addId(inscricao.desmontagem_eventId, local);
+	      addJsonIds(inscricao.eventos_json, local);
+	    });
 
     // 2. Deletar eventos do Google Calendar
     if (allEventIdsToDelete.length > 0) {
@@ -1453,29 +1462,29 @@ app.delete("/api/cancel-events/:local", async (req, res) => {
 app.delete("/api/inscricao/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    // 1. Buscar a inscrição para obter os eventIds do Google Calendar
-    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Inscrição não encontrada." });
-    }
-    const inscricao = result.rows[0];
+	    // 1. Buscar a inscrição para obter os eventIds do Google Calendar
+	    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+	    if (result.rows.length === 0) {
+	      return res.status(404).json({ error: "Inscrição não encontrada." });
+	    }
+	    const inscricao = result.rows[0];
 
-    // 2. Cancelar eventos no Google Calendar (se existirem)
-    const eventIdsToDelete = [];
-    const local = inscricao.local;
+	    // 2. Cancelar eventos no Google Calendar (se existirem)
+	    const eventIdsToDelete = [];
+	    const local = inscricao.local;
 
-    // Funções auxiliares para adicionar IDs
-    const addId = (id) => { if (id) eventIdsToDelete.push(id); };
-    const addJsonIds = (json) => {
-      try {
-        JSON.parse(json).forEach(e => addId(e.eventId));
-      } catch (e) { /* ignore */ }
-    };
+	    // Funções auxiliares para adicionar IDs
+	    const addId = (id) => { if (id) eventIdsToDelete.push(id); };
+	    const addJsonIds = (json) => {
+	      try {
+	        JSON.parse(json).forEach(e => addId(e.eventId));
+	      } catch (e) { /* ignore */ }
+	    };
 
-    addId(inscricao.ensaio_eventId);
-    addId(inscricao.montagem_eventId);
-    addId(inscricao.desmontagem_eventId);
-    addJsonIds(inscricao.eventos_json);
+	    // addId(inscricao.ensaio_eventId); // Removido, pois agora está em eventos_json
+	    addId(inscricao.montagem_eventId);
+	    addId(inscricao.desmontagem_eventId);
+	    addJsonIds(inscricao.eventos_json);
 
     if (eventIdsToDelete.length > 0 && calendarIds[local]) {
       console.log(`🗑️ Tentando deletar ${eventIdsToDelete.length} eventos do Google Calendar para a inscrição #${id}`);
@@ -2096,10 +2105,12 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       const hFim = new Date(fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       doc.font('Helvetica').fontSize(10).text(`• ${rotulo}: ${data}, das ${hIni} às ${hFim}`);
     };
-    linhaEtapa("Ensaio", inscricao.ensaio_inicio, inscricao.ensaio_fim);
-    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
-      JSON.parse(inscricao.eventos_json).forEach((ev, i) => linhaEtapa(`Evento ${i + 1}`, ev.inicio, ev.fim));
-    }
+	    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
+	      JSON.parse(inscricao.eventos_json).forEach((ev, i) => {
+	        const tipo = ev.tipo ? ev.tipo.charAt(0).toUpperCase() + ev.tipo.slice(1) : 'Evento';
+	        linhaEtapa(tipo, ev.inicio, ev.fim);
+	      });
+	    }
     linhaEtapa("Montagem", inscricao.montagem_inicio, inscricao.montagem_fim);
     linhaEtapa("Desmontagem", inscricao.desmontagem_inicio, inscricao.desmontagem_fim);
     doc.moveDown(1.5);
