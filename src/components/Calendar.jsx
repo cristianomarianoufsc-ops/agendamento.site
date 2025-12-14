@@ -37,11 +37,11 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
     if (isDisabled) {
       buttonClass += " bg-gray-100 text-gray-400 cursor-not-allowed";
     } else if (isCurrentlySelected) {
-      // 1ª Prioridade: Destaca o dia clicado com amarelo forte
-      buttonClass += " bg-yellow-400 text-black scale-110 shadow-lg";
+      // 1ª Prioridade: Destaca o dia clicado com azul
+      buttonClass += " bg-blue-600 text-white scale-110 shadow-lg";
     } else if (isMainEvent) {
-      // 2ª Prioridade: Marca os eventos principais já agendados com azul
-      buttonClass += " bg-blue-600 text-white";
+      // 2ª Prioridade: Marca os eventos principais já agendados com amarelo forte
+      buttonClass += " bg-yellow-400 text-black";
     } else if (hasOtherEvent) {
       // 3ª Prioridade: Marca outros dias ocupados com amarelo claro
       buttonClass += " bg-yellow-200 text-yellow-800 hover:bg-yellow-300";

@@ -1412,9 +1412,6 @@ app.post("/api/cleanup/force", async (req, res) => {
     console.log("🗑️ Todas as avaliações deletadas.");
     await query('DELETE FROM inscricoes');
     console.log("🗑️ Todas as inscrições deletadas.");
-    // ✅ NOVO: Reseta o contador de auto-incremento para que as novas inscrições comecem do ID 1
-    await query("ALTER SEQUENCE inscricoes_id_seq RESTART WITH 1");
-    console.log("✅ Contador de auto-incremento da tabela 'inscricoes' resetado para 1.");
 
     // 3. Limpar o cache de eventos (se houver)
     // O cache de eventos é limpo na inicialização, mas é bom garantir.
@@ -1971,21 +1968,93 @@ app.post("/api/config", async (req, res) => {
     res.status(500).json({ error: "Erro ao salvar configurações" });
   }
 });
-app.post("/api/gerar-pdf", async (req, res) => {
+app.get("/api/gerar-pdf/:id", async (req, res) => {
   try {
-    const { inscricao } = req.body;
-
-    if (!inscricao || !inscricao.id) {
-      return res.status(400).send('Dados da inscrição não fornecidos.');
+    const { id } = req.params;
+    
+    // 1. Buscar inscrição no banco
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).send('Inscrição não encontrada');
     }
     
-    // O objeto 'inscricao' já vem completo do frontend, incluindo formsData.
-    // Não é mais necessário buscar no banco.
+    const inscricao = result.rows[0];
     
-    // 2. Usar o formsData enviado pelo frontend
-    const respostaForms = inscricao.formsData;
+    // 2. Buscar dados do Google Sheets via CSV (como no backup)
+    let respostaForms = null;
+    try {
+      // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
+      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
+      let sheetId = null;
+      if (configResult.rows.length > 0) {
+        const config = JSON.parse(configResult.rows[0].config_json);
+        sheetId = config.sheetId;
+      }
+      console.log(`[PDF] Iniciando geração de PDF para inscrição ID: ${id}`);
+      console.log(`[PDF] SheetId do banco:`, sheetId);
 
+      if (sheetId) {
+        // ✅ Usar Sheets API ao invés do Drive API
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: 'A:Z'
+        });
+        
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) {
+          console.log('[PDF] Sheet vazio');
+        } else {
+          // Primeira linha = cabeçalhos
+          const headers = rows[0];
+          // Converter para array de objetos
+          const records = rows.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, i) => {
+              obj[header] = row[i] || '';
+            });
+            return obj;
+          });
+          console.log(`[PDF] Records found: ${records.length}`);
+          if (records.length > 0) {
+            console.log(`[PDF] Columns:`, Object.keys(records[0]));
+          }
 
+        // Encontrar linha correspondente
+        respostaForms = records.find(f => {
+          // Buscar coluna de email: primeiro tenta por nome, depois por conteúdo com @
+          let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          if (!emailKey) {
+            // Se não encontrou por nome, procura qualquer coluna que tenha @ (email válido)
+            emailKey = Object.keys(f).find(k => {
+              const value = (f[k] || "").trim();
+              return value.includes("@") && value.includes(".");
+            });
+          }
+          
+          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
+          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
+          const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
+          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          
+          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                 (telForms && telEtapa1 && telForms === telEtapa1);
+        });
+       console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'NÃO');
+          if (!respostaForms) {
+            console.log(`[PDF] DADOS DE COMPARAÇÃO:`);
+            console.log(`  - Email (Etapa 1): '${(inscricao.email || "").trim().toLowerCase()}'`);
+            console.log(`  - Telefone (Etapa 1): '${(inscricao.telefone || "").replace(/\D/g, "")}'`);
+          }
+          if (respostaForms) {
+            console.log(`[PDF] Campos:`, Object.keys(respostaForms));
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[PDF] ERRO ao buscar dados do Forms:", e.message);
+      console.error(e.stack);
+    }
     
     // 3. Gerar PDF
     const doc = new PDFDocument({ margin: 50 });
@@ -1993,7 +2062,7 @@ app.post("/api/gerar-pdf", async (req, res) => {
     doc.on("data", chunk => chunks.push(chunk));
     doc.on("end", () => {
       const pdfBuffer = Buffer.concat(chunks);
-      const filename = `inscricao-${inscricao.id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
+      const filename = `inscricao-${id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
       res.send(pdfBuffer);
