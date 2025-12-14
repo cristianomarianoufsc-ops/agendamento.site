@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive,6	  AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
+  Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
