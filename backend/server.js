@@ -1412,6 +1412,9 @@ app.post("/api/cleanup/force", async (req, res) => {
     console.log("🗑️ Todas as avaliações deletadas.");
     await query('DELETE FROM inscricoes');
     console.log("🗑️ Todas as inscrições deletadas.");
+    // ✅ NOVO: Reseta o contador de auto-incremento para que as novas inscrições comecem do ID 1
+    await query("ALTER SEQUENCE inscricoes_id_seq RESTART WITH 1");
+    console.log("✅ Contador de auto-incremento da tabela 'inscricoes' resetado para 1.");
 
     // 3. Limpar o cache de eventos (se houver)
     // O cache de eventos é limpo na inicialização, mas é bom garantir.
