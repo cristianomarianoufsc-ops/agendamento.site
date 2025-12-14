@@ -72,9 +72,21 @@ const FormDataModal = ({ inscricao, onClose }) => {
           </div>
         </div>
         <div className="space-y-4 text-gray-700">
-          <div className="bg-gray-50 p-3 rounded-lg mb-4">
-            <p className="text-sm font-semibold">Inscrição ID: {inscricao?.id} | Evento: {inscricao?.evento_nome}</p>
+          {/* DADOS DA ETAPA 1 */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-4 border-l-4 border-blue-500">
+            <h4 className="text-lg font-bold text-blue-700 mb-2">Dados da Inscrição (Etapa 1)</h4>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <p><strong>ID:</strong> {inscricao?.id}</p>
+              <p><strong>Evento:</strong> {inscricao?.evento_nome}</p>
+              <p><strong>Proponente:</strong> {inscricao?.nome}</p>
+              <p><strong>Local:</strong> {inscricao?.local === 'teatro' ? 'Teatro' : 'Igrejinha'}</p>
+              <p><strong>E-mail:</strong> {inscricao?.email}</p>
+              <p><strong>Telefone:</strong> {inscricao?.telefone || 'N/A'}</p>
+            </div>
           </div>
+
+          {/* DADOS DA ETAPA 2 */}
+          <h4 className="text-lg font-bold text-gray-700 mb-2 border-b pb-1">Detalhes do Evento (Etapa 2)</h4>
           {renderAllFormsData()}
         </div>
       </motion.div>
