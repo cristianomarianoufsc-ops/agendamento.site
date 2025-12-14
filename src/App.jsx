@@ -15,7 +15,7 @@ const AppVertical = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ evento: [] }); // Array para múltiplos eventos (máx 6)
+  const [resumo, setResumo] = useState({ ensaio: [], evento: [] });
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -309,7 +309,7 @@ const newEnd = toMinutes(newEntry.end);
   }
 
   // ✅ NOVA LÓGICA: Trata eventos como array
-  if (etapa === "evento") {
+  if (etapa === "evento" || etapa === "ensaio") {
     // Verifica se já atingiu o limite de 6 eventos
     if (resumo.evento.length >= 6) {
       setAlertMessage({ type: 'warning', text: "Você já atingiu o limite de 6 eventos!" });
@@ -539,14 +539,16 @@ const handleSendEmail = async () => {
     
     const tableData = [];
     
-    // Adicionar ensaio
-    if (resumo.ensaio) {
-      tableData.push([
-        "Ensaio",
-        new Date(resumo.ensaio.date).toLocaleDateString("pt-BR"),
-        `${resumo.ensaio.start} - ${resumo.ensaio.end}`
-      ]);
-    }
+// Adicionar ensaio
+if (resumo.ensaio && resumo.ensaio.length > 0) {
+  resumo.ensaio.forEach((ens, idx) => {
+    tableData.push([
+      `Ensaio ${idx + 1}`,
+      new Date(ens.date).toLocaleDateString("pt-BR"),
+      `${ens.start} - ${ens.end}`
+    ]);
+  });
+}
     
     // Adicionar montagem
     if (resumo.montagem) {
