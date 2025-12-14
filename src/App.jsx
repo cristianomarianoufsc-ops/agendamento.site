@@ -796,7 +796,7 @@ const handleSendEmail = async () => {
               <div className="bg-white p-6 rounded-2xl shadow-md">
 	                <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2"><CalendarIcon size={20} /> 1. Escolha as datas e horários</h3>
 	                <p className="text-sm text-gray-600 mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-	                  <b>**Atenção:** As datas e horários marcados em **amarelo** já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim.” A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</b>
+	                  <b>**Atenção:** As datas e horários marcados em **amarelo** já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim.A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</b>
 	                </p>
                 <div className="flex flex-col space-y-3">
                   {stageOrder.map((etapa) => {
