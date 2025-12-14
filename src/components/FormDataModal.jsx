@@ -83,6 +83,22 @@ const FormDataModal = ({ inscricao, onClose }) => {
               <p><strong>E-mail:</strong> {inscricao?.email}</p>
               <p><strong>Telefone:</strong> {inscricao?.telefone || 'N/A'}</p>
             </div>
+
+            <h5 className="text-md font-bold text-blue-700 mt-3 mb-1 border-t pt-2">Agendamentos</h5>
+            <div className="space-y-1 text-sm">
+              {inscricao?.ensaio_inicio && (
+                <p><strong>Ensaio:</strong> {new Date(inscricao.ensaio_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} - {new Date(inscricao.ensaio_fim).toLocaleTimeString('pt-BR', { timeStyle: 'short' })}</p>
+              )}
+              {inscricao?.eventos_json && JSON.parse(inscricao.eventos_json).map((ev, i) => (
+                <p key={i}><strong>Evento {i + 1}:</strong> {new Date(ev.inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} - {new Date(ev.fim).toLocaleTimeString('pt-BR', { timeStyle: 'short' })}</p>
+              ))}
+              {inscricao?.montagem_inicio && (
+                <p><strong>Montagem:</strong> {new Date(inscricao.montagem_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} - {new Date(inscricao.montagem_fim).toLocaleTimeString('pt-BR', { timeStyle: 'short' })}</p>
+              )}
+              {inscricao?.desmontagem_inicio && (
+                <p><strong>Desmontagem:</strong> {new Date(inscricao.desmontagem_inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} - {new Date(inscricao.desmontagem_fim).toLocaleTimeString('pt-BR', { timeStyle: 'short' })}</p>
+              )}
+            </div>
           </div>
 
           {/* DADOS DA ETAPA 2 */}
