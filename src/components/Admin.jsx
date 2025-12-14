@@ -2,8 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, 
-  AlertTriangle, CheckCircle, Search, Sheet, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
+  Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive,6	  AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
@@ -812,13 +811,7 @@ const Admin = ({ viewOnly = false }) => {
                         <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
                       </>
                     )}
-                    {/* ✅ NOVO BOTÃO: VER DADOS DO CSV */}
-                    {!viewOnly && (
-                      <a href="/csv-data" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 text-sm">
-                        <Sheet size={16} /> Ver Dados do Forms (CSV)
-                      </a>
-                    )}
-                    {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'   ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
+                    {/* ✅ NOVO BOTÃO: VER DAD               {!viewOnly && <button onClick={() => { const masterLink = 'https://docs.google.com/spreadsheets/d/139ElhiQPcF91DDCjUk74tyRCfH8x2zZKaNESbrnl8tY/edit'; window.open(masterLink, '_blank'   ); }} className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 text-sm"><Sheet size={16} /> Ver na Planilha</button>}
 
                   </div>
                 </div>
