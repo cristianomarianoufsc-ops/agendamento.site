@@ -1968,87 +1968,21 @@ app.post("/api/config", async (req, res) => {
     res.status(500).json({ error: "Erro ao salvar configurações" });
   }
 });
-app.get("/api/gerar-pdf/:id", async (req, res) => {
+app.post("/api/gerar-pdf", async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    // 1. Buscar inscrição no banco
-    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).send('Inscrição não encontrada');
+    const { inscricao } = req.body;
+
+    if (!inscricao || !inscricao.id) {
+      return res.status(400).send('Dados da inscrição não fornecidos.');
     }
     
-    const inscricao = result.rows[0];
+    // O objeto 'inscricao' já vem completo do frontend, incluindo formsData.
+    // Não é mais necessário buscar no banco.
     
-    // 2. Buscar dados do Google Sheets via CSV (como no backup)
-    let respostaForms = null;
-    try {
-      // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
-      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
-      let sheetId = null;
-      if (configResult.rows.length > 0) {
-        const config = JSON.parse(configResult.rows[0].config_json);
-        sheetId = config.sheetId;
-      }
-      console.log(`[PDF] SheetId do banco:`, sheetId);
+    // 2. Usar o formsData enviado pelo frontend
+    const respostaForms = inscricao.formsData;
 
-      if (sheetId) {
-        // ✅ Usar Sheets API ao invés do Drive API
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'A:Z'
-        });
-        
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-          console.log('[PDF] Sheet vazio');
-        } else {
-          // Primeira linha = cabeçalhos
-          const headers = rows[0];
-          // Converter para array de objetos
-          const records = rows.slice(1).map(row => {
-            const obj = {};
-            headers.forEach((header, i) => {
-              obj[header] = row[i] || '';
-            });
-            return obj;
-          });
-          console.log(`[PDF] Records found: ${records.length}`);
-          if (records.length > 0) {
-            console.log(`[PDF] Columns:`, Object.keys(records[0]));
-          }
 
-        // Encontrar linha correspondente
-        respostaForms = records.find(f => {
-          // Buscar coluna de email: primeiro tenta por nome, depois por conteúdo com @
-          let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
-          if (!emailKey) {
-            // Se não encontrou por nome, procura qualquer coluna que tenha @ (email válido)
-            emailKey = Object.keys(f).find(k => {
-              const value = (f[k] || "").trim();
-              return value.includes("@") && value.includes(".");
-            });
-          }
-          
-          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
-          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
-          const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
-          
-          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                 (telForms && telEtapa1 && telForms === telEtapa1);
-        });
-          console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'N\u00c3O');
-          if (respostaForms) {
-            console.log(`[PDF] Campos:`, Object.keys(respostaForms));
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[PDF] ERRO ao buscar dados do Forms:", e.message);
-      console.error(e.stack);
-    }
     
     // 3. Gerar PDF
     const doc = new PDFDocument({ margin: 50 });
@@ -2056,7 +1990,7 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     doc.on("data", chunk => chunks.push(chunk));
     doc.on("end", () => {
       const pdfBuffer = Buffer.concat(chunks);
-      const filename = `inscricao-${id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
+      const filename = `inscricao-${inscricao.id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
       res.send(pdfBuffer);

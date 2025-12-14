@@ -519,6 +519,36 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
+  const handleGeneratePDF = async (inscricao) => {
+    try {
+      const response = await fetch(`/api/gerar-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ inscricao }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inscricao_${inscricao.id}_${inscricao.evento_nome.replace(/\s/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      alert(`Erro ao gerar PDF: ${error.message}. Verifique o console para mais detalhes.`);
+    }
+  };
+
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = async () => {
     // Plano C: Gerar o relatório em Markdown diretamente no frontend
@@ -925,7 +955,7 @@ const Admin = ({ viewOnly = false }) => {
                                       )}
                                     </>
                                   )}
-                                </td>              {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">                           <a href={`/api/gerar-pdf/${u.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</a>
+                                </td>              {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">                           <button onClick={() => handleGeneratePDF(u)} className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</button>
                                   {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold"><FileText size={16} /> Ficha Detalhada</button>}
                                   <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button>
                                 </td>}
