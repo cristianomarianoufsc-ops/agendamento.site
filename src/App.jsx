@@ -310,35 +310,38 @@ const newEnd = toMinutes(newEntry.end);
 
   // ✅ NOVA LÓGICA: Trata eventos como array
   if (etapa === "evento" || etapa === "ensaio") {
-    // Verifica se já atingiu o limite de 6 eventos
-    if (resumo.evento.length >= 6) {
-      setAlertMessage({ type: 'warning', text: "Você já atingiu o limite de 6 eventos!" });
+    const stageName = etapa.charAt(0).toUpperCase() + etapa.slice(1);
+    const currentStageArray = resumo[etapa] || [];
+
+    // Verifica se já atingiu o limite de 6
+    if (currentStageArray.length >= 6) {
+      setAlertMessage({ type: 'warning', text: `Você já atingiu o limite de 6 agendamentos de ${stageName}!` });
       setTimeout(() => setAlertMessage(null), 4000);
       return;
     }
     
     // Verifica duplicação
-    const isDuplicate = resumo.evento.some(evt => 
+    const isDuplicate = currentStageArray.some(evt => 
       evt.date === newEntry.date && evt.start === newEntry.start && evt.end === newEntry.end
     );
     
     if (isDuplicate) return;
     
-    // Adiciona o novo evento ao array
+    // Adiciona o novo agendamento ao array
     setResumo((prev) => ({
       ...prev,
-      evento: [...prev.evento, newEntry]
+      [etapa]: [...currentStageArray, newEntry]
     }));
     
     // Abre o modal de confirmação se ainda não atingiu o limite
-    if (resumo.evento.length < 5) { // Menos de 6 após adicionar este
+    if (currentStageArray.length < 5) { // Menos de 6 após adicionar este
       setShowConfirmNextEventModal(true);
     } else {
-      // Se atingiu 6 eventos, fecha tudo
+      // Se atingiu 6, fecha tudo
       setSelectedStage(null);
       setSelectedDate(null);
       setStageTimes({ startTime: null, endTime: null });
-      setAlertMessage({ type: 'success', text: "Limite de 6 eventos atingido!" });
+      setAlertMessage({ type: 'success', text: `Limite de 6 agendamentos de ${stageName} atingido!` });
       setTimeout(() => setAlertMessage(null), 4000);
     }
   } else {
@@ -703,12 +706,12 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
      <Modal
   isOpen={showConfirmNextEventModal}
   onClose={handleDeclineNextEvent}
-  title="Evento Adicionado!"
+  title={`${selectedStage.charAt(0).toUpperCase() + selectedStage.slice(1)} Adicionado!`}
   showDefaultButton={false}
 >
   {/* O estilo deste parágrafo foi adicionado para aumentar a fonte */}
   <p style={{ fontSize: '1.125rem', color: '#4b5563', textAlign: 'center' }}>
-    Deseja agendar outro evento?
+    Deseja agendar outro ${selectedStage}?
   </p>
   
   <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
@@ -892,32 +895,34 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
                 <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
                 <ul className="space-y-3 text-sm text-gray-600">
                   {stageOrder.flatMap((etapa) => {
-                    if (etapa === 'evento') {
-                      // Para eventos, exibe todos os itens do array
-                      if (resumo.evento && Array.isArray(resumo.evento) && resumo.evento.length > 0) {
-                        return resumo.evento.map((evt, idx) => {
-                          if (!evt || !evt.date || !evt.start || !evt.end) return null;
-                          return (
-                            <li key={`evento-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                              <div><span className="font-semibold text-gray-800">Evento {idx + 1}:</span> {new Date(evt.date).toLocaleDateString("pt-BR")} | {evt.start} - {evt.end}</div>
-                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa: 'evento', idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-                            </li>
-                          );
-                        });
-                      }
-                    } else {
-                      // Para outras etapas, exibe normalmente
-                      if (resumo[etapa]) {
-                        const item = resumo[etapa];
-                        if (!item || !item.date || !item.start || !item.end) return null;
-                        return (
-                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                            <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
-                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-                          </li>
-                        );
-                      }
-                    }
+if (etapa === 'evento' || etapa === 'ensaio') {
+	                      // Para etapas de agendamento múltiplo (ensaio e evento)
+	                      const currentStageArray = resumo[etapa];
+	                      if (currentStageArray && Array.isArray(currentStageArray) && currentStageArray.length > 0) {
+	                        return currentStageArray.map((item, idx) => {
+	                          if (!item || !item.date || !item.start || !item.end) return null;
+	                          const stageName = etapa.charAt(0).toUpperCase() + etapa.slice(1);
+	                          return (
+	                            <li key={`${etapa}-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                              <div><span className="font-semibold text-gray-800">{stageName} {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa, idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                            </li>
+	                          );
+	                        });
+	                      }
+	                    } else {
+	                      // Para outras etapas (montagem, desmontagem)
+	                      if (resumo[etapa]) {
+	                        const item = resumo[etapa];
+	                        if (!item || !item.date || !item.start || !item.end) return null;
+	                        return (
+	                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                            <div><span className="font-semibold text-gray-800">{etapa.charAt(0).toUpperCase() + etapa.slice(1)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                          </li>
+	                        );
+	                      }
+	                    }
                     return [];
                   })}
                   {(!resumo.evento || resumo.evento.length === 0) && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
