@@ -3,7 +3,7 @@ import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRef } from "react";
+
 import Modal from "./components/Modal"; 
 
 const EnsaioPage = () => {
