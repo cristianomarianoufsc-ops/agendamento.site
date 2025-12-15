@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 // 1. Importe TODOS os componentes que servirão como páginas
 import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Completo)
-import AdminPanel from "./components/AdminPanel.jsx"; // Importando o painel administrativo correto
+import AdminPanel from "./components/AdminPanel.jsx"; // Importando o painel administrativo correto (DEIXADO POR COMPATIBILIDADE)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
 import Pagina from "./pages/Pagina.jsx"; // A NOVA PÁGINA COM DADOS DO CSV
 import Admin from "./components/Admin.jsx"; // Este é o AppVertical com props de admin, mas o nome é confuso. Deixando para trás.
@@ -140,7 +140,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         {/* ================================================================== */}
 
         {/* Rota para o painel de administração COMPLETO */}
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin" element={<Admin />} />
 
         {/* Rota para o painel de administração SOMENTE LEITURA (Se Admin for o AppVertical com props) */}
         <Route path="/admin-viewer" element={<Admin viewOnly={true} />} />
