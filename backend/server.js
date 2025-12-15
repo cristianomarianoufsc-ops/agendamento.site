@@ -973,6 +973,35 @@ async function deleteCalendarEvent(local, inscriptionId, eventType, eventId) {
 /**
  * Cria um evento no Google Calendar e salva o eventId no banco de dados.
  */
+async function updateCalendarEvent(local, eventId, summary) {
+  try {
+    const event = {
+      summary: summary,
+      extendedProperties: {
+        private: {
+          managedBy: "sistema-edital-dac",
+          status: "confirmed"
+        }
+      }
+    };
+
+    await calendar.events.patch({
+      calendarId: calendarIds[local],
+      eventId: eventId,
+      resource: event
+    });
+
+    console.log(`✅ Evento ${eventId} atualizado para 'confirmed' no Google Calendar.`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Erro ao atualizar evento ${eventId} no Google Calendar:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Cria um evento no Google Calendar e salva o eventId no banco de dados.
+ */
 async function createCalendarEvent(local, inscriptionId, eventType, start, end, summary) {
   try {
     const nomeEtapaCapitalizado = eventType.charAt(0).toUpperCase() + eventType.slice(1);
@@ -1156,8 +1185,12 @@ async function consolidateSchedule() {
           
           deleteCalendarEvent(slot.local, slot.inscriptionId, slot.type, slot.eventId);
         } else {
-          if (!slot.eventId) {
-            const inscricaoVencedora = inscriptionsWithScores.find(i => i.id === slot.inscriptionId);
+          const inscricaoVencedora = inscriptionsWithScores.find(i => i.id === slot.inscriptionId);
+          if (slot.eventId) {
+            // Se o evento já existe, atualiza o status para 'confirmed'
+            updateCalendarEvent(slot.local, slot.eventId, `${slot.type.charAt(0).toUpperCase() + slot.type.slice(1)} - ${inscricaoVencedora.evento_nome}`);
+          } else {
+            // Se o evento não existe (o que não deveria acontecer se a primeira etapa foi concluída), cria
             createCalendarEvent(slot.local, slot.inscriptionId, slot.type, slot.start.toISOString(), slot.end.toISOString(), inscricaoVencedora.evento_nome);
           }
         }
