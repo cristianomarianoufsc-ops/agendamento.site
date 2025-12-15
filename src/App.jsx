@@ -274,7 +274,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
 	        currentStageArray.forEach(evt => {
 	          if (evt && evt.date && evt.start && evt.end) {
 	            if (evt.date.split("T")[0] === dateString) {
-	              localSlots.push({ start: evt.start, end: evt.end, isContestable: false });
+	              localSlots.push({ start: evt.start, end: evt.end, isContestable: true });
 	            }
 	          }
 	        });
