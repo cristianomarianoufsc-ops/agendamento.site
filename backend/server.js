@@ -800,7 +800,8 @@ app.get("/api/inscricoes", async (req, res) => {
         for (let j = i + 1; j < allSlots.length; j++) {
           const slotA = allSlots[i];
           const slotB = allSlots[j];
-          if (slotA.local === slotB.local && slotA.start < slotB.end && slotA.end > slotB.start) {
+          // ✅ MODIFICADO: Conflito agora considera apenas data/horário (Teatro e Igrejinha são próximos)
+          if (slotA.start < slotB.end && slotA.end > slotB.start) {
             if (inscriptionSlots.some(s => (s.start === slotA.start && s.end === slotA.end) || (s.start === slotB.start && s.end === slotB.end))) {
               hasConflict = true;
               break;
@@ -1143,7 +1144,8 @@ async function consolidateSchedule() {
       const slotA = allSlots[i];
       const slotB = allSlots[j];
 
-      if (slotA.local === slotB.local && slotA.start < slotB.end && slotA.end > slotB.start) {
+      // ✅ MODIFICADO: Conflito agora considera apenas data/horário (Teatro e Igrejinha são próximos)
+      if (slotA.start < slotB.end && slotA.end > slotB.start) {
         const key = `${slotA.local}|${slotA.start.toISOString()}|${slotA.end.toISOString()}`;
         
         if (!conflictingTimeSlots[key]) {
