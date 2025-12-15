@@ -1387,11 +1387,10 @@ app.post("/api/create-events", async (req, res) => {
           }
         };
         try {
-          // const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
-          // etapasComId.push({ ...etapa, eventId: response.data.id });
-          // eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
-          etapasComId.push({ ...etapa, eventId: null }); // Adiciona eventId nulo para não quebrar o código
-          eventosCriados.push({ etapa: etapa.nome, id: null, summary: event.summary, inicio: etapa.inicio });
+          const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
+          etapasComId.push({ ...etapa, eventId: response.data.id });
+          eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
+
         } catch (err) {
           console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
           // Continua o loop mesmo com erro em um evento
