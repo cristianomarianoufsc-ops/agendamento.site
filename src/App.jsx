@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
+import { useRef } from "react"; // Importa useRef
 import { capitalize } from "./utils/stringUtils";
 
 
@@ -48,6 +49,9 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
   // ✅ NOVO ESTADO ADICIONADO AQUI
   const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços"); 
   const [buttonExternalEditalText, setButtonExternalEditalText] = useState("Edital Externo"); // ✅ ESTADO FALTANTE CORRIGIDO
+
+  // ✅ NOVO: Ref para a seção de horários
+  const timeSelectorRef = useRef(null);
 
 
   // ✅ Efeito para buscar configurações globais uma vez
@@ -198,7 +202,15 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
   };
 
-  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
+  const handleDateSelect = (date) => { 
+    setSelectedDate(date); 
+    setStageTimes({ startTime: null, endTime: null }); 
+    
+    // ✅ NOVO: Scroll automático para a seção de horários
+    if (timeSelectorRef.current) {
+      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // ✅ FUNÇÃO MODIFICADA: Agora verifica conflito ao selecionar horário de INÍCIO
   const handleTimeSelection = (time) => {
@@ -859,6 +871,7 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
                                 <AnimatePresence>
                                   {selectedDate && (
                                     <motion.div
+                                      ref={timeSelectorRef} // ✅ NOVO: Adiciona a ref aqui
                                       initial={{ opacity: 0, marginTop: 0 }}
                                       animate={{ opacity: 1, marginTop: '1.5rem' }}
                                       className="border-t pt-6"
