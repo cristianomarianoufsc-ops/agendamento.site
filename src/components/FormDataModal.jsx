@@ -1,3 +1,4 @@
+
 import React from "react";
 import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
@@ -5,10 +6,10 @@ import { FileText, X, Printer } from "lucide-react";
 
 // --- COMPONENTE AUXILIAR: SmartInfoRow (Replicado do EvaluationDrawer) ---
 const SmartInfoRow = ({ label, value }) => {
-  const isLink = (text) => typeof text === 'string' && (text.startsWith('http://' ) || text.startsWith('https://' ));
+  const isLink = (text) => typeof text === 'string' && (text.startsWith('http://') || text.startsWith('https://'));
   const renderValue = () => {
     if (!value) return <span className="italic text-gray-400">Não informado</span>;
-    const parts = value.split(', ');
+    const parts = String(value).split(', ');
     return (
       <div className="flex flex-col gap-1">
         {parts.map((part, index) => isLink(part) ? (
@@ -29,10 +30,8 @@ const SmartInfoRow = ({ label, value }) => {
 
 // --- COMPONENTE PRINCIPAL: Modal para Ficha Detalhada ---
 const FormDataModal = ({ inscricao, onClose }) => {
+
   const handlePrint = () => {
-    // O modal já tem um estilo que o torna o único conteúdo visível.
-    // Apenas chamamos window.print() para imprimir o conteúdo da janela.
-    // O CSS de impressão deve cuidar de esconder o fundo e o botão de fechar.
     window.print();
   };
 
