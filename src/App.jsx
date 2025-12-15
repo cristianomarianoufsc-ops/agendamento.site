@@ -166,7 +166,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
 	            return;
 	          }
 	          
-	          end.setMinutes(end.getMinutes() + 30);
+	          
 	          const dateString = start.toISOString().split("T")[0];
 	          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
 	          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
