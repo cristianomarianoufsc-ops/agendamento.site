@@ -12,7 +12,7 @@ const EnsaioPage = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ ensaio: null }); // Simplificado para ensaio
+  const [resumo, setResumo] = useState({ ensaio: [] }); // Múltipla escolha para ensaio
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -158,7 +158,7 @@ const EnsaioPage = () => {
 
   const handleBackToLocalSelect = () => {
     setLocalSelecionado(null); setCurrentStep("select_local"); setSelectedStage("ensaio"); setSelectedDate(null);
-    setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: null });
+    setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: [] });
     setUserData({ name: "", email: "", phone: "", eventName: "" }); setFirstStepDone(false);
     setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
   };
@@ -200,10 +200,9 @@ const EnsaioPage = () => {
     const backendSlots = backendOcupados[dateString] || [];
     
     // Filtra slots locais para a etapa atual (ensaio)
-    const localSlots = [];
-    if (resumo.ensaio && resumo.ensaio.date.split("T")[0] === dateString) {
-      localSlots.push({ start: resumo.ensaio.start, end: resumo.ensaio.end });
-    }
+    const localSlots = (resumo.ensaio || [])
+      .filter(item => item.date.split("T")[0] === dateString)
+      .map(item => ({ start: item.start, end: item.end }));
     
     return [...backendSlots, ...localSlots];
   };
@@ -229,11 +228,13 @@ const EnsaioPage = () => {
       return;
     }
 
-    // Lógica de resumo (apenas ensaio)
-    setResumo({ ensaio: newEntry });
+    // Lógica de resumo (múltipla escolha para ensaio)
+    setResumo(prevResumo => ({
+      ...prevResumo,
+      ensaio: [...(prevResumo.ensaio || []), newEntry]
+    }));
 
-    // Reset de estados
-    setSelectedDate(null);
+    // Reset de estados (apenas tempo para permitir nova seleção na mesma data)
     setStageTimes({ startTime: null, endTime: null });
   };
 
@@ -241,7 +242,14 @@ const EnsaioPage = () => {
     try {
       const eventIdsToCancel = [];
       
-      if (resumo.ensaio && resumo.ensaio.eventId) {
+      // Se for um array (múltipla escolha), itera sobre ele
+      if (Array.isArray(resumo.ensaio)) {
+        resumo.ensaio.forEach(item => {
+          if (item.eventId) {
+            eventIdsToCancel.push(item.eventId);
+          }
+        });
+      } else if (resumo.ensaio && resumo.ensaio.eventId) { // Lógica de fallback para objeto único
         eventIdsToCancel.push(resumo.ensaio.eventId);
       }
 
@@ -254,7 +262,7 @@ const EnsaioPage = () => {
         fetchOccupiedSlots(localSelecionado, currentMonth);
       }
 
-      setResumo({ ensaio: null });
+      setResumo({ ensaio: [] });
       setPendingRemovals([]);
       setAlertMessage({ type: 'success', text: "Cancelamento confirmado!" });
       setFirstStepDone(false);
