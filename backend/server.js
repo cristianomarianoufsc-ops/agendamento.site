@@ -1287,7 +1287,7 @@ app.get("/api/admin/inscricoes/:id", async (req, res) => {
 
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
 app.get("/api/admin/data-for-analysis", async (req, res) => {
-
+  try {
   } catch (error) {
     console.error("❌ Erro ao obter dados para análise:", error);
     res.status(500).json({ error: "Erro interno ao obter dados para análise." });
