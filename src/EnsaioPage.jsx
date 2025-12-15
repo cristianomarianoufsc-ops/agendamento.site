@@ -130,22 +130,31 @@ const EnsaioPage = () => {
 	        
 	        // Processa eventos do mês
 	        (data.eventos || []).forEach((event) => {
-	          if (!event || !event.start || !event.end) return;
-	          const start = new Date(event.start);
-	          const end = new Date(event.end);
-	          
-	          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-	            return;
-	          }
-	          
-	          end.setMinutes(end.getMinutes() + 30);
-	          const dateString = start.toISOString().split("T")[0];
-	          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-	          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-	          
-	          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
-	          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
-	        });
+		          if (!event || !event.start || !event.end) return;
+		          const start = new Date(event.start);
+		          const end = new Date(event.end);
+		          
+		          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+		            return;
+		          }
+		          
+		          const dateString = start.toISOString().split("T")[0];
+		          
+		          // NOVO: Se o evento for o dia todo, preenche todos os horários como ocupados
+		          if (event.isAllDay) {
+		            occupiedByDate[dateString] = [{ start: '00:00', end: '23:59', isContestable: false }];
+		            return; // Pula para o próximo evento
+		          }
+		          
+		          // Ajuste para o cálculo do fim (30 minutos)
+		          end.setMinutes(end.getMinutes() + 30);
+		          
+		          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+		          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+		          
+		          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+		          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
+		        });
 	      } catch (monthError) {
 	        console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
 	        continue;
