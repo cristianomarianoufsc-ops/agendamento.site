@@ -206,10 +206,12 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     setSelectedDate(date); 
     setStageTimes({ startTime: null, endTime: null }); 
     
-    // ✅ NOVO: Scroll automático para a seção de horários
-    if (timeSelectorRef.current) {
-      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // ✅ Scroll automático para a seção de horários (aguarda renderização)
+    setTimeout(() => {
+      if (timeSelectorRef.current) {
+        timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100); // Aguarda 100ms para o React renderizar o componente
   };
 
   // ✅ FUNÇÃO MODIFICADA: Agora verifica conflito ao selecionar horário de INÍCIO
