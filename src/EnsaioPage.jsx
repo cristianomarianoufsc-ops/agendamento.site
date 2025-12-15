@@ -244,7 +244,7 @@ const EnsaioPage = () => {
 
     // Reset de estados (apenas tempo para permitir nova seleção na mesma data)
     setStageTimes({ startTime: null, endTime: null });
-    setShowConfirmNextEventModal(true);
+    setShowConfirmNextEventModal(true)
   };
 
   const handleConfirmRemovals = async () => {
@@ -527,7 +527,7 @@ const EnsaioPage = () => {
 	                                      stageTimeLimits={configStageTimes["ensaio"]} 
 	                                    />
 	                                      {selectedDate && stageTimes.startTime && stageTimes.endTime && (
-	                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => confirmStage("ensaio")} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+	                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { confirmStage("ensaio"); }} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
 	                                          Adicionar Ensaio ao Resumo
 	                                        </motion.button>
 	                                      )}
