@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown } from "lucide-react";
@@ -7,6 +7,7 @@ import Modal from "./components/Modal";
 
 const EnsaioPage = () => {
   // ESTADOS
+  const timeSelectorRef = useRef(null); // Referência para a seção de horários
   const [localSelecionado, setLocalSelecionado] = useState(null);
   const [selectedStage, setSelectedStage] = useState("ensaio"); // Hardcoded para ensaio
   const [selectedDate, setSelectedDate] = useState(null);
@@ -166,7 +167,14 @@ const EnsaioPage = () => {
     setShowConfirmNextEventModal(false); // Resetar o novo estado
   };
 
-  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
+  const handleDateSelect = (date) => { 
+    setSelectedDate(date); 
+    setStageTimes({ startTime: null, endTime: null }); 
+    // ✅ NOVA LÓGICA: Rola para a seção de horários se uma data foi selecionada
+    if (date && timeSelectorRef.current) {
+      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const toMinutes = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
@@ -537,7 +545,7 @@ const EnsaioPage = () => {
 
 	                        <AnimatePresence>
 	                          {selectedStage === "ensaio" && (
-	                            <motion.div
+		                                    <motion.div ref={timeSelectorRef}
 	                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
 	                              animate={{ height: 'auto', opacity: 1, marginTop: '1rem' }}
 	                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
