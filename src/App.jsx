@@ -253,10 +253,11 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     // Slots que o usuário JÁ CONFIRMOU nesta sessão
     const localSlots = [];
   stageOrder.forEach((etapa) => {
-    if (etapa === 'evento') {
-      // Para eventos, processa o array
-      if (resumo.evento && Array.isArray(resumo.evento)) {
-        resumo.evento.forEach(evt => {
+    if (etapa === 'evento' || etapa === 'ensaio') {
+      // Para eventos e ensaios, processa o array
+      const currentStageArray = resumo[etapa];
+      if (currentStageArray && Array.isArray(currentStageArray)) {
+        currentStageArray.forEach(evt => {
           if (evt && evt.date && evt.start && evt.end) {
             if (evt.date.split("T")[0] === dateString) {
               localSlots.push({ start: evt.start, end: evt.end, isContestable: true });
@@ -265,7 +266,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
         });
       }
     } else {
-      // Para outras etapas, processa normalmente
+      // Para outras etapas (montagem, desmontagem), processa como objeto único
       if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
         if (resumo[etapa].date.split("T")[0] === dateString) {
           localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
