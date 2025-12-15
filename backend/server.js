@@ -1096,14 +1096,13 @@ async function consolidateSchedule() {
       }
     };
 
-	    // addSlot('ensaio', insc.ensaio_inicio, insc.ensaio_fim, insc.ensaio_eventId); // Removido, pois agora está em eventos_json
-	    addSlot('montagem', insc.montagem_inicio, insc.montagem_fim, insc.montagem_eventId);
-	    addSlot('desmontagem', insc.desmontagem_inicio, insc.desmontagem_fim, insc.desmontagem_eventId);
+    addSlot('ensaio', insc.ensaio_inicio, insc.ensaio_fim, insc.ensaio_eventId);
+    addSlot('montagem', insc.montagem_inicio, insc.montagem_fim, insc.montagem_eventId);
+    addSlot('desmontagem', insc.desmontagem_inicio, insc.desmontagem_fim, insc.desmontagem_eventId);
 
-	    if (insc.eventos_json) {
-	      // Adiciona todos os eventos extras (incluindo ensaio)
-	      JSON.parse(insc.eventos_json).forEach(ev => addSlot(ev.tipo || 'evento', ev.inicio, ev.fim, ev.eventId));
-	    }
+    if (insc.eventos_json) {
+      JSON.parse(insc.eventos_json).forEach(ev => addSlot('evento', ev.inicio, ev.fim, ev.eventId));
+    }
   });
 
   // 3. Identificar os slots de tempo que estão em conflito
@@ -1276,10 +1275,7 @@ app.get("/api/master-sheet-link", (req, res) => {
 // --- 16. ROTA PARA CRIAR EVENTOS (ETAPA 1) ---
 app.post("/api/create-events", async (req, res) => {
   try {
-        const { local, resumo, etapas, userData } = req.body;
-        
-        // Validação: Se houver mais de um ensaio, permite. Se houver mais de um evento, permite.
-        // A lógica de limite de agendamento para 'ensaio' será removida ao tratá-lo como 'evento' extra.
+    const { local, resumo, etapas, userData } = req.body;
     if (!calendarIds[local]) {
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
@@ -1329,36 +1325,31 @@ app.post("/api/create-events", async (req, res) => {
 
     // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
     try {
-	      const dbPayload = {
-	        nome: userData.name, email: userData.email, telefone: userData.phone,
-	        evento_nome: userData.eventName || resumo, local,
-	        // ensaio_inicio, ensaio_fim, ensaio_eventId serão removidos
-	        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
-	        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
-	        eventos_json: '[]'
-	      };
-	      const eventosExtras = [];
-	      etapasComId.forEach(e => {
-	        const nome = e.nome.toLowerCase();
-	        
-	        // Se for ensaio ou evento, trata como evento extra
-	        if (nome === 'ensaio' || nome === 'evento') {
-	          // Adiciona o tipo para que possa ser distinguido no JSON, se necessário
-	          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId, tipo: nome });
-	        } else if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
-	          // Mantém montagem e desmontagem como campos separados (se existirem)
-	          dbPayload[`${nome}_inicio`] = e.inicio;
-	          dbPayload[`${nome}_fim`] = e.fim;
-	          dbPayload[`${nome}_eventId`] = e.eventId;
-	        }
-	      });
-	      dbPayload.eventos_json = JSON.stringify(eventosExtras);
-	      
-	      // A query INSERT precisa ser atualizada para remover as colunas de ensaio
-	      await query(
-	        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-	        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-	      );
+      const dbPayload = {
+        nome: userData.name, email: userData.email, telefone: userData.phone,
+        evento_nome: userData.eventName || resumo, local,
+        ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
+        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
+        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
+        eventos_json: '[]'
+      };
+      const eventosExtras = [];
+      etapasComId.forEach(e => {
+        const nome = e.nome.toLowerCase();
+        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+          dbPayload[`${nome}_inicio`] = e.inicio;
+          dbPayload[`${nome}_fim`] = e.fim;
+          dbPayload[`${nome}_eventId`] = e.eventId;
+        } else if (nome === 'evento') {
+          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
+        }
+      });
+      dbPayload.eventos_json = JSON.stringify(eventosExtras);
+      
+      await query(
+        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+      );
       console.log("💾 Inscrição salva no banco com sucesso!");
       
       const message = calendarError ? "Inscrição salva, mas houve falha na criação dos eventos do Google Calendar." : "Eventos criados e inscrição salva com sucesso!";
@@ -1383,23 +1374,23 @@ app.post("/api/cleanup/force", async (req, res) => {
   try {
     // 1. Buscar todas as inscrições para obter os eventIds do Google Calendar
     const allInscricoes = await query('SELECT * FROM inscricoes');
-	    const allEventIdsToDelete = [];
-	    const localMap = {}; // Mapeia eventId para o local (calendarId)
+    const allEventIdsToDelete = [];
+    const localMap = {}; // Mapeia eventId para o local (calendarId)
 
-	    const addId = (id, local) => { if (id) { allEventIdsToDelete.push(id); localMap[id] = local; } };
-	    const addJsonIds = (json, local) => {
-	      try {
-	        JSON.parse(json).forEach(e => addId(e.eventId, local));
-	      } catch (e) { /* ignore */ }
-	    };
+    const addId = (id, local) => { if (id) { allEventIdsToDelete.push(id); localMap[id] = local; } };
+    const addJsonIds = (json, local) => {
+      try {
+        JSON.parse(json).forEach(e => addId(e.eventId, local));
+      } catch (e) { /* ignore */ }
+    };
 
-	    allInscricoes.rows.forEach(inscricao => {
-	      const local = inscricao.local;
-	      // addId(inscricao.ensaio_eventId, local); // Removido, pois agora está em eventos_json
-	      addId(inscricao.montagem_eventId, local);
-	      addId(inscricao.desmontagem_eventId, local);
-	      addJsonIds(inscricao.eventos_json, local);
-	    });
+    allInscricoes.rows.forEach(inscricao => {
+      const local = inscricao.local;
+      addId(inscricao.ensaio_eventId, local);
+      addId(inscricao.montagem_eventId, local);
+      addId(inscricao.desmontagem_eventId, local);
+      addJsonIds(inscricao.eventos_json, local);
+    });
 
     // 2. Deletar eventos do Google Calendar
     if (allEventIdsToDelete.length > 0) {
@@ -1462,29 +1453,29 @@ app.delete("/api/cancel-events/:local", async (req, res) => {
 app.delete("/api/inscricao/:id", async (req, res) => {
   const { id } = req.params;
   try {
-	    // 1. Buscar a inscrição para obter os eventIds do Google Calendar
-	    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
-	    if (result.rows.length === 0) {
-	      return res.status(404).json({ error: "Inscrição não encontrada." });
-	    }
-	    const inscricao = result.rows[0];
+    // 1. Buscar a inscrição para obter os eventIds do Google Calendar
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Inscrição não encontrada." });
+    }
+    const inscricao = result.rows[0];
 
-	    // 2. Cancelar eventos no Google Calendar (se existirem)
-	    const eventIdsToDelete = [];
-	    const local = inscricao.local;
+    // 2. Cancelar eventos no Google Calendar (se existirem)
+    const eventIdsToDelete = [];
+    const local = inscricao.local;
 
-	    // Funções auxiliares para adicionar IDs
-	    const addId = (id) => { if (id) eventIdsToDelete.push(id); };
-	    const addJsonIds = (json) => {
-	      try {
-	        JSON.parse(json).forEach(e => addId(e.eventId));
-	      } catch (e) { /* ignore */ }
-	    };
+    // Funções auxiliares para adicionar IDs
+    const addId = (id) => { if (id) eventIdsToDelete.push(id); };
+    const addJsonIds = (json) => {
+      try {
+        JSON.parse(json).forEach(e => addId(e.eventId));
+      } catch (e) { /* ignore */ }
+    };
 
-	    // addId(inscricao.ensaio_eventId); // Removido, pois agora está em eventos_json
-	    addId(inscricao.montagem_eventId);
-	    addId(inscricao.desmontagem_eventId);
-	    addJsonIds(inscricao.eventos_json);
+    addId(inscricao.ensaio_eventId);
+    addId(inscricao.montagem_eventId);
+    addId(inscricao.desmontagem_eventId);
+    addJsonIds(inscricao.eventos_json);
 
     if (eventIdsToDelete.length > 0 && calendarIds[local]) {
       console.log(`🗑️ Tentando deletar ${eventIdsToDelete.length} eventos do Google Calendar para a inscrição #${id}`);
@@ -1512,66 +1503,21 @@ app.delete("/api/inscricao/:id", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao excluir inscrição:", error);
-    res.status(500).json({ error: "Erro interno ao excluir inscrição." })// ===================================================================
-// ✅ FUNÇÃO AUXILIAR PARA BUSCAR EVENTOS DO BANCO DE DADOS LOCAL
-// ===================================================================
-async function getLocalEvents(local, year, monthNum) {
-  try {
-    // Busca todas as inscrições que têm eventos_json preenchido
-    const result = await query(
-      "SELECT eventos_json FROM inscricoes WHERE local = $1 AND eventos_json IS NOT NULL",
-      [local]
-    );
-
-    let localEvents = [];
-    const targetMonth = `${year}-${monthNum.toString().padStart(2, '0')}`;
-
-    result.rows.forEach(row => {
-      try {
-        const eventos = JSON.parse(row.eventos_json);
-        eventos.forEach(event => {
-          // Verifica se o evento pertence ao mês solicitado
-          if (event.inicio && event.inicio.startsWith(targetMonth)) {
-            localEvents.push({
-              // Formato compatível com o que o frontend espera
-              id: event.id,
-              summary: event.nome,
-              start: event.inicio, // Ex: 2025-02-14T14:00:00
-              end: event.fim,      // Ex: 2025-02-14T14:30:00
-              isContestable: true, // Eventos do banco local são sempre contestáveis
-            });
-          }
-        });
-      } catch (e) {
-        console.error("❌ Erro ao parsear eventos_json:", e.message);
-      }
-    });
-
-    return localEvents;
-  } catch (error) {
-    console.error("❌ Erro ao buscar eventos do banco de dados local:", error.message);
-    return [];
+    res.status(500).json({ error: "Erro interno ao excluir inscrição." });
   }
-}
+});
 
-// --- 18. ROTA PARA BUSCAR EVENTOS OCUPADOS (CALENDÁRIO) ---
-app.get("/api/occupied-slots/:local/:month", async (req, res) => {const { local, month } = req.params;
+// --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
+app.get("/api/occupied-slots/:local/:month", async (req, res) => {
+  const { local, month } = req.params;
   if (!calendarIds[local]) {
     return res.status(400).json({ error: "Local não encontrado." });
   }
   try {
-    const [year, monthNumStr] = month.split('-');
-    const yearInt = parseInt(year);
-    const monthNum = parseInt(monthNumStr);
-    const startDate = new Date(yearInt, monthNum - 1, 1);
-    const endDate = new Date(yearInt, monthNum, 0);
-    
-    let googleEvents = [];
-    let localEvents = [];
-
-    // 1. Tenta buscar eventos do Google Calendar
-    try {
-      const events = await calendar.events.list({
+    const [year, monthNum] = month.split('-');
+    const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
+    const events = await calendar.events.list({
       calendarId: calendarIds[local],
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
@@ -1596,31 +1542,12 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {const { local,
       };
     }).filter(e => e.start && e.end); // Remove eventos sem data válida
     
-    googleEvents = eventosProcessados;
+    res.json({ eventos: eventosProcessados });
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
-    console.log("⚠️ Prosseguindo com a busca de eventos no banco de dados local.");
-  }
-
-  // 2. Busca eventos do banco de dados local
-  try {
-    localEvents = await getLocalEvents(local, yearInt, monthNum);
-  } catch (error) {
-    console.error("❌ Erro ao buscar eventos locais:", error.message);
-  }
-
-  // 3. Combina os eventos (Google Calendar tem prioridade se houver duplicidade, mas o frontend lida com a sobreposição)
-  // Como o frontend espera um array simples, apenas concatenamos.
-  const allEvents = [...googleEvents, ...localEvents];
-  
-  // 4. Remove duplicatas (se um evento do Google Calendar for criado a partir de um local, ele pode aparecer duplicado)
-  // A remoção de duplicatas é complexa, mas como o frontend lida com a sobreposição, vamos apenas garantir que o localEvents seja usado como fallback.
-  // Para simplificar, vamos apenas retornar a concatenação, pois o frontend já lida com a lógica de disputa.
-  
-  res.json({ eventos: allEvents });
-  } catch (error) {
-    console.error("Erro na rota /api/events:", error);
-    res.status(500).json({ error: "Erro interno do servidor ao buscar eventos." });
+    // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
+    console.log("⚠️ Retornando lista vazia de eventos devido a erro na autenticação");
+    res.json({ eventos: [] });
   }
 });
 
@@ -2063,7 +1990,6 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
         const config = JSON.parse(configResult.rows[0].config_json);
         sheetId = config.sheetId;
       }
-      console.log(`[PDF] Iniciando geração de PDF para inscrição ID: ${id}`);
       console.log(`[PDF] SheetId do banco:`, sheetId);
 
       if (sheetId) {
@@ -2113,12 +2039,7 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
           return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                  (telForms && telEtapa1 && telForms === telEtapa1);
         });
-       console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'NÃO');
-          if (!respostaForms) {
-            console.log(`[PDF] DADOS DE COMPARAÇÃO:`);
-            console.log(`  - Email (Etapa 1): '${(inscricao.email || "").trim().toLowerCase()}'`);
-            console.log(`  - Telefone (Etapa 1): '${(inscricao.telefone || "").replace(/\D/g, "")}'`);
-          }
+          console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'N\u00c3O');
           if (respostaForms) {
             console.log(`[PDF] Campos:`, Object.keys(respostaForms));
           }
@@ -2169,12 +2090,10 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       const hFim = new Date(fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       doc.font('Helvetica').fontSize(10).text(`• ${rotulo}: ${data}, das ${hIni} às ${hFim}`);
     };
-	    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
-	      JSON.parse(inscricao.eventos_json).forEach((ev, i) => {
-	        const tipo = ev.tipo ? ev.tipo.charAt(0).toUpperCase() + ev.tipo.slice(1) : 'Evento';
-	        linhaEtapa(tipo, ev.inicio, ev.fim);
-	      });
-	    }
+    linhaEtapa("Ensaio", inscricao.ensaio_inicio, inscricao.ensaio_fim);
+    if (inscricao.eventos_json && inscricao.eventos_json !== '[]') {
+      JSON.parse(inscricao.eventos_json).forEach((ev, i) => linhaEtapa(`Evento ${i + 1}`, ev.inicio, ev.fim));
+    }
     linhaEtapa("Montagem", inscricao.montagem_inicio, inscricao.montagem_fim);
     linhaEtapa("Desmontagem", inscricao.desmontagem_inicio, inscricao.desmontagem_fim);
     doc.moveDown(1.5);
@@ -2187,10 +2106,8 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
 	        // Ignorar carimbo de data/hora
 	        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
 	        
-	        // Se o valor for vazio, ignora a exibição (como no EvaluationDrawer.jsx)
-	        if (String(value).trim() === "") continue;
-	        
-	        const displayValue = value;
+	        // Tratar valores vazios de forma mais flexível
+	        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
         
         // Se o valor for uma URL do Drive, exibir como link
         const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
@@ -2396,5 +2313,3 @@ async function startServer() {
 
 // Chama a função de inicialização
 startServer();
-
-// Forcing re-deploy to fix truncation issue
