@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
@@ -13,7 +13,6 @@ import "jspdf-autotable";
 
 const AppVertical = () => {
   // ESTADOS
-  const timeSelectorRef = useRef(null);
   const [localSelecionado, setLocalSelecionado] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
@@ -129,66 +128,66 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
       const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
       
       try {
-		        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
-		        
-		        if (!response.ok) {
-		          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
-		          continue;
-		        }
-		        
-		        let data;
-		        try {
-		          data = await response.json();
-		        } catch (e) {
-		          console.error(`❌ Erro ao processar JSON para ${year}-${month}:`, e);
-		          console.error("Resposta da API (texto):", await response.text());
-		          continue;
-		        }
+	        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
 	        
-	        if (data.error) {
-	          console.error(`❌ Erro retornado pela API para ${year}-${month}:`, data.error);
+	        if (!response.ok) {
+	          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
 	          continue;
 	        }
 	        
-	        if (!data || !data.eventos) {
-	          console.warn(`⚠️ Dados de eventos incompletos para ${year}-${month}`);
+	        let data;
+	        try {
+	          data = await response.json();
+	        } catch (e) {
+	          console.error(`❌ Erro ao processar JSON para ${year}-${month}:`, e);
+	          console.error("Resposta da API (texto):", await response.text());
 	          continue;
 	        }
-	        
-	        // Processa eventos do mês
-	        (data.eventos || []).forEach((event) => {
-	          if (!event || !event.start || !event.end) return;
-	          const start = new Date(event.start);
-	          const end = new Date(event.end);
-	          
-	          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-	            console.warn("⚠️ Evento com data inválida ignorado:", event);
-	            return;
-	          }
-	          
-	          
-	          const dateString = start.toISOString().split("T")[0];
-	          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-	          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-	          
-	          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
-	          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
-	        });
-	        
-	        console.log(`✅ ${(data.eventos || []).length} eventos carregados para ${year}-${month}`);
-	      } catch (monthError) {
-	        console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
-	        continue;
-	      }
-	    }
-	    
-	    setBackendOcupados(occupiedByDate);
-	    console.log(`✅ Total de datas com eventos ocupados: ${Object.keys(occupiedByDate).length}`);
-	  } catch (error) {
-	    console.error("❌ Erro ao buscar eventos:", error);
-	    setBackendOcupados({});
-	  }
-	};
+        
+        if (data.error) {
+          console.error(`❌ Erro retornado pela API para ${year}-${month}:`, data.error);
+          continue;
+        }
+        
+        if (!data || !data.eventos) {
+          console.warn(`⚠️ Dados de eventos incompletos para ${year}-${month}`);
+          continue;
+        }
+        
+        // Processa eventos do mês
+        (data.eventos || []).forEach((event) => {
+          if (!event || !event.start || !event.end) return;
+          const start = new Date(event.start);
+          const end = new Date(event.end);
+          
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn("⚠️ Evento com data inválida ignorado:", event);
+            return;
+          }
+          
+          end.setMinutes(end.getMinutes() + 30);
+          const dateString = start.toISOString().split("T")[0];
+          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          
+          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
+        });
+        
+        console.log(`✅ ${(data.eventos || []).length} eventos carregados para ${year}-${month}`);
+      } catch (monthError) {
+        console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
+        continue;
+      }
+    }
+    
+    setBackendOcupados(occupiedByDate);
+    console.log(`✅ Total de datas com eventos ocupados: ${Object.keys(occupiedByDate).length}`);
+  } catch (error) {
+    console.error("❌ Erro ao buscar eventos:", error);
+    setBackendOcupados({});
+  }
+};
 
   const handleLocalSelect = (local) => { setLocalSelecionado(local); setCurrentStep("calendar"); };
 
@@ -199,14 +198,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
   };
 
-  const handleDateSelect = (date) => { 
-    setSelectedDate(date); 
-    setStageTimes({ startTime: null, endTime: null }); 
-    // ✅ NOVA LÓGICA: Rola para a seção de horários se uma data foi selecionada
-    if (date && timeSelectorRef.current) {
-      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
 
   // ✅ FUNÇÃO MODIFICADA: Agora verifica conflito ao selecionar horário de INÍCIO
   const handleTimeSelection = (time) => {
@@ -244,13 +236,7 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     }
     
     // Quando está selecionando o horário de TÉRMINO
-    if (toMinutes(time) > toMinutes(startTime)) {
-      setStageTimes({ ...stageTimes, endTime: time });
-      setIsModalOpen(false);
-    } else {
-      // Se o horário de término for menor ou igual ao de início, reseta o término
-      setStageTimes({ ...stageTimes, endTime: null });
-    }
+    setStageTimes({ ...stageTimes, endTime: time });
   };
 
   const getOccupiedSlots = (date, etapa) => {
@@ -266,33 +252,33 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     
     // Slots que o usuário JÁ CONFIRMOU nesta sessão
     const localSlots = [];
-	  stageOrder.forEach((etapa) => {
-	    if (etapa === 'evento' || etapa === 'ensaio') {
-	      // Para eventos e ensaios, processa o array
-	      const currentStageArray = resumo[etapa];
-	      if (currentStageArray && Array.isArray(currentStageArray)) {
-	        currentStageArray.forEach(evt => {
-	          if (evt && evt.date && evt.start && evt.end) {
-	            if (evt.date.split("T")[0] === dateString) {
-	              localSlots.push({ start: evt.start, end: evt.end, isContestable: false });
-	            }
-	          }
-	        });
-	      }
-	    } else {
-	      // Para outras etapas (montagem, desmontagem), processa como objeto único
-	      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
-	        if (resumo[etapa].date.split("T")[0] === dateString) {
-	          localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
-	        }
-	      }
-	    }
-	  });
-	  
-	  const result = [...backendSlots, ...localSlots];
-	  console.log("✅ getOccupiedSlots retornando:", result);
-	  return result;
-	};
+  stageOrder.forEach((etapa) => {
+    if (etapa === 'evento' || etapa === 'ensaio') {
+      // Para eventos e ensaios, processa o array
+      const currentStageArray = resumo[etapa];
+      if (currentStageArray && Array.isArray(currentStageArray)) {
+        currentStageArray.forEach(evt => {
+          if (evt && evt.date && evt.start && evt.end) {
+            if (evt.date.split("T")[0] === dateString) {
+              localSlots.push({ start: evt.start, end: evt.end, isContestable: false });
+            }
+          }
+        });
+      }
+    } else {
+      // Para outras etapas (montagem, desmontagem), processa como objeto único
+      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+        if (resumo[etapa].date.split("T")[0] === dateString) {
+          localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
+        }
+      }
+    }
+  });
+  
+  const result = [...backendSlots, ...localSlots];
+  console.log("✅ getOccupiedSlots retornando:", result);
+  return result;
+};
 
 
   // =================================================
@@ -479,11 +465,7 @@ const handleSendEmail = async () => {
     const response = await fetch("/api/create-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        local: localSelecionado,
-        userData,
-        etapas,
-      }),
+      body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
     });
 
     const result = await response.json();
@@ -821,185 +803,166 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow-md">
-		                <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2"><CalendarIcon size={20} /> 1. Escolha as datas e horários</h3>
-		                <p className="text-sm text-gray-600 mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-		                  <b>**Atenção:** As datas e horários marcados em **amarelo** já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</b>
-		                </p>
-	                <div className="flex flex-col space-y-3">
-	                  {stageOrder.map((etapa) => {
-	                    const isDisabled = (etapa === "desmontagem" && (!resumo.evento || resumo.evento.length === 0));
-	                    const isSelected = selectedStage === etapa;
+	                <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2"><CalendarIcon size={20} /> 1. Escolha as datas e horários</h3>
+	                <p className="text-sm text-gray-600 mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+	                  <b>**Atenção:** As datas e horários marcados em **amarelo** já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</b>
+	                </p>
+                <div className="flex flex-col space-y-3">
+                  {stageOrder.map((etapa) => {
+                    const isDisabled = (etapa === "desmontagem" && (!resumo.evento || resumo.evento.length === 0));
+                    const isSelected = selectedStage === etapa;
 
-	                    return (
-	                      <div key={etapa} className="flex flex-col">
-	                        <button
-	                          onClick={() => { if (!isDisabled) setSelectedStage(isSelected ? null : etapa); }}
-	                          disabled={isDisabled}
-	                          className={`w-full p-3 text-left rounded-lg font-semibold transition-all duration-200 flex items-center justify-between ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-md" : "border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400"}`}
-	                        >
-	                          <span>
-	                            {capitalize(etapa)}
-	                          </span>
-	                          <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
-	                            <ChevronDown size={20} />
-	                          </motion.div>
-	                        </button>
+                    return (
+                      <div key={etapa} className="flex flex-col">
+                        <button
+                          onClick={() => { if (!isDisabled) setSelectedStage(isSelected ? null : etapa); }}
+                          disabled={isDisabled}
+                          className={`w-full p-3 text-left rounded-lg font-semibold transition-all duration-200 flex items-center justify-between ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-md" : "border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400"}`}
+                        >
+                          <span>
+                            {capitalize(etapa)}
+                          </span>
+                          <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                            <ChevronDown size={20} />
+                          </motion.div>
+                        </button>
 
-	                        <AnimatePresence>
-	                          {isSelected && (
-	                            <motion.div
-	                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
-	                              animate={{ height: 'auto', opacity: 1, marginTop: '1rem' }}
-	                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
-	                              transition={{ duration: 0.3, ease: "easeInOut" }}
-	                              className="overflow-hidden"
-	                            >
-	                              <div className="p-4 border rounded-lg bg-gray-50/50">
-	                                <h3 className="font-semibold text-md mb-3 text-gray-700">2. Selecione o dia para <span className="text-blue-600">{selectedStage}</span></h3>
-	            <Calendar
-	              onDateSelect={handleDateSelect}
-	              selectedDate={selectedDate}
-	              currentMonth={currentMonth}
-	              onMonthChange={setCurrentMonth}
-	              disabledDates={blockedDates} // Passando as datas bloqueadas
-	              eventDates={Object.keys(backendOcupados)}
-	              mainEventDatesSelected={(() => {
-	                if (!resumo.evento || !Array.isArray(resumo.evento) || resumo.evento.length === 0) return [];
-	                return resumo.evento.map(evt => new Date(evt.date)).filter(d => !isNaN(d.getTime()));
-	              })()}
-	            />
-		                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
-		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
-		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Parcial</span></div>
-		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-200"></div><span>Ocupado</span></div>
-		                                </div>
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                              animate={{ height: 'auto', opacity: 1, marginTop: '1rem' }}
+                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                              transition={{ duration: 0.3, ease: "easeInOut" }}
+                              className="overflow-hidden"
+                            >
+                              <div className="p-4 border rounded-lg bg-gray-50/50">
+                                <h3 className="font-semibold text-md mb-3 text-gray-700">2. Selecione o dia para <span className="text-blue-600">{selectedStage}</span></h3>
+            <Calendar
+              onDateSelect={handleDateSelect}
+              selectedDate={selectedDate}
+              currentMonth={currentMonth}
+              onMonthChange={setCurrentMonth}
+              disabledDates={blockedDates} // Passando as datas bloqueadas
+              eventDates={Object.keys(backendOcupados)}
+              mainEventDatesSelected={(() => {
+                if (!resumo.evento || !Array.isArray(resumo.evento) || resumo.evento.length === 0) return [];
+                return resumo.evento.map(evt => new Date(evt.date)).filter(d => !isNaN(d.getTime()));
+              })()}
+            />
+	                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Parcial</span></div>
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-200"></div><span>Ocupado</span></div>
+	                                </div>
 
-	                                <AnimatePresence>
-	                                  {selectedDate && (
-	                                    <motion.div ref={timeSelectorRef}
-	                                      initial={{ opacity: 0, marginTop: 0 }}
-	                                      animate={{ opacity: 1, marginTop: '1.5rem' }}
-	                                      className="border-t pt-6"
-	                                    >
-	                                      <h3 className="font-semibold text-md mb-3 text-gray-700 flex items-center gap-2">
-	                                        <Clock size={18} /> 
-	                                        {!stageTimes.startTime ? '3. Defina o horário de início' : '3. Agora, escolha o horário de término'}
-	                                      </h3>
-	<TimeBlockSelector
-	                                      selectedDate={selectedDate}
-	                                      timeSlots={timeSlots}
-	                                      selectedTimes={stageTimes || {}}
-	                                      onSelectTime={handleTimeSelection}
-	                                      occupiedSlots={selectedDate ? getOccupiedSlots(selectedDate, selectedStage) : []}
-	                                      stage={selectedStage}
-	                                      allowOverlap={allowBookingOverlap}
-	                                      stageTimeLimits={configStageTimes[selectedStage]} // ✅ PASSA OS LIMITES DE HORÁRIO
-	                                    />
-	                                      {selectedDate && stageTimes.startTime && stageTimes.endTime && (
-	                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => confirmStage(selectedStage)} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
-	                                          Adicionar {selectedStage} ao Resumo
-	                                        </motion.button>
-	                                      )}
-	                                    </motion.div>
-	                                  )}
-	                                </AnimatePresence>
-	                              </div>
-	                            </motion.div>
-	                          )}
-	                        </AnimatePresence>
-	                      </div>
-	                    );
-	                  })}
-	                </div>
-	              </div>
+                                <AnimatePresence>
+                                  {selectedDate && (
+                                    <motion.div
+                                      initial={{ opacity: 0, marginTop: 0 }}
+                                      animate={{ opacity: 1, marginTop: '1.5rem' }}
+                                      className="border-t pt-6"
+                                    >
+                                      <h3 className="font-semibold text-md mb-3 text-gray-700 flex items-center gap-2">
+                                        <Clock size={18} /> 
+                                        {!stageTimes.startTime ? '3. Defina o horário de início' : '3. Agora, escolha o horário de término'}
+                                      </h3>
+<TimeBlockSelector
+                                      selectedDate={selectedDate}
+                                      timeSlots={timeSlots}
+                                      selectedTimes={stageTimes || {}}
+                                      onSelectTime={handleTimeSelection}
+                                      occupiedSlots={selectedDate ? getOccupiedSlots(selectedDate, selectedStage) : []}
+                                      stage={selectedStage}
+                                      allowOverlap={allowBookingOverlap}
+                                      stageTimeLimits={configStageTimes[selectedStage]} // ✅ PASSA OS LIMITES DE HORÁRIO
+                                    />
+                                      {selectedDate && stageTimes.startTime && stageTimes.endTime && (
+                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => confirmStage(selectedStage)} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+                                          Adicionar {selectedStage} ao Resumo
+                                        </motion.button>
+                                      )}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-	              <div className="bg-white p-6 rounded-2xl shadow-md">
-	                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
-	                <ul className="space-y-3 text-sm text-gray-600">
-	                  {stageOrder.flatMap((etapa) => {
-	if (etapa === 'evento' || etapa === 'ensaio') {
-		                      // Para etapas de agendamento múltiplo (ensaio e evento)
-		                      const currentStageArray = resumo[etapa];
-		                      if (currentStageArray && Array.isArray(currentStageArray) && currentStageArray.length > 0) {
-		                        return currentStageArray.map((item, idx) => {
-		                          if (!item || !item.date || !item.start || !item.end) return null;
-		                          const stageName = capitalize(etapa);
-		                          return (
-		                            <li key={`${etapa}-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-		                              <div><span className="font-semibold text-gray-800">{stageName} {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
-		                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa, idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-		                            </li>
-		                          );
-		                        });
-		                      }
-		                    } else {
-		                      // Para outras etapas (montagem, desmontagem)
-		                      if (resumo[etapa]) {
-		                        const item = resumo[etapa];
-		                        if (!item || !item.date || !item.start || !item.end) return null;
-		                        return (
-		                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-		                            <div><span className="font-semibold text-gray-800">{capitalize(etapa)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
-		                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-		                          </li>
-		                        );
-		                      }
-		                    }
-	                    return [];
-	                  })}
-	                  {(!resumo.evento || resumo.evento.length === 0) && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
-	                </ul>
+              <div className="bg-white p-6 rounded-2xl shadow-md">
+                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  {stageOrder.flatMap((etapa) => {
+if (etapa === 'evento' || etapa === 'ensaio') {
+	                      // Para etapas de agendamento múltiplo (ensaio e evento)
+	                      const currentStageArray = resumo[etapa];
+	                      if (currentStageArray && Array.isArray(currentStageArray) && currentStageArray.length > 0) {
+	                        return currentStageArray.map((item, idx) => {
+	                          if (!item || !item.date || !item.start || !item.end) return null;
+	                          const stageName = capitalize(etapa);
+	                          return (
+	                            <li key={`${etapa}-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                              <div><span className="font-semibold text-gray-800">{stageName} {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa, idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                            </li>
+	                          );
+	                        });
+	                      }
+	                    } else {
+	                      // Para outras etapas (montagem, desmontagem)
+	                      if (resumo[etapa]) {
+	                        const item = resumo[etapa];
+	                        if (!item || !item.date || !item.start || !item.end) return null;
+	                        return (
+	                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                            <div><span className="font-semibold text-gray-800">{capitalize(etapa)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                          </li>
+	                        );
+	                      }
+	                    }
+                    return [];
+                  })}
+                  {(!resumo.evento || resumo.evento.length === 0) && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
+                </ul>
 
-	                {pendingRemovals.length > 0 && (
-	                  <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-sm">
-	                    <p className="font-semibold mb-2">Confirmação de Remoção:</p>
-	                    <ul className="list-disc list-inside mb-3">
-	                      {pendingRemovals.map((r, index) => {
-	                        const item = r.etapa === 'evento' ? resumo.evento[r.idx] : resumo[r.etapa];
-	                        if (!item) return null;
-	                        const stageName = capitalize(r.etapa) + (r.etapa === 'evento' ? ` ${r.idx + 1}` : '');
-	                        return <li key={index}>{stageName}: {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</li>;
-	                      })}
-	                    </ul>
-	                    <div className="flex gap-2">
-	                      <button onClick={handleConfirmRemovals} className="flex-1 py-2 px-4 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition-colors">
-	                        Confirmar Remoção
-	                      </button>
-	                      <button onClick={() => setPendingRemovals([])} className="flex-1 py-2 px-4 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300 transition-colors">
-	                        Cancelar
-	                      </button>
-	                    </div>
-	                  </div>
-	                )}
-	              </div>
+                {pendingRemovals.length > 0 && (
+                  <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-sm">
+                    <p className="text-yellow-800 font-semibold mb-2">Você marcou {pendingRemovals.length} item(ns) para remoção.</p>
+                    <button onClick={handleConfirmRemovals} className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">Confirmar Cancelamento</button>
+                  </div>
+                )}
 
-	              <div className="flex flex-col gap-4">
-	                <button onClick={handleSendEmail} disabled={!isFormValid() || firstStepDone} className={`w-full py-3 px-6 rounded-lg font-bold text-white transition-colors ${isFormValid() && !firstStepDone ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}>
-	                  {firstStepDone ? <CheckCircle size={20} className="inline mr-2" /> : <ArrowRight size={20} className="inline mr-2" />}
-	                  {firstStepDone ? "1ª Etapa Concluída" : "Concluir 1ª Etapa e Enviar"}
-	                </button>
-	                
-	                {firstStepDone && (
-	                  <div className="flex gap-4">
-	                    <button onClick={handleDownloadPDF} className="flex-1 py-3 px-6 rounded-lg font-bold text-blue-600 border border-blue-600 hover:bg-blue-50 transition-colors flex items-center justify-center gap-2">
-	                      <Download size={20} /> Baixar Comprovante
-	                    </button>
-	                    <button onClick={handleGoToSecondStep} className="flex-1 py-3 px-6 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-	                      <ArrowRight size={20} /> Ir para 2ª Etapa
-	                    </button>
-	                  </div>
-	                )}
-	                
-	                <a href="https://editais.ufsc.br/edital-externo" target="_blank" rel="noopener noreferrer" className="w-full py-3 px-6 rounded-lg font-bold text-center text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors">
-	                  {buttonExternalEditalText}
-	                </a>
-	              </div>
-	            </div>
-	          </motion.div>
-	        )}
-	      </div>
-	    </div>
-	  );
-	};
+                <div className="mt-6 border-t pt-6">
+                  {!firstStepDone ? (
+                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
+                      Confirmar 1ª Etapa e Agendar
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Etapa 1 Concluída!</div>
+                      <button onClick={handleDownloadPDF} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
+                        <Download size={20}/> Baixar Comprovante em PDF
+                      </button>
+                      <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
+                        Ir para a 2ª Etapa <ArrowRight size={20}/>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default AppVertical;
