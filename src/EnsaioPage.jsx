@@ -20,7 +20,6 @@ const EnsaioPage = () => {
   const [pendingRemovals, setPendingRemovals] = useState([]);
   const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showConfirmNextEventModal, setShowConfirmNextEventModal] = useState(false);
   
   // =================================================
   // ESTADOS DE CONFIGURAÇÃO (Simplificados)
@@ -157,13 +156,6 @@ const EnsaioPage = () => {
 
   const handleLocalSelect = (local) => { setLocalSelecionado(local); setCurrentStep("calendar"); };
 
-  const handleRemoveEnsaio = (indexToRemove) => {
-    setResumo(prevResumo => ({
-      ...prevResumo,
-      ensaio: prevResumo.ensaio.filter((_, index) => index !== indexToRemove)
-    }));
-  };
-
   const handleBackToLocalSelect = () => {
     setLocalSelecionado(null); setCurrentStep("select_local"); setSelectedStage("ensaio"); setSelectedDate(null);
     setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: [] });
@@ -244,7 +236,6 @@ const EnsaioPage = () => {
 
     // Reset de estados (apenas tempo para permitir nova seleção na mesma data)
     setStageTimes({ startTime: null, endTime: null });
-    setShowConfirmNextEventModal(true)
   };
 
   const handleConfirmRemovals = async () => {
@@ -527,7 +518,7 @@ const EnsaioPage = () => {
 	                                      stageTimeLimits={configStageTimes["ensaio"]} 
 	                                    />
 	                                      {selectedDate && stageTimes.startTime && stageTimes.endTime && (
-	                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => { confirmStage("ensaio"); }} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+	                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => confirmStage("ensaio")} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
 	                                          Adicionar Ensaio ao Resumo
 	                                        </motion.button>
 	                                      )}
@@ -545,12 +536,11 @@ const EnsaioPage = () => {
 	              <div className="bg-white p-6 rounded-2xl shadow-md">
 	                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
 	                <ul className="space-y-3 text-sm text-gray-600">
-	                  {resumo.ensaio && Array.isArray(resumo.ensaio) && resumo.ensaio.length > 0 ? (
-  resumo.ensaio.map((ensaio, index) => (
-                            <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-                              <div><span className="font-semibold text-gray-800">Ensaio {index + 1}:</span> {new Date(ensaio.date).toLocaleDateString("pt-BR")} | {ensaio.start} - {ensaio.end}</div>
-                             <button onClick={() => handleRemoveEnsaio(index)} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>                            </li>
-                          ))
+	                  {resumo.ensaio ? (
+	                          <li key="ensaio" className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                            <div><span className="font-semibold text-gray-800">Ensaio:</span> {new Date(resumo.ensaio.date).toLocaleDateString("pt-BR")} | {resumo.ensaio.start} - {resumo.ensaio.end}</div>
+	                            <button onClick={() => setResumo({ ensaio: null })} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                          </li>
 	                        ) : (
 	                            <p className="text-center text-gray-400 py-4">Nenhum ensaio adicionado ainda.</p>
 	                        )}
@@ -578,14 +568,5 @@ const EnsaioPage = () => {
 	    </div>
 	  );
 	};
-
-
-      <Modal isOpen={showConfirmNextEventModal} onClose={() => setShowConfirmNextEventModal(false)} title="Ensaio Adicionado">
-        <p>Seu horário de ensaio foi adicionado ao resumo. Deseja agendar outro ensaio?</p>
-        <div className="flex justify-end gap-4 mt-4">
-          <button onClick={() => setShowConfirmNextEventModal(false)} className="px-4 py-2 bg-gray-300 rounded-lg">Não, ir para resumo</button>
-          <button onClick={() => { setShowConfirmNextEventModal(false); setSelectedDate(null); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Sim, agendar outro</button>
-        </div>
-      </Modal>
 
 export default EnsaioPage;
