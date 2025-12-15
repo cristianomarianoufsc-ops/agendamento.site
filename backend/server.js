@@ -2396,3 +2396,4 @@ async function startServer() {
 
 // Chama a função de inicialização
 startServer();
+
