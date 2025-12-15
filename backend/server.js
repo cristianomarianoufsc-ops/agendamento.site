@@ -211,6 +211,7 @@ if (!credentials) {
 let sheets = null;
 let calendar = null;
 let drive = null;
+let auth = null; // Variável de autenticação global
 
 const calendarIds = {
   teatro: "oto.bezerra@ufsc.br",
@@ -397,7 +398,7 @@ async function atualizarCache() {
 // Função assíncrona para inicializar as Google APIs
 async function initializeGoogleAPIs() {
   try {
-    let auth = null;
+    // Variável 'auth' agora é global (declarada acima)
     
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
