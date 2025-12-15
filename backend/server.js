@@ -347,7 +347,7 @@ async function sendEvaluatorCredentials(email, password) {
 
 // --- 4. FUNCOES UTILITARIAS ---`}
 function normalizeKey(key = "") {
-  return key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  return key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "").toLowerCase();
 }
 
 // ✅ FUNÇÃO ATUALIZADA para buscar pesos do novo banco de dados
