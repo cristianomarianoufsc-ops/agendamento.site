@@ -181,6 +181,16 @@ const EnsaioPage = () => {
     }, 100); // Aguarda 100ms para o React renderizar o componente
   };
 
+  // ✅ NOVO: Calcula as datas que estão 100% ocupadas por eventos (slots 00:00-23:59)
+  const fullyOccupiedDates = useMemo(() => {
+    return Object.keys(backendOcupados).filter(dateString => {
+        const slots = backendOcupados[dateString] || [];
+        // A data está 100% ocupada se tiver um slot de 00:00 a 23:59 (indicando evento de dia inteiro)
+        // E não está na lista de blockedDates (que já é tratada como isAllDayBlocked)
+        return slots.some(slot => slot.start === '00:00' && slot.end === '23:59') && !blockedDates.includes(dateString);
+    });
+  }, [backendOcupados, blockedDates]);
+
   const toMinutes = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
   const handleTimeSelection = (time) => {
@@ -558,15 +568,16 @@ const EnsaioPage = () => {
 	                            >
 	                              <div className="p-4 border rounded-lg bg-gray-50/50">
 	                                <h3 className="font-semibold text-md mb-3 text-gray-700">2. Selecione o dia para <span className="text-blue-600">Ensaio</span></h3>
-	            <Calendar
-	              onDateSelect={handleDateSelect}
-	              selectedDate={selectedDate}
-	              currentMonth={currentMonth}
-	              onMonthChange={setCurrentMonth}
-	              disabledDates={blockedDates} // Passando as datas bloqueadas
-	              eventDates={Object.keys(backendOcupados)}
-		              mainEventDatesSelected={resumo.ensaio ? resumo.ensaio.map(e => new Date(e.date)) : []}
-	            />
+		            <Calendar
+		              onDateSelect={handleDateSelect}
+		              selectedDate={selectedDate}
+		              currentMonth={currentMonth}
+		              onMonthChange={setCurrentMonth}
+		              disabledDates={blockedDates} // Passando as datas bloqueadas
+		              eventDates={Object.keys(backendOcupados)}
+			              mainEventDatesSelected={resumo.ensaio ? resumo.ensaio.map(e => new Date(e.date)) : []}
+			              fullyOccupiedDates={fullyOccupiedDates} // ✅ NOVO: Datas 100% ocupadas
+		            />
 		                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Em Parcial</span></div>
