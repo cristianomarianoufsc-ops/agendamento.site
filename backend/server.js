@@ -1235,6 +1235,58 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
       criteria: criteria,
       totalEvaluators: totalEvaluators,
     });
+  } catch (error) {
+    console.error("❌ Erro em GET /api/inscricoes:", error);
+    res.status(500).json({ error: "Erro interno ao obter inscrições." });
+  }
+});
+
+// --- 11.1. ROTA PARA OBTER APENAS OS IDs DAS INSCRIÇÕES (PARA O ADMIN PANEL) ---
+app.get("/api/admin/inscricoes", async (req, res) => {
+  try {
+    const inscriptionsResult = await query("SELECT id FROM inscricoes ORDER BY criado_em DESC");
+    const ids = inscriptionsResult.rows.map(row => row.id);
+    res.json(ids);
+  } catch (error) {
+    console.error("❌ Erro em GET /api/admin/inscricoes:", error);
+    res.status(500).json({ error: "Erro interno ao obter IDs de inscrições." });
+  }
+});
+
+// --- 12. ROTA PARA OBTER DETALHES DE UMA INSCRIÇÃO (PARA O ADMIN PANEL) ---
+app.get("/api/admin/inscricoes/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const inscriptionResult = await query("SELECT * FROM inscricoes WHERE id = $1", [id]);
+    if (inscriptionResult.rows.length === 0) {
+      return res.status(404).json({ error: "Inscrição não encontrada." });
+    }
+    const inscricao = inscriptionResult.rows[0];
+
+    // Simulação de dados do Forms e Arquivos (para evitar dependência do Google Sheets/Drive)
+    // Em um ambiente real, esta lógica precisaria ser implementada.
+    const dadosForms = {
+      "Campo 1 do Forms": "Valor de teste 1",
+      "Campo 2 do Forms": "Valor de teste 2",
+    };
+    const arquivos = [
+      { nome: "anexo_teste_1.pdf", url: "/anexos/1/anexo_teste_1.pdf" },
+      { nome: "anexo_teste_2.jpg", url: "/anexos/1/anexo_teste_2.jpg" },
+    ];
+
+    res.json({
+      dados: inscricao, // Retorna os dados brutos da inscrição
+      forms: dadosForms, // Retorna dados simulados do forms
+      arquivos: arquivos, // Retorna arquivos simulados
+    });
+  } catch (error) {
+    console.error("❌ Erro em GET /api/admin/inscricoes/:id:", error);
+    res.status(500).json({ error: "Erro interno ao obter detalhes da inscrição." });
+  }
+});
+
+// --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
+app.get("/api/admin/data-for-analysis", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao obter dados para análise:", error);
