@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import Calendar from "./components/Calendar";
-import TimeBlockSelector from "./components/TimeBlockSelector";
+import Calendar from "./Calendar";
+import TimeBlockSelector from "./TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
-import { capitalize } from "./utils/stringUtils";
+import { capitalize } from "../utils/stringUtils";
 
 
 import { motion, AnimatePresence } from "framer-motion";
-import Modal from "./components/Modal";
+import Modal from "./Modal";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
