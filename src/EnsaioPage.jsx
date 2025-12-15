@@ -12,7 +12,9 @@ const EnsaioPage = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
-  const [resumo, setResumo] = useState({ ensaio: [] }); // Múltipla escolha para ensaio
+    const [resumo, setResumo] = useState({ ensaio: [] }); // Múltipla escolha para ensaio
+  const [showConfirmNextEventModal, setShowConfirmNextEventModal] = useState(false); // NOVO ESTADO: Modal de confirmação para agendar mais
+  const MAX_ENSAIOS = 6; // Limite de agendamentos de ensaio
   const [backendOcupados, setBackendOcupados] = useState({});
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
@@ -161,6 +163,7 @@ const EnsaioPage = () => {
     setStageTimes({ startTime: null, endTime: null }); setResumo({ ensaio: [] });
     setUserData({ name: "", email: "", phone: "", eventName: "" }); setFirstStepDone(false);
     setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
+    setShowConfirmNextEventModal(false); // Resetar o novo estado
   };
 
   const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
@@ -229,13 +232,31 @@ const EnsaioPage = () => {
     }
 
     // Lógica de resumo (múltipla escolha para ensaio)
+    const currentStageArray = resumo.ensaio || [];
+
+    // Verifica se já atingiu o limite
+    if (currentStageArray.length >= MAX_ENSAIOS) {
+      setAlertMessage({ type: 'warning', text: `Você já atingiu o limite de ${MAX_ENSAIOS} agendamentos de Ensaio!` });
+      setTimeout(() => setAlertMessage(null), 4000);
+      return;
+    }
+
+    // Adiciona o novo agendamento ao array
     setResumo(prevResumo => ({
       ...prevResumo,
-      ensaio: [...(prevResumo.ensaio || []), newEntry]
+      ensaio: [...currentStageArray, newEntry]
     }));
 
-    // Reset de estados (apenas tempo para permitir nova seleção na mesma data)
-    setStageTimes({ startTime: null, endTime: null });
+    // Abre o modal de confirmação se ainda não atingiu o limite
+    if (currentStageArray.length < MAX_ENSAIOS - 1) {
+      setShowConfirmNextEventModal(true);
+    } else {
+      // Se atingiu o limite, fecha tudo
+      setSelectedDate(null);
+      setStageTimes({ startTime: null, endTime: null });
+      setAlertMessage({ type: 'success', text: `Limite de ${MAX_ENSAIOS} agendamentos de Ensaio atingido!` });
+      setTimeout(() => setAlertMessage(null), 4000);
+    }
   };
 
   const handleConfirmRemovals = async () => {
@@ -278,9 +299,13 @@ const EnsaioPage = () => {
     try {
       const etapas = [];
       
-      if (resumo.ensaio) {
-        const item = resumo.ensaio;
-        etapas.push({ nome: "ensaio", inicio: `${item.date.split("T")[0]}T${item.start}:00`, fim: `${item.date.split("T")[0]}T${item.end}:00`, isDispute: item.isDispute });
+      // ✅ LÓGICA ATUALIZADA PARA TRATAR MÚLTIPLOS ENSAIOS
+      if (resumo.ensaio && Array.isArray(resumo.ensaio)) {
+        resumo.ensaio.forEach(item => {
+          if (item.date && item.start && item.end) {
+            etapas.push({ nome: "ensaio", inicio: `${item.date.split("T")[0]}T${item.start}:00`, fim: `${item.date.split("T")[0]}T${item.end}:00`, isDispute: item.isDispute });
+          }
+        });
       }
 
       if (etapas.length === 0) {
@@ -299,12 +324,16 @@ const EnsaioPage = () => {
       if (result?.success && result.eventos?.[0]) {
         setAlertMessage({type: 'success', text: "Agendamento confirmado! Enviando e-mails..."});
         
-        const ensaioComId = { ...resumo.ensaio, eventId: result.eventos[0].id };
-        setResumo({ ensaio: ensaioComId });
+        // ✅ LÓGICA ATUALIZADA PARA TRATAR MÚLTIPLOS ENSAIOS
+        const ensaiosComIds = resumo.ensaio.map((ensaio, index) => ({
+          ...ensaio,
+          eventId: result.eventos[index] ? result.eventos[index].id : undefined,
+        }));
+        setResumo({ ensaio: ensaiosComIds });
 
         fetchOccupiedSlots(localSelecionado, currentMonth);
         setFirstStepDone(true);
-        setAlertMessage({type: 'success', text: "Ensaio agendado com sucesso! Prossiga para a próxima etapa."});
+        setAlertMessage({type: 'success', text: "Ensaios agendados com sucesso! Prossiga para a próxima etapa."});
       } else {
         setAlertMessage({type: 'error', text: result.error || "Erro ao salvar evento."});
       }
@@ -315,7 +344,7 @@ const EnsaioPage = () => {
     }
   };
 
-  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio;
+  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio && resumo.ensaio.length > 0;
 
   const handleGoToSecondStep = () => {
     // Lógica placeholder para a segunda etapa
@@ -350,6 +379,42 @@ const EnsaioPage = () => {
         title="Horário de início confirmado!"
       >
         <p>Agora, clique em 'OK' e escolha o horário de término no seletor.</p>
+      </Modal>
+
+      {/* NOVO MODAL: Confirmação para agendar mais ensaios */}
+      <Modal
+        isOpen={showConfirmNextEventModal}
+        onClose={() => setShowConfirmNextEventModal(false)}
+        title="Agendar outro Ensaio?"
+        showDefaultButton={false}
+      >
+        <p className="text-center text-gray-600 mb-6">
+          Você agendou um ensaio com sucesso. Deseja agendar outro horário para ensaio?
+          Você pode agendar até {MAX_ENSAIOS} ensaios no total.
+        </p>
+        <div className="flex gap-4 mt-4">
+          <button
+            onClick={() => {
+              setSelectedStage(null);
+              setSelectedDate(null);
+              setStageTimes({ startTime: null, endTime: null });
+              setShowConfirmNextEventModal(false);
+            }}
+            className="flex-1 py-2 px-4 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300"
+          >
+            Não, continuar
+          </button>
+          <button
+            onClick={() => {
+              setSelectedDate(null);
+              setStageTimes({ startTime: null, endTime: null });
+              setShowConfirmNextEventModal(false);
+            }}
+            className="flex-1 py-2 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+          >
+            Sim, agendar outro
+          </button>
+        </div>
       </Modal>
 
 <Modal
@@ -488,7 +553,7 @@ const EnsaioPage = () => {
 	              onMonthChange={setCurrentMonth}
 	              disabledDates={blockedDates} // Passando as datas bloqueadas
 	              eventDates={Object.keys(backendOcupados)}
-	              mainEventDatesSelected={resumo.ensaio ? [new Date(resumo.ensaio.date)] : []}
+		              mainEventDatesSelected={resumo.ensaio ? resumo.ensaio.map(e => new Date(e.date)) : []}
 	            />
 		                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
@@ -534,17 +599,31 @@ const EnsaioPage = () => {
 	              </div>
 
 	              <div className="bg-white p-6 rounded-2xl shadow-md">
-	                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
-	                <ul className="space-y-3 text-sm text-gray-600">
-	                  {resumo.ensaio ? (
-	                          <li key="ensaio" className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
-	                            <div><span className="font-semibold text-gray-800">Ensaio:</span> {new Date(resumo.ensaio.date).toLocaleDateString("pt-BR")} | {resumo.ensaio.start} - {resumo.ensaio.end}</div>
-	                            <button onClick={() => setResumo({ ensaio: null })} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
-	                          </li>
-	                        ) : (
-	                            <p className="text-center text-gray-400 py-4">Nenhum ensaio adicionado ainda.</p>
-	                        )}
-	                </ul>
+		                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
+		                <ul className="space-y-3 text-sm text-gray-600">
+		                  {resumo.ensaio && resumo.ensaio.length > 0 ? (
+		                    resumo.ensaio.map((ensaio, index) => (
+		                      <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+		                        <div>
+		                          <span className="font-semibold text-gray-800">Ensaio {index + 1}:</span> {new Date(ensaio.date).toLocaleDateString("pt-BR")} | {ensaio.start} - {ensaio.end}
+		                        </div>
+		                        <button 
+		                          onClick={() => {
+		                            setResumo(prev => ({
+		                              ...prev,
+		                              ensaio: prev.ensaio.filter((_, i) => i !== index)
+		                            }));
+		                          }} 
+		                          className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"
+		                        >
+		                          <Trash2 size={16} />
+		                        </button>
+		                      </li>
+		                    ))
+		                  ) : (
+		                    <p className="text-center text-gray-400 py-4">Nenhum ensaio adicionado ainda.</p>
+		                  )}
+		                </ul>
 
 	                <div className="mt-6 border-t pt-6">
 	                  {!firstStepDone ? (
