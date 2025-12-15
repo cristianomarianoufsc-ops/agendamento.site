@@ -37,17 +37,20 @@ const TimeBlockSelector = ({
           const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
           const timeInMinutes = toMinutes(time);
 
-          const conflictingSlot = occupiedSlots.find(occupied => {
+          const allConflictingSlots = occupiedSlots.filter(occupied => {
             // ✅ VALIDAÇÃO: Verifica se occupied existe e tem as propriedades necessárias
             if (!occupied || !occupied.start || !occupied.end) return false;
             const occupiedStart = toMinutes(occupied.start);
             const occupiedEnd = toMinutes(occupied.end);
+            // Verifica sobreposição: [time, time+30] se sobrepõe a [occupiedStart, occupiedEnd]
             return timeInMinutes < occupiedEnd && (timeInMinutes + 30) > occupiedStart;
           });
 
           // --- Lógica de Classificação do Bloco ---
-          const isFixedBlock = conflictingSlot && !conflictingSlot.isContestable;
-          const isProponentBlock = conflictingSlot && conflictingSlot.isContestable;
+          // 1. É um bloco fixo (vermelho) se HOUVER qualquer conflito não contestável
+          const isFixedBlock = allConflictingSlots.some(slot => !slot.isContestable);
+          // 2. É um bloco em disputa (amarelo) se HOUVER qualquer conflito contestável E NÃO for um bloco fixo
+          const isProponentBlock = !isFixedBlock && allConflictingSlots.some(slot => slot.isContestable);
 
           // --- Lógica de Estilo e Comportamento ---
           let isDisabled = false;

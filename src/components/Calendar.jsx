@@ -84,7 +84,7 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
           <ChevronRight size={20} />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2">
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-500 mb-2 px-2">
         <div>Dom</div>
         <div>Seg</div>
         <div>Ter</div>
@@ -93,7 +93,7 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
         <div>Sex</div>
         <div>Sab</div>
       </div>
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 px-2">
         {days}
       </div>
     </div>
