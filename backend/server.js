@@ -1401,6 +1401,8 @@ app.post("/api/create-events", async (req, res) => {
       // Captura erro de inicialização do Google Calendar (ex: invalid_grant)
       calendarError = err;
       console.error("❌ Erro de inicialização ou criação de eventos do Google Calendar:", err.message);
+      // NOVO: Log mais detalhado do erro
+      console.error("❌ DETALHES DO ERRO DO GOOGLE CALENDAR:", err);
       // Se houver um erro crítico (como credenciais inválidas), aborta o processo de agendamento.
       return res.status(500).json({ success: false, error: "Erro crítico na sincronização com o Google Calendar. Verifique as credenciais." });
     }
