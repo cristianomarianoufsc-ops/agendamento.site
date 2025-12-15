@@ -1625,6 +1625,7 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
         // ✅ EXTRAI dateTime ou date com fallback
         start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
         end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
+        isAllDay: !!event.start?.date && !event.start?.dateTime,
         isContestable: isContestable
       };
     }).filter(e => e.start && e.end); // Remove eventos sem data válida

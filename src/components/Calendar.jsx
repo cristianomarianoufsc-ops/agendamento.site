@@ -22,7 +22,9 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
     const dateString = date.toISOString().split('T')[0];
     const isPast = date < today;
     // ✅ ATUALIZADO: Verifica se a data está na lista de datas desabilitadas (bloqueadas pelo admin ou lotadas)
-    const isDisabled = disabledDates.includes(dateString) || isPast;
+    // NOVO: Verifica se a data está na lista de datas de eventos de dia inteiro (bloqueio total)
+    const isAllDayBlocked = disabledDates.includes(dateString);
+    const isDisabled = isAllDayBlocked || isPast;
 
     // Lógica para estilização
     const isMainEvent = mainEventDatesSelected.some(d => d.getTime() === date.getTime());
@@ -34,16 +36,20 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
     let buttonClass = "w-full aspect-square flex items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200";
 
     // ATUALIZADO: Nova ordem de prioridade para os estilos
-    if (isDisabled) {
+    if (isAllDayBlocked) {
+      // 1ª Prioridade: Bloqueio de dia inteiro (vermelho)
+      buttonClass += " bg-red-500 text-white cursor-not-allowed opacity-80";
+    } else if (isDisabled) {
+      // 2ª Prioridade: Datas desabilitadas (passado)
       buttonClass += " bg-gray-100 text-gray-400 cursor-not-allowed";
     } else if (isCurrentlySelected) {
-      // 1ª Prioridade: Destaca o dia clicado com azul
+      // 3ª Prioridade: Destaca o dia clicado com azul
       buttonClass += " bg-blue-600 text-white scale-110 shadow-lg";
     } else if (isMainEvent) {
-      // 2ª Prioridade: Marca os eventos principais já agendados com amarelo forte
+      // 4ª Prioridade: Marca os eventos principais já agendados com amarelo forte
       buttonClass += " bg-yellow-400 text-black";
     } else if (hasOtherEvent) {
-      // 3ª Prioridade: Marca outros dias ocupados com amarelo claro
+      // 5ª Prioridade: Marca outros dias ocupados com amarelo claro
       buttonClass += " bg-yellow-200 text-yellow-800 hover:bg-yellow-300";
     } else {
       // Padrão: Dia livre

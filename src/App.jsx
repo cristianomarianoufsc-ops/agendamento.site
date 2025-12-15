@@ -175,6 +175,13 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
           const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
           
           if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+
+          // NOVO: Se o evento for o dia todo, preenche todos os horários como ocupados
+          if (event.isAllDay) {
+            occupiedByDate[dateString] = [{ start: '00:00', end: '23:59', isContestable: false }];
+            return; // Pula para o próximo evento
+          }
+
           occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
         });
         
