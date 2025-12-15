@@ -37,7 +37,7 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
 
     // ATUALIZADO: Nova ordem de prioridade para os estilos
     if (isAllDayBlocked) {
-      // 1ª Prioridade: Bloqueio de dia inteiro (vermelho)
+      // 1ª Prioridade: Bloqueio de dia inteiro (100% ocupado ou admin) (vermelho)
       buttonClass += " bg-red-500 text-white cursor-not-allowed opacity-80";
     } else if (isDisabled) {
       // 2ª Prioridade: Datas desabilitadas (passado)
