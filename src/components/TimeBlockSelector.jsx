@@ -49,7 +49,7 @@ const TimeBlockSelector = ({
           // --- Lógica de Classificação do Bloco ---
           // 1. É um bloco fixo (vermelho) se HOUVER qualquer conflito não contestável
           const isFixedBlock = allConflictingSlots.some(slot => !slot.isContestable);
-          // 2. É um bloco em disputa (amarelo) se HOUVER qualquer conflito contestável E NÃO for um bloco fixo
+          // 2. É um bloco em parcial (amarelo) se HOUVER qualquer conflito contestável E NÃO for um bloco fixo
           const isProponentBlock = !isFixedBlock && allConflictingSlots.some(slot => slot.isContestable);
 
           // --- Lógica de Estilo e Comportamento ---
@@ -62,7 +62,7 @@ const TimeBlockSelector = ({
             buttonClass += " bg-red-100 text-red-400 cursor-not-allowed line-through";
           } else if (isProponentBlock) {
             // Cenário 2: É um evento de outro proponente. Sempre pinta de amarelo e permite clique.
-            // A lógica de bloqueio (se allowOverlap for false) é mantida, mas a cor é sempre amarela para indicar disputa.
+            // A lógica de bloqueio (se allowOverlap for false) é mantida, mas a cor é sempre amarela para indicar parcial.
             if (!allowOverlap) {
               isDisabled = true;
             }
@@ -128,7 +128,7 @@ const TimeBlockSelector = ({
       {/* Legenda (opcional, mas bom para clareza) */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-500">
 	        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-gray-100 border"></div><span>Livre</span></div>
-		        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-400"></div><span>Em Disputa</span></div>
+		        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-400"></div><span>Em Parcial</span></div>
 	        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-100 border border-red-200"></div><span>Ocupado (Fixo)</span></div>
       </div>
     </div>

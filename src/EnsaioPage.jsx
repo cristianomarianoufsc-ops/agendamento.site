@@ -420,7 +420,7 @@ const EnsaioPage = () => {
 <Modal
   isOpen={showConflictModal}
   onClose={() => setShowConflictModal(false)}
-  title="Atenção: Horário em Disputa!"
+  title="Atenção: Horário em Parcial!"
   showDefaultButton={false}
 >
   <p className="text-center text-gray-600 mb-6">
@@ -446,7 +446,7 @@ const EnsaioPage = () => {
       }}
       className="flex-1 py-2 px-4 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600"
     >
-      Entrar na Disputa
+      Entrar na Parcial
     </button>
   </div>
 </Modal>
@@ -557,7 +557,7 @@ const EnsaioPage = () => {
 	            />
 		                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
-		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Em Disputa</span></div>
+		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Em Parcial</span></div>
 		                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-200"></div><span>Ocupado (Fixo)</span></div>
 		                                </div>
 
