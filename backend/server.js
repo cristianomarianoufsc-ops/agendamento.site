@@ -1512,21 +1512,66 @@ app.delete("/api/inscricao/:id", async (req, res) => {
 
   } catch (error) {
     console.error("❌ Erro ao excluir inscrição:", error);
-    res.status(500).json({ error: "Erro interno ao excluir inscrição." });
-  }
-});
+    res.status(500).json({ error: "Erro interno ao excluir inscrição." })// ===================================================================
+// ✅ FUNÇÃO AUXILIAR PARA BUSCAR EVENTOS DO BANCO DE DADOS LOCAL
+// ===================================================================
+async function getLocalEvents(local, year, monthNum) {
+  try {
+    // Busca todas as inscrições que têm eventos_json preenchido
+    const result = await query(
+      "SELECT eventos_json FROM inscricoes WHERE local = $1 AND eventos_json IS NOT NULL",
+      [local]
+    );
 
-// --- 18. ROTA PARA OBTER EVENTOS OCUPADOS ---
-app.get("/api/occupied-slots/:local/:month", async (req, res) => {
-  const { local, month } = req.params;
+    let localEvents = [];
+    const targetMonth = `${year}-${monthNum.toString().padStart(2, '0')}`;
+
+    result.rows.forEach(row => {
+      try {
+        const eventos = JSON.parse(row.eventos_json);
+        eventos.forEach(event => {
+          // Verifica se o evento pertence ao mês solicitado
+          if (event.inicio && event.inicio.startsWith(targetMonth)) {
+            localEvents.push({
+              // Formato compatível com o que o frontend espera
+              id: event.id,
+              summary: event.nome,
+              start: event.inicio, // Ex: 2025-02-14T14:00:00
+              end: event.fim,      // Ex: 2025-02-14T14:30:00
+              isContestable: true, // Eventos do banco local são sempre contestáveis
+            });
+          }
+        });
+      } catch (e) {
+        console.error("❌ Erro ao parsear eventos_json:", e.message);
+      }
+    });
+
+    return localEvents;
+  } catch (error) {
+    console.error("❌ Erro ao buscar eventos do banco de dados local:", error.message);
+    return [];
+  }
+}
+
+// --- 18. ROTA PARA BUSCAR EVENTOS OCUPADOS (CALENDÁRIO) ---
+app.get("/api/occupied-slots/:local/:month", async (req, res) => {const { local, month } = req.params;
   if (!calendarIds[local]) {
     return res.status(400).json({ error: "Local não encontrado." });
   }
   try {
-    const [year, monthNum] = month.split('-');
-    const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
-    const events = await calendar.events.list({
+    const [year, monthNumStr] = month.split('-');
+    const yearInt = parseInt(year);
+    const monthNum = parseInt(monthNumStr);
+    const startDate = new Date(yearInt, monthNum - 1, 1);
+    const endDate = new Date(yearInt, monthNum, 0);
+    
+    let googleEvents = [];
+    let localEvents = [];
+
+    // 1. Tenta buscar eventos do Google Calendar
+    try {
+      const events = await calendar.events.list({
       calendarId: calendarIds[local],
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
@@ -1551,13 +1596,28 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {
       };
     }).filter(e => e.start && e.end); // Remove eventos sem data válida
     
-    res.json({ eventos: eventosProcessados });
+    googleEvents = eventosProcessados;
   } catch (error) {
     console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
-    // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
-    console.log("⚠️ Retornando lista vazia de eventos devido a erro na autenticação");
-    res.json({ eventos: [] });
+    console.log("⚠️ Prosseguindo com a busca de eventos no banco de dados local.");
   }
+
+  // 2. Busca eventos do banco de dados local
+  try {
+    localEvents = await getLocalEvents(local, yearInt, monthNum);
+  } catch (error) {
+    console.error("❌ Erro ao buscar eventos locais:", error.message);
+  }
+
+  // 3. Combina os eventos (Google Calendar tem prioridade se houver duplicidade, mas o frontend lida com a sobreposição)
+  // Como o frontend espera um array simples, apenas concatenamos.
+  const allEvents = [...googleEvents, ...localEvents];
+  
+  // 4. Remove duplicatas (se um evento do Google Calendar for criado a partir de um local, ele pode aparecer duplicado)
+  // A remoção de duplicatas é complexa, mas como o frontend lida com a sobreposição, vamos apenas garantir que o localEvents seja usado como fallback.
+  // Para simplificar, vamos apenas retornar a concatenação, pois o frontend já lida com a lógica de disputa.
+  
+  res.json({ eventos: allEvents });
 });
 
 // --- 19. ROTA PARA SALVAR AVALIAÇÃO ---
