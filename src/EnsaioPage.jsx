@@ -437,7 +437,7 @@ const EnsaioPage = () => {
   showDefaultButton={false}
 >
   <p className="text-center text-gray-600 mb-6">
-    O hAs datas e horários marcados em amarelo já foram solicitadas por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital..
+    As datas e horários marcados em amarelo já foram solicitadas por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital..
   </p>
   <div className="flex gap-4 mt-4">
     <button
