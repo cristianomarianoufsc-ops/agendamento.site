@@ -435,7 +435,7 @@ const newEnd = toMinutes(newEntry.end);
     }
   };
 // SUBSTITUA TODA A SUA FUNÇÃO 'handleSendEmail' POR ESTA:
-const handleSendEmail = async () => {
+const handleFinalizeBooking = async () => {
   try {
     const etapas = [];
     stageOrder.forEach(etapa => {
