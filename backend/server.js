@@ -1455,6 +1455,52 @@ app.post("/api/create-events", async (req, res) => {
 // --- 17. ROTA PARA CANCELAR MÚLTIPLOS EVENTOS ---
 
 // --- ROTA PARA LIMPEZA GERAL (FORÇADA) ---
+app.post("/api/cleanup/calendar-force", async (req, res) => {
+  try {
+    const calendarIdsToClean = Object.values(calendarIds);
+    let totalDeleted = 0;
+
+    for (const calendarId of calendarIdsToClean) {
+      console.log(`🗑️ Buscando eventos criados pelo sistema no calendário: ${calendarId}`);
+      
+      // 1. Buscar eventos criados pelo sistema (Service Account)
+      const eventsResponse = await calendar.events.list({
+        calendarId: calendarId,
+        timeMin: (new Date()).toISOString(), // Busca a partir de agora
+        singleEvents: true,
+        q: 'managedBy:sistema-edital-dac', // Filtra por metadado privado
+        privateExtendedProperty: 'managedBy=sistema-edital-dac', // Filtra por metadado privado
+        showDeleted: false,
+      });
+
+      const eventsToDelete = eventsResponse.data.items || [];
+      console.log(`   - Encontrados ${eventsToDelete.length} eventos para exclusão.`);
+
+      // 2. Deletar eventos
+      const deletePromises = eventsToDelete.map(event => {
+        return calendar.events.delete({ calendarId: calendarId, eventId: event.id })
+          .then(() => {
+            console.log(`   ✅ Evento ${event.id} (${event.summary}) deletado do Calendar.`);
+            return 1;
+          })
+          .catch(err => {
+            console.error(`   ❌ Falha ao deletar evento ${event.id} (${event.summary}) do Calendar:`, err.message);
+            return 0;
+          });
+      });
+
+      const results = await Promise.all(deletePromises);
+      totalDeleted += results.reduce((sum, current) => sum + current, 0);
+    }
+
+    res.json({ success: true, message: `Limpeza forçada do Google Calendar concluída. Total de eventos deletados: ${totalDeleted}.` });
+  } catch (error) {
+    console.error("❌ Erro ao executar limpeza forçada do Google Calendar:", error);
+    res.status(500).json({ error: "Erro interno ao executar a limpeza forçada do Google Calendar." });
+  }
+});
+
+// --- ROTA PARA LIMPEZA GERAL (FORÇADA) ---
 app.post("/api/cleanup/force", async (req, res) => {
   try {
     // 1. Buscar todas as inscrições para obter os eventIds do Google Calendar

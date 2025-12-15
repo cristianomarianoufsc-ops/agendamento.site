@@ -668,6 +668,22 @@ const Admin = ({ viewOnly = false }) => {
   };
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
+
+  const handleCalendarCleanup = async () => {
+    if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os eventos do Google Calendar criados pelo sistema?")) {
+      try {
+        const response = await fetch("/api/cleanup/calendar-force", { method: "POST" });
+        const data = await response.json();
+        if (data.success) {
+          alert(`✅ Limpeza do Google Calendar concluída! ${data.message}`);
+        } else {
+          alert(`❌ Erro ao executar a limpeza do Google Calendar: ${data.error}`);
+        }
+      } catch (err) {
+        alert("❌ Erro de conexão ao executar a limpeza do Google Calendar.");
+      }
+    }
+  };
   // --- RENDERIZAÇÃO ---
   
   // ✅ TELA DE LOGIN PARA ADMINISTRADOR
@@ -838,7 +854,8 @@ const Admin = ({ viewOnly = false }) => {
                         </button>
                         
                         {/* ✅ BOTÃO LIMPEZA GERAL */}
-                        <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
+                        <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral (DB)</button>
+                        <button onClick={handleCalendarCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white font-semibold rounded-lg hover:bg-red-600 text-sm"><Calendar size={16} /> Limpeza Calendar (Forçada)</button>
                       </>
                     )}
                     
