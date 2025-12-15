@@ -1393,18 +1393,16 @@ app.post("/api/create-events", async (req, res) => {
 
         } catch (err) {
           console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
-          // Continua o loop mesmo com erro em um evento
-          etapasComId.push({ ...etapa, eventId: null });
-          eventosCriados.push({ etapa: etapa.nome, id: null, summary: event.summary, inicio: etapa.inicio });
+          // Se falhar a criação de um evento, considera-se falha total do agendamento.
+          throw err;
         }
       }
     } catch (err) {
       // Captura erro de inicialização do Google Calendar (ex: invalid_grant)
       calendarError = err;
       console.error("❌ Erro de inicialização ou criação de eventos do Google Calendar:", err.message);
-      // Preenche etapasComId com nulls para que a inserção no DB possa prosseguir
-      etapasComId = etapas.map(etapa => ({ ...etapa, eventId: null }));
-      eventosCriados = etapas.map(etapa => ({ etapa: etapa.nome, id: null, summary: `${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)} - ${resumo}`, inicio: etapa.inicio }));
+      // Se houver um erro crítico (como credenciais inválidas), aborta o processo de agendamento.
+      return res.status(500).json({ success: false, error: "Erro crítico na sincronização com o Google Calendar. Verifique as credenciais." });
     }
 
     // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
@@ -1436,8 +1434,7 @@ app.post("/api/create-events", async (req, res) => {
       );
       console.log("💾 Inscrição salva no banco com sucesso!");
       
-      const message = calendarError ? "Inscrição salva, mas houve falha na criação dos eventos do Google Calendar." : "Eventos criados e inscrição salva com sucesso!";
-      res.json({ success: true, message: message, eventos: eventosCriados });
+      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
 
 		      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
 			      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
@@ -1445,10 +1442,11 @@ app.post("/api/create-events", async (req, res) => {
       console.error("❌ Erro ao salvar inscrição no banco:", err.message);
       res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
     }
-  } catch (err) {
-    console.error("❌ Erro no endpoint /api/create-events:", err.message);
-    res.status(500).json({ success: false, error: "Erro interno ao criar eventos." });
-  }
+    } catch (err) {
+      console.error("❌ Erro no endpoint /api/create-events:", err.message);
+      // Se o erro for propagado do bloco try/catch do Calendar, ele será capturado aqui.
+      res.status(500).json({ success: false, error: "Erro interno ao criar eventos. A inscrição não foi salva devido a uma falha na criação do evento no Google Calendar." });
+    }
 });
 
 // --- 17. ROTA PARA CANCELAR MÚLTIPLOS EVENTOS ---
