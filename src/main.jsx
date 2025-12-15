@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 // 1. Importe TODOS os componentes que servirão como páginas
 import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Completo)
-import AdminPanel from "./components/AdminPanel.jsx"; // Importando o painel administrativo correto (DEIXADO POR COMPATIBILIDADE)
+import AdminPanel from "./components/Admin.jsx"; // Importando o painel administrativo correto (DEIXADO POR COMPATIBILIDADE)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
 import Pagina from "./pages/Pagina.jsx"; // A NOVA PÁGINA COM DADOS DO CSV
 import Admin from "./components/Admin.jsx"; // Este é o AppVertical com props de admin, mas o nome é confuso. Deixando para trás.
