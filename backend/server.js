@@ -1619,7 +1619,7 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {const { local,
   
   res.json({ eventos: allEvents });
   } catch (error) {
-    console.error("Erro ao buscar eventos:", error);
+    console.error("Erro na rota /api/events:", error);
     res.status(500).json({ error: "Erro interno do servidor ao buscar eventos." });
   }
 });
