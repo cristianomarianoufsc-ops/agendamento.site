@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
 import Modal from "./components/Modal"; 
 
 const EnsaioPage = () => {
   // ESTADOS
-  const timeSelectorRef = useRef(null); // Referência para a seção de horários (já existe)
   const [localSelecionado, setLocalSelecionado] = useState(null);
   const [selectedStage, setSelectedStage] = useState("ensaio"); // Hardcoded para ensaio
   const [selectedDate, setSelectedDate] = useState(null);
@@ -168,20 +166,7 @@ const EnsaioPage = () => {
     setShowConfirmNextEventModal(false); // Resetar o novo estado
   };
 
-    const handleDateSelect = (date) => { 
-    setSelectedDate(date); 
-    setStageTimes({ startTime: null, endTime: null }); 
-    
-    // ✅ NOVO: Scroll automático para a seção de horários
-    if (timeSelectorRef.current) {
-      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };l }); 
-    // ✅ NOVA LÓGICA: Rola para a seção de horários se uma data foi selecionada
-    if (date && timeSelectorRef.current) {
-      timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
 
   const toMinutes = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
@@ -552,8 +537,8 @@ const EnsaioPage = () => {
 
 	                        <AnimatePresence>
 	                          {selectedStage === "ensaio" && (
-			                                    <motion.div ref={timeSelectorRef}
-		                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
+	                            <motion.div
+	                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
 	                              animate={{ height: 'auto', opacity: 1, marginTop: '1rem' }}
 	                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
 	                              transition={{ duration: 0.3, ease: "easeInOut" }}
