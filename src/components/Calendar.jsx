@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ATUALIZADO: Adicionada a prop 'selectedDate'
-const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, disabledDates = [], eventDates = [], mainEventDatesSelected = [] }) => {
+const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, disabledDates = [], eventDates = [], mainEventDatesSelected = [], fullyOccupiedDates = [] }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -23,7 +23,7 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
     const isPast = date < today;
     // ✅ ATUALIZADO: Verifica se a data está na lista de datas desabilitadas (bloqueadas pelo admin ou lotadas)
     // NOVO: Verifica se a data está na lista de datas de eventos de dia inteiro (bloqueio total)
-    const isAllDayBlocked = disabledDates.includes(dateString);
+    const isAllDayBlocked = disabledDates.includes(dateString) || fullyOccupiedDates.includes(dateString);
     const isDisabled = isAllDayBlocked || isPast;
 
     // Lógica para estilização
@@ -36,10 +36,10 @@ const Calendar = ({ onDateSelect, selectedDate, currentMonth, onMonthChange, dis
     let buttonClass = "w-full aspect-square flex items-center justify-center rounded-full text-sm font-semibold transition-colors duration-200";
 
     // ATUALIZADO: Nova ordem de prioridade para os estilos
-    if (isAllDayBlocked) {
-      // 1ª Prioridade: Bloqueio de dia inteiro (100% ocupado ou admin) (vermelho)
-      buttonClass += " bg-red-500 text-white cursor-not-allowed opacity-80";
-    } else if (isDisabled) {
+	    if (isAllDayBlocked) {
+	      // 1ª Prioridade: Bloqueio de dia inteiro (100% ocupado ou admin) (vermelho)
+	      buttonClass += " bg-red-500 text-white cursor-not-allowed opacity-80";
+	    } else if (isDisabled) {
       // 2ª Prioridade: Datas desabilitadas (passado)
       buttonClass += " bg-gray-100 text-gray-400 cursor-not-allowed";
     } else if (isCurrentlySelected) {

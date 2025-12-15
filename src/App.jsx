@@ -221,6 +221,16 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     }, 100); // Aguarda 100ms para o React renderizar o componente
   };
 
+  // ✅ NOVO: Calcula as datas que estão 100% ocupadas por eventos (slots 00:00-23:59)
+  const fullyOccupiedDates = useMemo(() => {
+    return Object.keys(backendOcupados).filter(dateString => {
+        const slots = backendOcupados[dateString] || [];
+        // A data está 100% ocupada se tiver um slot de 00:00 a 23:59 (indicando evento de dia inteiro)
+        // E não está na lista de blockedDates (que já é tratada como isAllDayBlocked)
+        return slots.some(slot => slot.start === '00:00' && slot.end === '23:59') && !blockedDates.includes(dateString);
+    });
+  }, [backendOcupados, blockedDates]);
+
   // ✅ FUNÇÃO MODIFICADA: Agora verifica conflito ao selecionar horário de INÍCIO
   const handleTimeSelection = (time) => {
     const { startTime } = stageTimes;
@@ -865,6 +875,9 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
               onMonthChange={setCurrentMonth}
               disabledDates={blockedDates} // Passando as datas bloqueadas
               eventDates={Object.keys(backendOcupados)}
+              fullyOccupiedDates={fullyOccupiedDates}
+
+
               mainEventDatesSelected={(() => {
                 if (!resumo.evento || !Array.isArray(resumo.evento) || resumo.evento.length === 0) return [];
                 return resumo.evento.map(evt => new Date(evt.date)).filter(d => !isNaN(d.getTime()));
