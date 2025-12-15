@@ -1371,7 +1371,7 @@ app.post("/api/create-events", async (req, res) => {
 
     // 1. Tenta criar os eventos no Google Calendar
     try {
-      const calendar = google.calendar({ version: 'v3', auth: jwtClient });
+      const calendar = google.calendar({ version: 'v3', auth: auth });
       for (const etapa of etapas) {
         const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
         const event = {
