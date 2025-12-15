@@ -1,1307 +1,968 @@
 import React, { useState, useEffect, useMemo } from "react";
-import ReactDOM from "react-dom";
+import Calendar from "./components/Calendar";
+import TimeBlockSelector from "./components/TimeBlockSelector";
+import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown, Download } from "lucide-react";
+import { capitalize } from "./utils/stringUtils";
+
+
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
-  SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
-  PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
-} from "lucide-react";
-import EvaluationDrawer from './EvaluationDrawer';
-import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
-import SlidesViewer from './SlidesViewer';
-import { v4 as uuidv4 } from 'uuid';
+import Modal from "./components/Modal";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
-// Componente Modal (sem alterações)
-const Modal = ({ user, onClose }) => {
-  const findFormsEmail = (formData) => { if (!formData) return null; const emailKey = Object.keys(formData).find((k) => k.toLowerCase().includes("mail")); return emailKey ? formData[emailKey] : null; };
-  const findFormsPhone = (formData) => { if (!formData) return null; const telKey = Object.keys(formData).find((k) => k.toLowerCase().includes("fone")); return telKey ? formData[telKey] : null; };
-  return ReactDOM.createPortal( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}> <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="bg-white rounded-2xl shadow-xl p-6 m-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}> <div className="flex justify-between items-center mb-4"> <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"> <Contact size={24} /> Contatos de {user?.nome || "Usuário"} </h3> <button onClick={onClose} className="p-1 rounded-full text-gray-500 hover:bg-gray-200 transition-colors"> <X size={20} /> </button> </div> <div className="space-y-4 text-gray-700"> <p><strong>Nome:</strong> {user?.nome}</p> <div> <p><strong>Telefone(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> {findFormsPhone(user?.formsData) ? ( <li>{findFormsPhone(user.formsData)} (Etapa 2)</li> ) : ( <li>{user?.telefone || "N/A"} (Etapa 1)</li> )} </ul> </div> <div> <p><strong>E-mail(s):</strong></p> <ul className="list-disc list-inside ml-2 text-gray-600"> <li>{user?.email || "N/A"} (Etapa 1)</li> {user?.formsData && findFormsEmail(user.formsData) && findFormsEmail(user.formsData).toLowerCase() !== user?.email?.toLowerCase() && ( <li>{findFormsEmail(user.formsData)} (Etapa 2)</li> )} </ul> </div> </div> </motion.div> </motion.div>, document.getElementById("modal-root") );
-};
 
-// Função auxiliar para extrair o ID do Google Forms ou Sheets
-const extractIdFromUrl = (url) => {
-  if (!url) return "";
-  // Expressão regular para extrair o ID de forms/d/e/.../viewform ou spreadsheets/d/.../edit
-  const match = url.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : url; // Retorna o ID ou a URL original se não encontrar
-};
-
-// --- COMPONENTE PRINCIPAL ---
-const Admin = ({ viewOnly = false }) => {
-  // --- ESTADOS ---
-  const [unificados, setUnificados] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false); // NOVO ESTADO
-  const [showSlidesViewer, setShowSlidesViewer] = useState(false); // NOVO ESTADO
-  const [showFormDataModal, setShowFormDataModal] = useState(false); // ✅ NOVO ESTADO
-  const [selectedFormData, setSelectedFormData] = useState(null); // ✅ NOVO ESTADO
-  const [slidesData, setSlidesData] = useState(null); // NOVO ESTADO
-  const [openAccordionId, setOpenAccordionId] = useState(null);
+const AppVertical = () => {
+  // ESTADOS
+  const [localSelecionado, setLocalSelecionado] = useState(null);
+  const [selectedStage, setSelectedStage] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [stageTimes, setStageTimes] = useState({ startTime: null, endTime: null });
+  const [resumo, setResumo] = useState({ ensaio: [], evento: [] });
+  const [backendOcupados, setBackendOcupados] = useState({});
+  const [currentStep, setCurrentStep] = useState("select_local");
+  const [firstStepDone, setFirstStepDone] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [pendingRemovals, setPendingRemovals] = useState([]);
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Estados de Configuração
-  
-  // ✅ NOVA FUNÇÃO: Remove a data da lista e salva a configuração
-  const handleToggleDateFromList = (date) => {
-    const newBlockedDates = blockedDates.filter(d => d !== date);
-    setBlockedDates(newBlockedDates);
-    handleSaveConfig({ blockedDates: newBlockedDates });
-  };
-  const [formsId, setFormsId] = useState("");
-  const [sheetId, setSheetId] = useState("");
-  const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços");
-  const [evaluationCriteria, setEvaluationCriteria] = useState([]);
-  const [evaluators, setEvaluators] = useState([]);
-  const [allowBookingOverlap, setAllowBookingOverlap] = useState(false);
-  // ✅ NOVOS ESTADOS PARA CONTROLE DE CALENDÁRIO
-  const [blockedDates, setBlockedDates] = useState([]); // Datas bloqueadas (YYYY-MM-DD)
-  const [dateToToggle, setDateToToggle] = useState(''); // Data temporária para bloqueio/desbloqueio
-  const [stageTimes, setStageTimes] = useState({
+  // =================================================
+  // NOVOS ESTADOS PARA O MODAL DE CONFIRMAÇÃO
+  // =================================================
+  const [showConfirmNextEventModal, setShowConfirmNextEventModal] = useState(false);
+  const [stageBeingConfirmed, setStageBeingConfirmed] = useState(null);
+  const [allowBookingOverlap, setAllowBookingOverlap] = useState(false); // Para guardar a config do admin
+  const [configStageTimes, setConfigStageTimes] = useState({ // ✅ NOVO ESTADO: Horários limite do Admin
     ensaio: { start: "08:00", end: "21:00" },
     montagem: { start: "08:00", end: "21:00" },
     evento: { start: "08:00", end: "21:00" },
     desmontagem: { start: "08:00", end: "21:00" },
   });
+  const [blockedDates, setBlockedDates] = useState([]); // ✅ NOVO ESTADO: Datas bloqueadas do Admin
+const [showConflictModal, setShowConflictModal] = useState(false); // Para controlar o pop-up de disputa
+const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os detalhes do conflito
+// const [showRevealModal, setShowRevealModal] = useState(false); // Removido: Modal de revelação de disputa
+// const [disputeHoursRevealed, setDisputeHoursRevealed] = useState(false); // Removido: Flag de revelação de disputa
 
-  // Estados dos botões da página inicial
-  const [enableInternalEdital, setEnableInternalEdital] = useState(false);
-  const [enableExternalEdital, setEnableExternalEdital] = useState(true);
-  const [enableRehearsal, setEnableRehearsal] = useState(true);
-  const [buttonExternalEditalText, setButtonExternalEditalText] = useState("Edital Externo"); // NOVO ESTADO
+  // ✅ NOVO ESTADO ADICIONADO AQUI
+  const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços"); 
+  const [buttonExternalEditalText, setButtonExternalEditalText] = useState("Edital Externo"); // ✅ ESTADO FALTANTE CORRIGIDO
 
-  // ✅ NOVO ESTADO PARA O NÚMERO DE AVALIAÇÕES
-  const [requiredAssessments, setRequiredAssessments] = useState(3);
 
-  // Estados de Navegação e Filtro
-  const [mainTab, setMainTab] = useState('inscricoes'); // 'inscricoes', 'configuracoes_gerais', 'configuracoes_avaliacao'
-  const [inscricoesTab, setInscricoesTab] = useState(viewOnly ? 'eventos' : 'eventos');
-  const [localFilters, setLocalFilters] = useState({ teatro: true, igrejinha: true });
-  const [sortOrder, setSortOrder] = useState('id_asc');
-  const [assessmentFilter, setAssessmentFilter] = useState('todos');
-  const [evaluatorEmail, setEvaluatorEmail] = useState(localStorage.getItem('evaluatorEmail') || '');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
-  const [evaluatorPassword, setEvaluatorPassword] = useState('');
-  const [conflictFilter, setConflictFilter] = useState(false);
-   // ✅ NOVO: Senha única para todos os avaliadores
-  
-  // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
-  const [showAdminPassword, setShowAdminPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha
-  const [showEvaluatorPassword, setShowEvaluatorPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha do avaliador
-
-  // --- LÓGICA DE DADOS E FILTRAGEM ---
-
-  // ✅ NOVA FUNÇÃO: Processa a data temporária e salva no estado blockedDates
-  const handleToggleDate = () => {
-    if (!dateToToggle) return;
-
-    const isBlocked = blockedDates.includes(dateToToggle);
-    const newBlockedDates = isBlocked
-      ? blockedDates.filter(d => d !== dateToToggle)
-      : [...blockedDates, dateToToggle].sort();
-    
-    // 1. Atualiza o estado local
-    setBlockedDates(newBlockedDates);
-    // 2. Salva a configuração no backend
-    handleSaveConfig({ blockedDates: newBlockedDates });
-    // 3. Limpa o campo de seleção
-    setDateToToggle('');
-  };
-  const handleToggleAccordion = (id) => {
-    if (openAccordionId === id) {
-      setOpenAccordionId(null);
-    } else {
-      fetchData().then(() => {
-        setOpenAccordionId(id);
-      });
-    }
-  };
-
- const dadosProcessados = useMemo(() => {
-    let dadosParaProcessar = [...unificados];
-
-    // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
-    const conflitosPorSlot = new Map();
-    const coresConflito = [
-      'bg-red-100 text-red-800', 'bg-blue-100 text-blue-800', 'bg-green-100 text-green-800', 
-      'bg-yellow-100 text-yellow-800', 'bg-purple-100 text-purple-800', 'bg-pink-100 text-pink-800'
-    ];
-    let corIndex = 0;
-
-    const getSlots = (item) => {
-      const slots = [];
-      const addSlot = (inicio, fim) => {
-        if (inicio && fim) {
-          // Normaliza o slot para a chave de conflito (data + hora de início/fim)
-          const key = `${new Date(inicio).toDateString()}-${new Date(inicio).toTimeString().substring(0, 5)}-${new Date(fim).toTimeString().substring(0, 5)}`;
-          slots.push(key);
-        }
-      };
-
-      addSlot(item.ensaio_inicio, item.ensaio_fim);
-      addSlot(item.montagem_inicio, item.montagem_fim);
-      addSlot(item.desmontagem_inicio, item.desmontagem_fim);
-      
-      if (item.eventos_json) {
-        try {
-          JSON.parse(item.eventos_json).forEach(ev => addSlot(ev.inicio, ev.fim));
-        } catch (e) { /* ignore */ }
+  // ✅ Efeito para buscar configurações globais uma vez
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const response = await fetch("/api/config");
+        const data = await response.json();
+        setAllowBookingOverlap(data.allowBookingOverlap);
+        if (data.pageTitle) setPageTitle(data.pageTitle);
+        if (data.buttonExternalEditalText) setButtonExternalEditalText(data.buttonExternalEditalText);
+          // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
+          if (data.stageTimes) setConfigStageTimes(data.stageTimes);
+          // ✅ CORREÇÃO: Garante que blockedDates seja um array, mesmo que vazio
+          if (data.blockedDates) setBlockedDates(Array.isArray(data.blockedDates) ? data.blockedDates : []);
+      } catch (error) {
+        console.error("Erro ao buscar configurações:", error);
+        // Garante que o frontend não quebre se a configuração falhar
+        setPageTitle("Sistema de Agendamento de Espaços (Erro de Configuração)");
       }
-      return slots;
     };
+    fetchConfig();
+  }, []); 
 
-    // 1. Mapeia todos os slots e identifica os conflitos
-    dadosParaProcessar.forEach(item => {
-      item.conflictGroup = null; // Inicializa o campo de grupo
-      item.conflictColor = null; // Inicializa o campo de cor
-      if (item.hasConflict) {
-        const slots = getSlots(item);
-        slots.forEach(slot => {
-          if (!conflitosPorSlot.has(slot)) {
-            conflitosPorSlot.set(slot, new Set());
+  const locaisNomes = {
+    teatro: "Teatro Carmen Fossari",
+    igrejinha: "Igrejinha da UFSC",
+  };
+
+  const [userData, setUserData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    eventName: "",
+  });
+
+  // ... (o restante do seu código AppVertical continua aqui)
+
+
+    // ✅ GERA OS SLOTS DE 30 EM 30 MINUTOS, EXCLUINDO 00:00-07:30 E 22:30-23:30
+  const timeSlots = useMemo(() => {
+    const slots = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        // Horário atual em minutos
+        const totalMinutes = h * 60 + m;
+        
+        // Limites: 08:00 (480 minutos) e 22:30 (1350 minutos)
+        // Queremos slots de 08:00 até 22:00 (o último slot de início)
+        // O último slot de início é 22:00 (1320 minutos)
+        
+        // Se o horário for menor que 08:00 (480) OU maior ou igual a 22:30 (1350), ignora.
+        if (totalMinutes < 480 || totalMinutes >= 1350) {
+          continue;
+        }
+
+        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  }, []);
+
+  const stageOrder = ["ensaio", "montagem", "evento", "desmontagem"];
+
+  // =================================================
+  // BLOCO DE FUNÇÕES
+  // =================================================
+
+  const fetchOccupiedSlots = async (local) => {
+  try {
+    const now = new Date();
+    const occupiedByDate = {};
+    
+    // 🔄 Busca eventos dos próximos 12 meses
+    for (let i = 0; i < 12; i++) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const year = monthDate.getFullYear();
+      const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
+      
+      try {
+	        const response = await fetch(`/api/occupied-slots/${local}/${year}-${month}`);
+	        
+	        if (!response.ok) {
+	          console.error(`❌ Erro ao buscar eventos de ${year}-${month}: Status ${response.status}`);
+	          continue;
+	        }
+	        
+	        let data;
+	        try {
+	          data = await response.json();
+	        } catch (e) {
+	          console.error(`❌ Erro ao processar JSON para ${year}-${month}:`, e);
+	          console.error("Resposta da API (texto):", await response.text());
+	          continue;
+	        }
+        
+        if (data.error) {
+          console.error(`❌ Erro retornado pela API para ${year}-${month}:`, data.error);
+          continue;
+        }
+        
+        if (!data || !data.eventos) {
+          console.warn(`⚠️ Dados de eventos incompletos para ${year}-${month}`);
+          continue;
+        }
+        
+        // Processa eventos do mês
+        (data.eventos || []).forEach((event) => {
+          if (!event || !event.start || !event.end) return;
+          const start = new Date(event.start);
+          const end = new Date(event.end);
+          
+          if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+            console.warn("⚠️ Evento com data inválida ignorado:", event);
+            return;
           }
-          conflitosPorSlot.get(slot).add(item.id);
+          
+          end.setMinutes(end.getMinutes() + 30);
+          const dateString = start.toISOString().split("T")[0];
+          const startTime = start.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          const endTime = end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          
+          if (!occupiedByDate[dateString]) occupiedByDate[dateString] = [];
+          occupiedByDate[dateString].push({ start: startTime, end: endTime, isContestable: event.isContestable });
+        });
+        
+        console.log(`✅ ${(data.eventos || []).length} eventos carregados para ${year}-${month}`);
+      } catch (monthError) {
+        console.error(`❌ Erro ao processar mês ${year}-${month}:`, monthError);
+        continue;
+      }
+    }
+    
+    setBackendOcupados(occupiedByDate);
+    console.log(`✅ Total de datas com eventos ocupados: ${Object.keys(occupiedByDate).length}`);
+  } catch (error) {
+    console.error("❌ Erro ao buscar eventos:", error);
+    setBackendOcupados({});
+  }
+};
+
+  const handleLocalSelect = (local) => { setLocalSelecionado(local); setCurrentStep("calendar"); };
+
+  const handleBackToLocalSelect = () => {
+    setLocalSelecionado(null); setCurrentStep("select_local"); setSelectedStage(null); setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null }); setResumo({ evento: [] });
+    setUserData({ name: "", email: "", phone: "", eventName: "" }); setFirstStepDone(false);
+    setPendingRemovals([]); setBackendOcupados({}); setShowCompletionMessage(false);
+  };
+
+  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
+
+  // ✅ FUNÇÃO MODIFICADA: Agora verifica conflito ao selecionar horário de INÍCIO
+  const handleTimeSelection = (time) => {
+    const { startTime } = stageTimes;
+    const toMinutes = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+
+    // Quando está selecionando o horário de INÍCIO (ou resetando)
+    if (!startTime || toMinutes(time) <= toMinutes(startTime)) {
+      
+      // ✅ NOVA LÓGICA: Verifica se há conflito ANTES de definir o horário
+      const timeInMinutes = toMinutes(time);
+    const conflictingSlot = getOccupiedSlots(selectedDate, selectedStage).find(occupied => {
+      // ✅ VALIDAÇÃO: Verifica se occupied existe e tem as propriedades necessárias
+      if (!occupied || !occupied.start || !occupied.end) return false;
+      const occupiedStart = toMinutes(occupied.start);
+      const occupiedEnd = toMinutes(occupied.end);
+      return timeInMinutes < occupiedEnd && (timeInMinutes + 30) > occupiedStart;
+    });
+
+      // Se há conflito e é um horário contestável com a opção ativada
+      // Se há conflito e é um horário contestável com a opção ativada
+      if (conflictingSlot && conflictingSlot.isContestable && allowBookingOverlap) {
+        setConflictDetails({ etapa: selectedStage, pendingStartTime: time });
+        setShowConflictModal(true);
+        return; // Não define o horário ainda, espera a confirmação do usuário
+      }
+      
+      // Se já revelou, ou se não há conflito, ou se o conflito é fixo, prossegue normalmente
+      // (O conflito fixo já é bloqueado visualmente no TimeBlockSelector)
+
+      // Se não há conflito ou é um horário fixo (que já está bloqueado visualmente), prossegue normalmente
+      setStageTimes({ startTime: time, endTime: null });
+      setIsModalOpen(true);
+      return;
+    }
+    
+    // Quando está selecionando o horário de TÉRMINO
+    setStageTimes({ ...stageTimes, endTime: time });
+  };
+
+  const getOccupiedSlots = (date, etapa) => {
+    console.log("🔍 getOccupiedSlots chamado:", { date, etapa });
+    if (!date) {
+      console.log("⚠️ Sem data, retornando array vazio");
+      return [];
+    }
+    const dateString = date.toISOString().split("T")[0];
+    
+    // Slots que vêm do backend (outros usuários e eventos fixos)
+    const backendSlots = backendOcupados[dateString] || [];
+    
+    // Slots que o usuário JÁ CONFIRMOU nesta sessão
+    const localSlots = [];
+  stageOrder.forEach((etapa) => {
+    if (etapa === 'evento' || etapa === 'ensaio') {
+      // Para eventos e ensaios, processa o array
+      const currentStageArray = resumo[etapa];
+      if (currentStageArray && Array.isArray(currentStageArray)) {
+        currentStageArray.forEach(evt => {
+          if (evt && evt.date && evt.start && evt.end) {
+            if (evt.date.split("T")[0] === dateString) {
+              localSlots.push({ start: evt.start, end: evt.end, isContestable: false });
+            }
+          }
         });
       }
+    } else {
+      // Para outras etapas (montagem, desmontagem), processa como objeto único
+      if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+        if (resumo[etapa].date.split("T")[0] === dateString) {
+          localSlots.push({ start: resumo[etapa].start, end: resumo[etapa].end, isContestable: true });
+        }
+      }
+    }
+  });
+  
+  const result = [...backendSlots, ...localSlots];
+  console.log("✅ getOccupiedSlots retornando:", result);
+  return result;
+};
+
+
+  // =================================================
+  // FUNÇÃO 'confirmStage' ATUALIZADA
+  // =================================================
+  // Função `confirmStage` ATUALIZADA
+const confirmStage = (etapa, force = false) => {
+  if (!selectedDate || !stageTimes.startTime || !stageTimes.endTime) return;
+
+  const newEntry = { date: selectedDate.toISOString(), start: stageTimes.startTime, end: stageTimes.endTime };
+  const toMinutes = (time) => { const [h, m] = time.split(":").map(Number); return h * 60 + m; };
+  const newStart = toMinutes(newEntry.start);
+const newEnd = toMinutes(newEntry.end);
+
+// A verificação de conflito foi movida para handleTimeSelection.
+  // Aqui, apenas verificamos se há conflito com um horário FIXO (não contestável)
+  // ou se a opção de sobreposição está DESLIGADA.
+  const conflictingSlot = getOccupiedSlots(selectedDate, etapa).find((slot) => {
+    // ✅ VALIDAÇÃO: Verifica se slot existe e tem as propriedades necessárias
+    if (!slot || !slot.start || !slot.end) return false;
+    const s = toMinutes(slot.start);
+    const e = toMinutes(slot.end);
+    return newStart < e && newEnd > s;
+  });
+
+  if (conflictingSlot && !force) {
+    if (!conflictingSlot.isContestable || !allowBookingOverlap) {
+      setAlertMessage({ type: 'error', text: "Conflito de horário! Este intervalo já está ocupado e não pode ser agendado." });
+      setTimeout(() => setAlertMessage(null), 4000);
+      return;
+    }
+  }
+
+  // ✅ NOVA LÓGICA: Trata eventos como array
+  if (etapa === "evento" || etapa === "ensaio") {
+    const stageName = capitalize(etapa);
+    const currentStageArray = resumo[etapa] || [];
+
+    // Verifica se já atingiu o limite de 6
+    if (currentStageArray.length >= 6) {
+      setAlertMessage({ type: 'warning', text: `Você já atingiu o limite de 6 agendamentos de ${stageName}!` });
+      setTimeout(() => setAlertMessage(null), 4000);
+      return;
+    }
+    
+    // Verifica duplicação
+    const isDuplicate = currentStageArray.some(evt => 
+      evt.date === newEntry.date && evt.start === newEntry.start && evt.end === newEntry.end
+    );
+    
+    if (isDuplicate) return;
+    
+    // Adiciona o novo agendamento ao array
+    setResumo((prev) => ({
+      ...prev,
+      [etapa]: [...currentStageArray, newEntry]
+    }));
+    
+    // Abre o modal de confirmação se ainda não atingiu o limite
+    if (currentStageArray.length < 5) { // Menos de 6 após adicionar este
+      setShowConfirmNextEventModal(true);
+    } else {
+      // Se atingiu 6, fecha tudo
+      setSelectedStage(null);
+      setSelectedDate(null);
+      setStageTimes({ startTime: null, endTime: null });
+      setAlertMessage({ type: 'success', text: `Limite de 6 agendamentos de ${stageName} atingido!` });
+      setTimeout(() => setAlertMessage(null), 4000);
+    }
+  } else {
+    // Para outras etapas (ensaio, montagem, desmontagem)
+    setResumo((prev) => {
+      const novoResumo = { ...prev };
+      novoResumo[etapa] = newEntry;
+      return novoResumo;
     });
+    
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+  }
+};
 
-    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito
-    const gruposConflito = new Map(); // Map<id_inscricao, id_grupo>
-    const slotsConflitantes = Array.from(conflitosPorSlot.keys()).filter(slot => conflitosPorSlot.get(slot).size > 1);
 
-    slotsConflitantes.forEach(slot => {
-      const idsConflito = Array.from(conflitosPorSlot.get(slot));
-      let grupoExistente = null;
 
-      // Verifica se algum item do conflito já pertence a um grupo
-      for (const id of idsConflito) {
-        if (gruposConflito.has(id)) {
-          grupoExistente = gruposConflito.get(id);
-          break;
+  // =================================================
+  // NOVAS FUNÇÕES PARA OS BOTÕES DO NOVO MODAL
+  // =================================================
+  const handleConfirmNextEvent = () => {
+    // Usuário clicou "Sim": limpa a seleção para um novo agendamento.
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+    setShowConfirmNextEventModal(false);
+  };
+
+  const handleDeclineNextEvent = () => {
+    // Usuário clicou "Não": fecha a gaveta.
+    setSelectedStage(null);
+    setSelectedDate(null);
+    setStageTimes({ startTime: null, endTime: null });
+    setShowConfirmNextEventModal(false);
+  };
+
+    // ✅ CORREÇÃO 1: handleConfirmRemovals agora cancela no backend se necessário
+  const handleConfirmRemovals = async () => {
+    try {
+      // Se a primeira etapa já foi concluída, os eventos existem no Google Calendar
+      if (firstStepDone) {
+        const eventosParaCancelar = pendingRemovals
+          .map(r => {
+            const item = r.etapa === 'evento' ? resumo.evento[r.idx] : resumo[r.etapa];
+            return item ? item.eventId : null;
+          })
+          .filter(Boolean); // Filtra para garantir que só temos IDs válidos
+
+        if (eventosParaCancelar.length > 0) {
+          await fetch(`/api/cancel-events/${localSelecionado}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventIds: eventosParaCancelar } )
+          });
+          fetchOccupiedSlots(localSelecionado, currentMonth); // Atualiza o calendário visual
         }
       }
 
-      // Se não houver grupo, cria um novo
-      if (!grupoExistente) {
-        grupoExistente = corIndex++;
-      }
-
-      // Adiciona todos os itens do conflito ao grupo
-      idsConflito.forEach(id => {
-        gruposConflito.set(id, grupoExistente);
+      // Esta parte remove os itens da tela (estado local), funcionando para ambos os casos
+      const novoResumo = { ...resumo };
+      // Processa as remoções
+      pendingRemovals.forEach(r => {
+        if (r.etapa === 'evento' && r.idx !== undefined) {
+          // Remove um evento específico do array
+          novoResumo.evento = novoResumo.evento.filter((_, index) => index !== r.idx);
+        } else {
+          // Remove outras etapas normalmente
+          delete novoResumo[r.etapa];
+        }
       });
-    });
+      setResumo(novoResumo);
 
-    // 3. Aplica o grupo e a cor aos dados
-    dadosParaProcessar = dadosParaProcessar.map(item => {
-      if (gruposConflito.has(item.id)) {
-        const grupo = gruposConflito.get(item.id);
-        item.conflictGroup = grupo;
-        item.conflictColor = coresConflito[grupo % coresConflito.length];
-      }
-      return item;
-    });
-    // --- FIM DA LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
+      setPendingRemovals([]);
+      setAlertMessage({ type: 'success', text: "Cancelamento confirmado!" });
 
-
-    // Lógica de filtro
-    dadosParaProcessar = dadosParaProcessar.filter(item => {
-      const localCorreto = (localFilters.teatro && item.local === 'teatro') || (localFilters.igrejinha && item.local === 'igrejinha');
-      if (!localCorreto) return false;
-
-      // Filtro de conflito
-      if (conflictFilter && !item.hasConflict) {
-        return false;
+      // Verifica se o resumo ficou vazio após a remoção
+      const resumoVazio = !novoResumo.ensaio && !novoResumo.montagem && !novoResumo.desmontagem && (!novoResumo.evento || novoResumo.evento.length === 0);
+      if (resumoVazio) {
+        setFirstStepDone(false); // Reseta o fluxo se tudo foi cancelado
       }
 
-      // Lógica de filtro de avaliação (aplica-se a ambos os modos, mas com lógica diferente)
-      if (inscricoesTab === 'eventos') {
-        const isEvento = item.eventos_json !== '[]' || item.montagem_inicio || item.desmontagem_inicio;
-        if (!isEvento) return false; // Garante que só eventos sejam filtrados
+    } catch (e) {
+      console.error("Erro ao cancelar:", e);
+      setAlertMessage({ type: 'error', text: "Erro ao cancelar. Tente novamente." });
+    } finally {
+      setTimeout(() => setAlertMessage(null), 3000);
+    }
+  };
+// SUBSTITUA TODA A SUA FUNÇÃO 'handleSendEmail' POR ESTA:
+const handleSendEmail = async () => {
+  try {
+    const etapas = [];
+    stageOrder.forEach(etapa => {
+      if (etapa === 'evento') {
+        // Para eventos, processa o array
+        if (resumo.evento && Array.isArray(resumo.evento)) {
+          resumo.evento.forEach(evt => {
+            if (evt.date && evt.start && evt.end) {
+              etapas.push({ nome: etapa, inicio: `${evt.date.split("T")[0]}T${evt.start}:00`, fim: `${evt.date.split("T")[0]}T${evt.end}:00` });
+            }
+          });
+        }
+      } else {
+        // Para outras etapas, processa normalmente
+        if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
+          etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
+        }
+      }
+    });
 
-        if (assessmentFilter !== 'todos') {
-          const isFullyAssessed = item.assessmentsCount >= item.requiredAssessments;
-          
-          if (viewOnly) {
-            const currentUserHasAssessed = item.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-            if (assessmentFilter === 'avaliados') return currentUserHasAssessed;
-            if (assessmentFilter === 'nao_avaliados') return !currentUserHasAssessed;
-          } else { // Modo Admin (viewOnly = false)
-            if (assessmentFilter === 'avaliados') return isFullyAssessed;
-            if (assessmentFilter === 'nao_avaliados') return !isFullyAssessed;
+    if (etapas.length === 0) {
+      setAlertMessage({type: 'warning', text: "Nenhuma etapa selecionada."});
+      setTimeout(() => setAlertMessage(null), 4000);
+      return;
+    }
+
+    const response = await fetch("/api/create-events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
+    });
+
+    const result = await response.json();
+
+    if (result?.success && result.eventos) {
+      setAlertMessage({type: 'success', text: "Agendamento confirmado!"});
+
+      // Lógica corrigida para associar os eventIds
+      const novoResumoComIds = { ...resumo };
+      
+      // Contador para eventos múltiplos
+      let eventoIndex = 0;
+
+      result.eventos.forEach(eventoCriado => {
+        if (eventoCriado.etapa === 'evento') {
+          // Para eventos, adiciona o eventId ao item correspondente no array
+          if (novoResumoComIds.evento && novoResumoComIds.evento[eventoIndex]) {
+            novoResumoComIds.evento[eventoIndex].eventId = eventoCriado.id;
+            eventoIndex++;
+          }
+        } else {
+          // Para outras etapas, funciona como antes
+          if (novoResumoComIds[eventoCriado.etapa]) {
+            novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
           }
         }
-      }
+      });
 
-      // Lógica de filtro de avaliação para o modo viewOnly (mantida para a ordenação)
-      if (viewOnly) {
-        const isEvento = item.eventos_json !== '[]' || item.montagem_inicio || item.desmontagem_inicio;
-        if (!isEvento) return false;
+      setResumo(novoResumoComIds);
 
-        const currentUserHasAssessed = item.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-        if (assessmentFilter === 'avaliados') return currentUserHasAssessed;
-        if (assessmentFilter === 'nao_avaliados') return !currentUserHasAssessed;
-        return true;
-      }
+      // E-mail de confirmação desabilitado temporariamente
 
-      const tipoCorreto = inscricoesTab === 'eventos'
-        ? item.eventos_json !== '[]' || item.montagem_inicio || item.desmontagem_inicio
-        : item.ensaio_inicio && item.eventos_json === '[]' && !item.montagem_inicio && !item.desmontagem_inicio;
+      fetchOccupiedSlots(localSelecionado, currentMonth);
+      setFirstStepDone(true);
+      setAlertMessage({type: 'success', text: "Primeira etapa concluída com sucesso!"});
+
+    } else {
+      setAlertMessage({type: 'error', text: result.error || "Erro ao salvar eventos."});
+    }
+  } catch (err) {
+    console.error("Falha na comunicação:", err);
+    setAlertMessage({type: 'error', text: "Falha na comunicação com o servidor."});
+  } finally {
+    setTimeout(() => setAlertMessage(null), 5000);
+  }
+};
+
+  const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.evento && resumo.evento.length > 0;
+
+  const handleDownloadPDF = () => {
+    try {
+      const doc = new jsPDF();
       
-      return tipoCorreto;
+      // Título
+    
+    // Título
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Comprovante de Inscrição - 1ª Etapa", 105, 20, { align: "center" });
+    
+    // Informações do local
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Local: ${locaisNomes[localSelecionado]}`, 20, 35);
+    
+    // Dados do responsável
+    doc.setFont("helvetica", "bold");
+    doc.text("Dados do Responsável:", 20, 45);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${userData.name}`, 20, 52);
+    doc.text(`E-mail: ${userData.email}`, 20, 59);
+    doc.text(`Telefone: ${userData.phone}`, 20, 66);
+    doc.text(`Nome do Evento: ${userData.eventName}`, 20, 73);
+    
+    // Tabela de agendamentos
+    doc.setFont("helvetica", "bold");
+    doc.text("Agendamentos Solicitados:", 20, 85);
+    
+    const tableData = [];
+    
+// Adicionar ensaio
+if (resumo.ensaio && resumo.ensaio.length > 0) {
+  resumo.ensaio.forEach((ens, idx) => {
+    tableData.push([
+      `Ensaio ${idx + 1}`,
+      new Date(ens.date).toLocaleDateString("pt-BR"),
+      `${ens.start} - ${ens.end}`
+    ]);
+  });
+}
+    
+    // Adicionar montagem
+    if (resumo.montagem) {
+      tableData.push([
+        "Montagem",
+        new Date(resumo.montagem.date).toLocaleDateString("pt-BR"),
+        `${resumo.montagem.start} - ${resumo.montagem.end}`
+      ]);
+    }
+    
+    // Adicionar eventos
+    if (resumo.evento && resumo.evento.length > 0) {
+      resumo.evento.forEach((evt, idx) => {
+        tableData.push([
+          `Evento ${idx + 1}`,
+          new Date(evt.date).toLocaleDateString("pt-BR"),
+          `${evt.start} - ${evt.end}`
+        ]);
+      });
+    }
+    
+    // Adicionar desmontagem
+    if (resumo.desmontagem) {
+      tableData.push([
+        "Desmontagem",
+        new Date(resumo.desmontagem.date).toLocaleDateString("pt-BR"),
+        `${resumo.desmontagem.start} - ${resumo.desmontagem.end}`
+      ]);
+    }
+    
+    doc.autoTable({
+      startY: 90,
+      head: [["Etapa", "Data", "Horário"]],
+      body: tableData,
+      theme: "striped",
+      headStyles: { fillColor: [37, 99, 235] },
+      margin: { left: 20, right: 20 }
     });
+    
+    // Rodapé
+    const finalY = doc.lastAutoTable.finalY || 90;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 20, finalY + 15);
+    doc.text("Este é um comprovante de inscrição da 1ª etapa.", 20, finalY + 22);
+    doc.text("Prossiga para a 2ª etapa para completar sua solicitação.", 20, finalY + 29);
+    
+    // Salvar PDF
+    doc.save(`Inscricao_1Etapa_${userData.eventName.replace(/\s+/g, '_')}.pdf`);
+  } catch (error) {
+    console.error("Erro ao gerar PDF:", error);
+    alert("Erro ao gerar PDF. Verifique o console para mais detalhes.");
+  }
+  };
 
-    // Lógica de ordenação
-    return dadosParaProcessar.sort((a, b) => {
-      // ✅ ORDENAÇÃO POR GRUPO DE CONFLITO
-      if (conflictFilter) {
-        const aGroup = a.conflictGroup ?? Infinity;
-        const bGroup = b.conflictGroup ?? Infinity;
-        if (aGroup !== bGroup) {
-          return aGroup - bGroup;
-        }
-      }
-
-      if (viewOnly) {
-        const aHasBeenAssessedByMe = a.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-        const bHasBeenAssessedByMe = b.evaluatorsWhoAssessed?.includes(evaluatorEmail);
-
-        if (aHasBeenAssessedByMe && !bHasBeenAssessedByMe) return 1;
-        if (!aHasBeenAssessedByMe && bHasBeenAssessedByMe) return -1;
-      }
-     
-      switch (sortOrder) {
-        case 'nota_desc': return (b.finalScore ?? -1) - (a.finalScore ?? -1);
-        case 'nota_asc': return (a.finalScore ?? Infinity) - (b.finalScore ?? Infinity);
-        case 'id_asc': default: return a.id - b.id;
-      }
-    });
-  }, [unificados, inscricoesTab, localFilters, sortOrder, viewOnly, assessmentFilter, evaluatorEmail, conflictFilter]);
-
-
-  const handleLocalFilterChange = (local) => { setLocalFilters(prev => ({ ...prev, [local]: !prev[local] })); };
-  // --- FUNÇÕES DE API ---
-  const fetchData = async () => {
-    setLoading(true);
+  const handleGoToSecondStep = async () => {
     try {
-      const response = await fetch("/api/inscricoes"   );
-      const data = await response.json();
-      setUnificados(data.inscricoes || []);
-      setEvaluationCriteria(data.criteria || []);
-    } catch (err) { 
-      console.error("Erro ao carregar dados:", err);
-      setUnificados([]);
-      setEvaluationCriteria([]);
-    } finally { 
-      setLoading(false); 
+      const res = await fetch("/api/config");
+      if (!res.ok) {
+        alert("Erro ao carregar link.");
+        return;
+      }
+      const data = await res.json();
+      if (data?.formsLink) {
+        window.open(data.formsLink, "_blank");
+        setShowCompletionMessage(true);
+        setTimeout(() => handleBackToLocalSelect(), 5000);
+      } else {
+        alert("Nenhum link de formulário configurado no painel de administração.");
+      }
+    } catch (err) {
+      console.error("Erro em handleGoToSecondStep:", err);
+      alert("Erro ao carregar link.");
     }
   };
 
-  const fetchEvaluators = async () => {
-    if (viewOnly) return;
-    try {
-        const response = await fetch("/api/evaluators"   );
-        const data = await response.json();
-        setEvaluators(data || []);
-    } catch (error) {
-        console.error("Erro ao buscar avaliadores:", error);
-    }
-  };
+  // ✅ NOVO USEEFFECT ADICIONADO AQUI
+  useEffect(() => {
+  fetch("/api/config")
+    .then(res => res.json())
+    .then(data => {
+      if (data.pageTitle) {
+        setPageTitle(data.pageTitle);
+      }
+      // ✅ ADICIONE ESTA CONDIÇÃO
+      if (data.allowBookingOverlap) {
+        setAllowBookingOverlap(data.allowBookingOverlap);
+      }
+    })
+    .catch(err => console.error("Erro ao buscar configurações:", err));
+}, []);
 
   useEffect(() => {
-    fetchData();
-    if (!viewOnly) {
-      fetchEvaluators();
-      fetch("/api/config"   ).then(res => res.json()).then(data => {
-        if (data.formsId) setFormsId(data.formsId);
-        if (data.sheetId) setSheetId(data.sheetId);
-        if (data.pageTitle) setPageTitle(data.pageTitle);
-        if (data.allowBookingOverlap) setAllowBookingOverlap(data.allowBookingOverlap);
-        // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
-        if (data.blockedDates) setBlockedDates(data.blockedDates);
-        if (data.stageTimes) setStageTimes(data.stageTimes);
-        
-        // Atualiza os estados dos botões
-        setEnableInternalEdital(data.enableInternalEdital);
-        setEnableExternalEdital(data.enableExternalEdital);
-        setEnableRehearsal(data.enableRehearsal);
-        if (data.buttonExternalEditalText) setButtonExternalEditalText(data.buttonExternalEditalText); // NOVO: Carrega o texto do botão
+    if (localSelecionado) fetchOccupiedSlots(localSelecionado, currentMonth);
+  }, [localSelecionado, currentMonth]);
 
-        // ✅ ATUALIZA O NOVO ESTADO
-        if (data.requiredAssessments) {
-          setRequiredAssessments(data.requiredAssessments);
-        }
+  const alertStyles = { success: "bg-green-100 text-green-800", error: "bg-red-100 text-red-800", warning: "bg-yellow-100 text-yellow-800" };
 
-      }).catch(err => console.error("Erro ao carregar config:", err));
-    }
-  }, [viewOnly]);
-
-  // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
-  const handleSaveConfig = async (configData) => {
-    try {
-      const response = await fetch("/api/config", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configData   ),
-      });
-      if (response.ok) alert("✅ Configurações salvas com sucesso!");
-      else throw new Error("Erro no servidor.");
-    } catch (error) {
-      alert("❌ Erro ao salvar configurações.");
-    }
-  };
-
-  // ✅ NOVA FUNÇÃO PARA ABRIR O MODAL DE DADOS DO FORMULÁRIO
-  const handleShowFormDataModal = (inscricao) => {
-    setSelectedFormData(inscricao);
-    setShowFormDataModal(true);
-  };
-// ✅ FUNÇÃO DE LOGIN DO AVALIADOR (handleViewerLogin)
-  const handleViewerLogin = async () => {
-    if (!evaluatorEmail || !evaluatorPassword) {
-      alert("Por favor, insira seu e-mail e senha.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/auth/viewer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: evaluatorEmail, password: evaluatorPassword } ), // ENVIANDO SENHA
-      });
-      const data = await response.json();
-      if (data.success) {
-        localStorage.setItem('evaluatorEmail', evaluatorEmail);
-        setIsAuthenticated(true); // DEFINE COMO AUTENTICADO
-        // Não salvamos a senha no localStorage por segurança, apenas o email.
-        window.location.reload();
-      } else {
-        alert(data.message || "Erro de autenticação.");
-      }
-    } catch (error) {
-      alert("Erro ao tentar conectar com o servidor.");
-    }
-  };
-  const handleViewerLogout = () => {
-    localStorage.removeItem('evaluatorEmail');
-    setIsAuthenticated(false); // DEFINE COMO DESAUTENTICADO
-    window.location.reload();
-  };
-  
-  // ✅ FUNÇÃO DE LOGIN DO ADMINISTRADOR
-  const handleAdminLogin = async () => {
-    if (!adminPassword) {
-      alert("Por favor, insira a senha de administrador.");
-      return;
-    }
-    try {
-      const response = await fetch("/api/auth/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: adminPassword }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        sessionStorage.setItem('adminAuth', 'true');
-        setIsAdminAuthenticated(true);
-        setAdminPassword(''); // Limpa o campo de senha
-      } else {
-        alert(data.message || "❌ Senha incorreta.");
-      }
-    } catch (error) {
-      alert("❌ Erro ao tentar conectar com o servidor.");
-      console.error("Erro no login admin:", error);
-    }
-  };
-  
-  // ✅ FUNÇÃO DE LOGOUT DO ADMINISTRADOR
-  const handleAdminLogout = () => {
-    sessionStorage.removeItem('adminAuth');
-    setIsAdminAuthenticated(false);
-    window.location.reload();
-  };
-
-  const handleCriterionChange = (id, field, value) => {
-    setEvaluationCriteria(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
-  };
-
-  const handleAddCriterion = () => {
-    const newCriterion = {
-      id: uuidv4(), title: 'Novo Critério', description: 'Descrição do novo critério.',
-      weight: 1, sort_order: evaluationCriteria.length,
-    };
-    setEvaluationCriteria(prev => [...prev, newCriterion]);
-  };
-
-  const handleRemoveCriterion = (id) => {
-    if (window.confirm("Tem certeza que deseja remover este critério?")) {
-      setEvaluationCriteria(prev => prev.filter(c => c.id !== id).map((c, index) => ({ ...c, sort_order: index })));
-    }
-  };
-
-  const handleSaveCriteria = async () => {
-    const criteriaToSave = evaluationCriteria.map((c, index) => ({ ...c, sort_order: index }));
-    try {
-      const response = await fetch("/api/criteria", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(criteriaToSave   ),
-      });
-      if (response.ok) {
-        alert("✅ Critérios de avaliação salvos com sucesso!");
-        fetchData();
-      } else { throw new Error("Erro no servidor ao salvar critérios."); }
-    } catch (error) {
-      console.error("Erro ao salvar critérios:", error);
-      alert("❌ Erro ao salvar critérios.");
-    }
-  };
-  const handleAddEvaluator = (email) => {
-    if (email && email.trim() !== '') {
-      const trimmedEmail = email.trim();
-      // Verifica se o email já existe na lista
-      if (!evaluators.some(e => e.email === trimmedEmail)) {
-        const newEvaluator = { id: `new-${Date.now()}`, email: trimmedEmail };
-        setEvaluators(prev => [...prev, newEvaluator]);
-      }
-    }
-  };
-
-  const handleRemoveEvaluator = (id) => {
-    setEvaluators(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleSaveEvaluators = async () => {
-     const evaluatorsToSave = evaluators.map(e => ({ email: e.email }));;
-    try {
-      const response = await fetch("/api/evaluators", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: "dac.ufsc2026" }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert("Avaliadores salvos com sucesso! Nenhum e-mail foi enviado.");
-        fetchEvaluators();
-
-      } else { throw new Error(data.error || "Erro no servidor ao salvar a lista."); }
-    } catch (error) {
-      console.error("Erro ao salvar avaliadores:", error);
-      alert("Erro ao salvar a lista de avaliadores: " + error.message);
-    }
-  };
-
-  const handleOpenModal = (user) => { setSelectedUser(user); setShowModal(true); };
-  const handleDelete = async (id) => { if (window.confirm("Deseja realmente excluir esta inscrição?")) { try { const res = await fetch(`/api/inscricao/${id}`, { method: "DELETE" }   ); if (res.ok) { alert("✅ Inscrição excluída."); fetchData(); } else { alert("⚠️ Erro ao excluir."); } } catch (err) { alert("❌ Erro de comunicação."); } } };
-  
-  // =================================================
-  // ✅ FUNÇÃO PARA GERAR SLIDES
-  // =================================================
-  const handleGenerateSlides = async () => {
-    if (isGeneratingSlides) return;
-    setIsGeneratingSlides(true);
-    try {
-      // 1. Chamar o novo endpoint para obter os dados brutos
-      const response = await fetch("/api/admin/data-for-analysis");
-      if (!response.ok) {
-        throw new Error("Falha ao buscar dados para análise.");
-      }
-      const data = await response.json();
-      
-      // 2. Armazenar os dados e abrir o visualizador
-      setSlidesData(data);
-      setShowSlidesViewer(true);
-
-    } catch (error) {
-      console.error("Erro ao gerar slides:", error);
-      alert(`❌ Erro ao gerar slides: ${error.message}`);
-    } finally {
-      setIsGeneratingSlides(false);
-    }
-  };
-
-  const handleGeneratePDF = async (inscricao) => {
-    try {
-      const response = await fetch(`/api/gerar-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inscricao }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `inscricao_${inscricao.id}_${inscricao.evento_nome.replace(/\s/g, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert(`Erro ao gerar PDF: ${error.message}. Verifique o console para mais detalhes.`);
-    }
-  };
-
-  const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
-  const handleConsolidateAgenda = async () => {
-    // Plano C: Gerar o relatório em Markdown diretamente no frontend
-    const inscricoes = unificados; // Usar a lista de inscrições já carregada
-
-    // 1. Classificar e contar
-    let aprovadas = 0;
-    let reprovadas = 0;
-    let naoAvaliadas = 0;
-    const listaAprovadas = [];
-    const listaReprovadas = [];
-    const listaNaoAvaliadas = [];    inscricoes.forEach(inscricao => {
-      // Tratar null/undefined/string vazia como 0 para parseFloat, mas manter a lógica de não avaliado
-      const rawScore = inscricao.finalScore;
-      const nota = parseFloat(rawScore); // Converter para número para garantir a comparação
-      
-      if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) { // Se for null, undefined, string vazia ou NaN após parseFloat
-        naoAvaliadas++;
-        listaNaoAvaliadas.push(inscricao);
-      } else if (nota > 0) {
-        aprovadas++;
-        listaAprovadas.push(inscricao);
-      } else {
-        reprovadas++;
-        listaReprovadas.push(inscricao);
-      }
-    });
-
-    // 2. Gerar o conteúdo em Markdown
-    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
-    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
-
-    // Resumo
-    content += `## Resumo da Classificação\n\n`;
-    content += `| Categoria | Quantidade |\n`;
-    content += `| :--- | :--- |\n`;
-    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
-    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
-
-    // Lista de Aprovadas
-    content += `## Inscrições Aprovadas\n\n`;
-    if (listaAprovadas.length === 0) {
-      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
-    } else {
-      listaAprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Reprovadas
-    content += `## Inscrições Reprovadas\n\n`;
-    if (listaReprovadas.length === 0) {
-      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
-    } else {
-      listaReprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Não Avaliadas
-    content += `## Inscrições Não Avaliadas\n\n`;
-    if (listaNaoAvaliadas.length === 0) {
-      content += `Nenhuma inscrição não avaliada.\n\n`;
-    } else {
-      listaNaoAvaliadas.forEach((inscricao, index) => {
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // 3. Enviar o conteúdo Markdown para o backend para conversão em PDF
-    setIsDownloading(true);
-    try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ markdown: content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao gerar PDF: ${response.statusText}`);
-      }
-
-      // 4. Receber o PDF e forçar o download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click(); // <-- Ação de clique para iniciar o download
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      alert("✅ PDF da Agenda Final Consolidada gerado com sucesso!");
-
-    } catch (err) {
-      console.error("Erro no download do PDF:", err);
-      alert(`❌ Falha ao gerar PDF: ${err.message}. Verifique o console para detalhes.`);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
-  const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
-  // --- RENDERIZAÇÃO ---
-  
-  // ✅ TELA DE LOGIN PARA ADMINISTRADOR
-  if (!viewOnly && !isAdminAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-              <Settings size={32} className="text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Painel Administrativo</h2>
-            <p className="text-gray-600">Insira a senha para acessar</p>
-          </div>
-          <div className="relative mb-6">
-            <input
-              type={showAdminPassword ? "text" : "password"}
-              placeholder="Senha de administrador"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdminLogin(); }}
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => setShowAdminPassword(!showAdminPassword)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label={showAdminPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              {showAdminPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-          <button
-            onClick={handleAdminLogin}
-            className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-          >
-            <CheckCircle size={20} />
-            Entrar
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
-  // ✅ TELA DE LOGIN PARA AVALIADOR
-   if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Acesso do Avaliador</h2>
-          <p className="text-gray-600 mb-6 text-center">Por favor, insira seu e-mail e senha para continuar.</p>
-          <input
-            type="email"
-            placeholder="seu.email@exemplo.com"
-            value={evaluatorEmail}
-            onChange={(e) => setEvaluatorEmail(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div className="relative mb-6">
-            <input // NOVO CAMPO DE SENHA
-              type={showEvaluatorPassword ? "text" : "password"}
-              placeholder="Sua Senha"
-              value={evaluatorPassword}
-              onChange={(e) => setEvaluatorPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg pr-10 focus:ring-blue-500 focus:border-blue-500"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleViewerLogin(); }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowEvaluatorPassword(!showEvaluatorPassword)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label={showEvaluatorPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              {showEvaluatorPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
-          </div>
-          <button
-            onClick={handleViewerLogin}
-            className="w-full bg-blue-600 text-white font-semibold p-3 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Entrar
-          </button>
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className="bg-gray-50 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">{viewOnly ? 'Painel de Avaliação' : 'Painel Administrativo'}</h1>
-          <p className="text-gray-600">{viewOnly ? 'Avalie as propostas de eventos recebidas.' : 'Gerencie as inscrições e configurações do sistema.'}</p>
-          {viewOnly && evaluatorEmail && (
-            <div className="flex items-center justify-between mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm font-semibold text-blue-800">Avaliador Logado: {evaluatorEmail}</p>
-              <button 
-                onClick={handleViewerLogout} 
-                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors"
-              >
-                Sair
-              </button>
-            </div>
-          )}
-          {!viewOnly && isAdminAuthenticated && (
-            <div className="flex items-center justify-between mt-2 p-2 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm font-semibold text-green-800">✅ Sessão Administrativa Ativa</p>
-              <button 
-                onClick={handleAdminLogout} 
-                className="text-sm text-red-600 hover:text-red-800 font-medium transition-colors flex items-center gap-1"
-              >
-                <X size={16} />
-                Sair
-              </button>
-            </div>
-          )}
-        </header>
+    <div className="bg-gray-50 min-h-screen font-sans">
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Horário de início confirmado!"
+      >
+        <p>Agora, clique em 'OK' e escolha o horário de término no seletor.</p>
+      </Modal>
+{/* ✅ MODAL DE CONFLITO MODIFICADO */}
+<Modal
+  isOpen={showConflictModal}
+  onClose={() => setShowConflictModal(false)}
+  title="Atenção: Conflito de Horários"
+  showDefaultButton={false}
+>
+  <p className="text-center text-gray-600 mb-6">
+    O horário que você selecionou já foi solicitado por outro proponente.
+    Ao clicar em continuar você concorrerá a esta vaga. A alocação final será decidida pela sua pontuação no edital.
+  </p>
+  <div className="flex gap-4 mt-4">
+    <button
+      onClick={() => setShowConflictModal(false)}
+      className="flex-1 py-2 px-4 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300"
+    >
+      Cancelar
+    </button>
+    <button
+      onClick={() => {
+        setShowConflictModal(false);
+        // ✅ LÓGICA MODIFICADA: Se há pendingStartTime, define o horário de início
+        if (conflictDetails.pendingStartTime) {
+          // Define o horário de início e prossegue
+          setStageTimes({ startTime: conflictDetails.pendingStartTime, endTime: null });
+          setIsModalOpen(true);
+        } else {
+          // Caso contrário, confirma a etapa completa (comportamento antigo)
+          confirmStage(conflictDetails.etapa, true);
+        }
+      }}
+      className="flex-1 py-2 px-4 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600"
+    >
+      Continuar
+    </button>
+  </div>
+</Modal>
 
-        {!viewOnly && (
-          <div className="flex border-b border-gray-200 mb-8">
-            <button onClick={() => setMainTab('inscricoes')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold transition-colors ${mainTab === 'inscricoes' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              <Search size={20} /> Inscrições Recebidas
-            </button>
-            <button onClick={() => setMainTab('configuracoes_gerais')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold transition-colors ${mainTab === 'configuracoes_gerais' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              <SlidersHorizontal size={20} /> Configurações Gerais
-            </button>
-            <button onClick={() => setMainTab('configuracoes_avaliacao')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold transition-colors ${mainTab === 'configuracoes_avaliacao' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
-              <Scale size={20} /> Configurações de Avaliação
-            </button>
-          </div>
+{/* NOVO MODAL DE REVELA
+</Modal>
+
+      {/* =============================================== */}
+      {/* NOVO MODAL DE CONFIRMAÇÃO DE EVENTO             */}
+      {/* =============================================== */}
+     <Modal
+  isOpen={showConfirmNextEventModal}
+  onClose={handleDeclineNextEvent}
+  title={`${capitalize(selectedStage)} Adicionado!`}
+  showDefaultButton={false}
+>
+  {/* O estilo deste parágrafo foi adicionado para aumentar a fonte */}
+  <p style={{ fontSize: '1.125rem', color: '#4b5563', textAlign: 'center' }}>
+    Deseja agendar outro ${selectedStage}?
+  </p>
+  
+  <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+    <button
+      onClick={handleDeclineNextEvent}
+      style={{ flex: 1, padding: '0.75rem', backgroundColor: '#f3f4f6', color: '#1f2937', borderRadius: '0.5rem', fontWeight: 'bold', border: '1px solid #d1d5db' }}
+    >
+      Não
+    </button>
+    <button
+      onClick={handleConfirmNextEvent}
+      style={{ flex: 1, padding: '0.75rem', backgroundColor: '#f3f4f6', color: '#1f2937', borderRadius: '0.5rem', fontWeight: 'bold', border: '1px solid #d1d5db' }}
+    >
+      Sim
+    </button>
+  </div>
+</Modal>
+
+
+
+      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <AnimatePresence>
+          {alertMessage && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className={`fixed top-5 right-5 z-50 mb-4 p-4 rounded-xl shadow-lg text-sm font-semibold ${alertStyles[alertMessage.type] || 'bg-gray-100'}`}>
+              {alertMessage.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showCompletionMessage && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-gray-50 z-40 flex flex-col items-center justify-center text-center p-4">
+              <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.2, type: 'spring' } }}>
+                <PartyPopper size={80} className="text-green-500 mx-auto" />
+                <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mt-6">Obrigado!</h1>
+                <p className="text-lg text-gray-600 mt-2">Sua solicitação de agendamento foi recebida. Continue preenchendo as informações na nova aba que foi aberta.</p>
+                <p className="text-sm text-gray-500 mt-8">Você será redirecionado para a página inicial em 5 segundos...</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {currentStep === "select_local" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[80vh] text-center">
+                        {/* ✅ LINHA ATUALIZADA */}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800 mb-4">{pageTitle}</h1>
+
+            <p className="text-gray-600 mb-10 text-lg">Selecione o local desejado para iniciar</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+              <motion.button whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => handleLocalSelect("teatro")} className="flex flex-col items-center justify-center gap-3 py-8 px-10 rounded-2xl shadow-lg text-xl font-bold text-white bg-blue-600 transition-shadow duration-300 w-60">
+                <Theater size={60} />
+                <span>{locaisNomes.teatro}</span>
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.05, y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => handleLocalSelect("igrejinha")} className="flex flex-col items-center justify-center gap-3 py-8 px-10 rounded-2xl shadow-lg text-xl font-bold text-white bg-blue-600 transition-shadow duration-300 w-60">
+                <Church size={60} />
+                <span>{locaisNomes.igrejinha}</span>
+              </motion.button>
+            </div>
+          </motion.div>
         )}
 
-        <AnimatePresence mode="wait">
-          <motion.div key={mainTab} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.2 }}>
-            {(mainTab === 'inscricoes' || viewOnly) && (
+        {currentStep === "calendar" && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                                {/* ✅ LINHA ATUALIZADA */}
+                <h1 className="text-3xl font-bold text-gray-800">{pageTitle}</h1>
+
+                <p className="text-md font-semibold mt-1">Local: <span className="text-blue-600">{locaisNomes[localSelecionado]}</span></p>
+              </div>
+              <button onClick={handleBackToLocalSelect} className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                <ArrowLeft size={18} /> Voltar
+              </button>
+            </div>
+
+            <div className="flex flex-col space-y-8">
               <div className="bg-white p-6 rounded-2xl shadow-md">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                  <h3 className="font-bold text-xl text-gray-700">{!viewOnly ? 'Lista de Inscrições' : 'Propostas de Eventos'}</h3>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {!viewOnly && (
-                      <>
-                        {/* ✅ BOTÃO BAIXAR TUDO */}
-                        {isDownloading ? ( <div className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed text-sm"><Loader className="animate-spin" size={16} /><span>Processando...</span></div> ) : ( <button onClick={handleDownloadAllZip} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 text-sm"><Download size={16} /> Baixar Tudo (ZIP)</button> )}
-                        
-                        {/* ✅ NOVO BOTÃO: GERAR SLIDES */}
-                        <button onClick={handleGenerateSlides} disabled={isGeneratingSlides} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 text-sm disabled:bg-purple-400">
-                          {isGeneratingSlides ? <Loader className="animate-spin" size={16} /> : <Presentation size={16} />}
-                          {isGeneratingSlides ? 'Gerando...' : 'Gerar Slides'}
-                        </button>
+                <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><User size={20} /> Dados do Responsável</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input type="text" placeholder="Nome completo" value={userData.name} onChange={(e) => setUserData({ ...userData, name: e.target.value })} className="p-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="email" placeholder="E-mail de contato" value={userData.email} onChange={(e) => setUserData({ ...userData, email: e.target.value })} className="p-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="tel" placeholder="Telefone (com DDD)" value={userData.phone} onChange={(e) => setUserData({ ...userData, phone: e.target.value })} className="p-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="text" placeholder="Nome do Evento" value={userData.eventName} onChange={(e) => setUserData({ ...userData, eventName: e.target.value })} className="p-3 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
 
-                        {/* ✅ BOTÃO CONSOLIDAR AGENDA */}
-                        <button 
-                          onClick={handleConsolidateAgenda} 
-                          disabled={isDownloading}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
+              <div className="bg-white p-6 rounded-2xl shadow-md">
+	                <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2"><CalendarIcon size={20} /> 1. Escolha as datas e horários</h3>
+	                <p className="text-sm text-gray-600 mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+	                  <b>**Atenção:** As datas e horários marcados em **amarelo** já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</b>
+	                </p>
+                <div className="flex flex-col space-y-3">
+                  {stageOrder.map((etapa) => {
+                    const isDisabled = (etapa === "desmontagem" && (!resumo.evento || resumo.evento.length === 0));
+                    const isSelected = selectedStage === etapa;
+
+                    return (
+                      <div key={etapa} className="flex flex-col">
+                        <button
+                          onClick={() => { if (!isDisabled) setSelectedStage(isSelected ? null : etapa); }}
+                          disabled={isDisabled}
+                          className={`w-full p-3 text-left rounded-lg font-semibold transition-all duration-200 flex items-center justify-between ${isDisabled ? "bg-gray-100 text-gray-400 cursor-not-allowed" : isSelected ? "bg-blue-600 text-white shadow-md" : "border border-gray-300 text-gray-700 hover:bg-blue-50 hover:border-blue-400"}`}
                         >
-                          {isDownloading ? (
-                            <>
-                              <Loader className="animate-spin" size={16} />
-                              Gerando PDF...
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={16} />
-                              Consolidar Agenda Final (PDF)
-                            </>
-                          )}
+                          <span>
+                            {capitalize(etapa)}
+                          </span>
+                          <motion.div animate={{ rotate: isSelected ? 180 : 0 }} transition={{ duration: 0.3 }}>
+                            <ChevronDown size={20} />
+                          </motion.div>
                         </button>
-                        
-                        {/* ✅ BOTÃO LIMPEZA GERAL */}
-                        <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
-                      </>
-                    )}
-                    
 
-                  </div>
-                </div>
-                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-                  {!viewOnly ? (
-                    <div className="border-b border-gray-200"><nav className="-mb-px flex space-x-6" aria-label="Tabs"><button onClick={() => setInscricoesTab('eventos')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${inscricoesTab === 'eventos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Eventos</button><button onClick={() => setInscricoesTab('ensaios')} className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm ${inscricoesTab === 'ensaios' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Ensaios</button></nav></div>
-                  ) : (
-                    <div className="w-full border-b border-gray-200"></div>
-                  )}
-<div className="flex items-center gap-4">
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="id_asc">Ordenar por Inscrição</option>
-	        <option value="nota_desc">Maior Nota</option>
-	        <option value="nota_asc">Menor Nota</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="todos">Mostrar Todos</option>
-	        <option value="avaliados">{viewOnly ? 'Apenas Avaliados por Mim' : 'Apenas Avaliados (100%)'}</option>
-	        <option value="nao_avaliados">{viewOnly ? 'Não Avaliados por Mim' : 'Não Avaliados (Pendente)'}</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.teatro} onChange={() => handleLocalFilterChange('teatro')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Theater size={16} /> Teatro</label>
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.igrejinha} onChange={() => handleLocalFilterChange('igrejinha')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Church size={16} /> Igrejinha</label>
-  
-  {/* ✅ NOVO CHECKBOX DE FILTRO DE CONFLITO */}
-  <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-red-600">
-    <input 
-      type="checkbox" 
-      checked={conflictFilter} 
-      onChange={() => setConflictFilter(!conflictFilter)} 
-      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500" 
-    />
-    <AlertTriangle size={16} /> Apenas Conflitos
-  </label>
-</div>
-                </div>
-                {loading ? ( <div className="flex justify-center items-center py-20"><Loader className="animate-spin text-blue-500" size={40} /><p className="ml-4 text-gray-600">Carregando...</p></div> ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-600 table-auto">
-                      <thead className="text-xs text-gray-700 uppercase bg-gray-100">
-                        <tr>
-                          <th scope="col" className="px-4 py-3 w-[5%]">#</th>
-                          <th scope="col" className="px-6 py-3 w-[20%]">Evento</th>
-                          <th scope="col" className="px-6 py-3 w-[10%]">Local</th>
-                          <th scope="col" className="px-6 py-3 w-[25%]">Etapas Agendadas</th>
-                          {!viewOnly && inscricoesTab === 'eventos' && <th scope="col" className="px-6 py-3 text-center w-[10%]">Nota Final</th>}
-                          {(inscricoesTab === 'eventos' || viewOnly) && <th scope="col" className="px-6 py-3 text-center w-[5%]">Status</th>}
-                          {!viewOnly && <th scope="col" className="px-6 py-3 w-[15%]">Arquivos</th>}
-                          <th scope="col" className="px-6 py-3 text-center w-[10%]">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dadosProcessados.length > 0 ? (
-                          dadosProcessados.map((u) => (
-                            <React.Fragment key={u.id}>
-                              <tr className="bg-white border-b hover:bg-gray-50" style={{ backgroundColor: u.conflictColor ? u.conflictColor.split(' ')[0].replace('bg-', '#') : undefined }}>
-                                <td className="px-4 py-4 font-medium text-gray-900 align-top">{String(u.id).padStart(2, '0')}</td>
-                                <td className={`px-6 py-4 font-semibold align-top break-words ${!u.etapa2_ok ? 'text-red-500' : ''}`}>{u.evento_nome}</td>
-                                <td className="px-6 py-4 align-top">
-                                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${u.local === 'teatro' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                                    {u.local === 'teatro' ? <Theater size={12} /> : <Church size={12} />}
-                                    {u.local === 'teatro' ? 'Teatro' : 'Igrejinha'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 align-top">
-  {/* ✅ A classe 'text-red-500' é adicionada se 'u.hasConflict' for verdadeiro */}
-  <div className={`space-y-1 text-sm ${u.conflictColor ? u.conflictColor.split(' ')[1] : (u.hasConflict ? 'text-red-500 font-bold' : '')}`}>
-    {u.ensaio_inicio && <div className="whitespace-nowrap"><strong>Ensaio:</strong>{` ${new Date(u.ensaio_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.ensaio_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.ensaio_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-    {u.montagem_inicio && <div className="whitespace-nowrap"><strong>Montagem:</strong>{` ${new Date(u.montagem_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.montagem_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.montagem_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-    {u.eventos_json && JSON.parse(u.eventos_json).map((ev, i) => ( <div key={`evento-${i}`} className="whitespace-nowrap"><strong>Evento {i + 1}:</strong>{` ${new Date(ev.inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(ev.inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(ev.fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>))}
-    {u.desmontagem_inicio && <div className="whitespace-nowrap"><strong>Desmontagem:</strong>{` ${new Date(u.desmontagem_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.desmontagem_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.desmontagem_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
-  </div>
-</td>
-                                {!viewOnly && inscricoesTab === 'eventos' && (
-                                  <td className="px-6 py-4 text-center align-top font-bold text-lg">
-                                    {u.assessmentsCount >= u.requiredAssessments && u.finalScore !== null ? u.finalScore.toFixed(2) : '-'}
-                                  </td>
-                                )}
-                                
-                                <td className="px-6 py-4 text-center align-top">                                  {viewOnly ? (
-                                    (() => {
-                                      const currentUserHasAssessed = u.evaluatorsWhoAssessed?.includes(evaluatorEmail);                                    if (currentUserHasAssessed) {
-                                        return (
-                                          <span className="flex items-center justify-center gap-1 text-sm text-green-600 font-semibold">
-                                            <CheckCircle size={16} /> Concluído
-                                          </span>
-                                        );
-                                      }
-                                      if (u.requiredAssessments > 0) {
-                                        return (
-                                          <span className="text-red-500 font-semibold text-lg">
-                                            {`${u.assessmentsCount || 0}/${u.requiredAssessments}`}
-                                          </span>
-                                        );
-                                      }
-                                      return <FileClock className="text-gray-400 inline-block" title="Pendente de Avaliação" />;                                    })()
-                                  ) : (                              <>
-                                      {u.requiredAssessments > 0 && u.assessmentsCount >= u.requiredAssessments ? (
-                                        <CheckCircle className="text-green-500 inline-block" title="Avaliações Concluídas" />
-                                      ) : (
-                                        <span className="text-red-500 font-semibold text-lg">{`${u.assessmentsCount || 0}/${u.requiredAssessments || '?'}`}</span>
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                              animate={{ height: 'auto', opacity: 1, marginTop: '1rem' }}
+                              exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                              transition={{ duration: 0.3, ease: "easeInOut" }}
+                              className="overflow-hidden"
+                            >
+                              <div className="p-4 border rounded-lg bg-gray-50/50">
+                                <h3 className="font-semibold text-md mb-3 text-gray-700">2. Selecione o dia para <span className="text-blue-600">{selectedStage}</span></h3>
+            <Calendar
+              onDateSelect={handleDateSelect}
+              selectedDate={selectedDate}
+              currentMonth={currentMonth}
+              onMonthChange={setCurrentMonth}
+              disabledDates={blockedDates} // Passando as datas bloqueadas
+              eventDates={Object.keys(backendOcupados)}
+              mainEventDatesSelected={(() => {
+                if (!resumo.evento || !Array.isArray(resumo.evento) || resumo.evento.length === 0) return [];
+                return resumo.evento.map(evt => new Date(evt.date)).filter(d => !isNaN(d.getTime()));
+              })()}
+            />
+	                                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-white border"></div><span>Livre</span></div>
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-200"></div><span>Parcial</span></div>
+	                                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-200"></div><span>Ocupado</span></div>
+	                                </div>
+
+                                <AnimatePresence>
+                                  {selectedDate && (
+                                    <motion.div
+                                      initial={{ opacity: 0, marginTop: 0 }}
+                                      animate={{ opacity: 1, marginTop: '1.5rem' }}
+                                      className="border-t pt-6"
+                                    >
+                                      <h3 className="font-semibold text-md mb-3 text-gray-700 flex items-center gap-2">
+                                        <Clock size={18} /> 
+                                        {!stageTimes.startTime ? '3. Defina o horário de início' : '3. Agora, escolha o horário de término'}
+                                      </h3>
+<TimeBlockSelector
+                                      selectedDate={selectedDate}
+                                      timeSlots={timeSlots}
+                                      selectedTimes={stageTimes || {}}
+                                      onSelectTime={handleTimeSelection}
+                                      occupiedSlots={selectedDate ? getOccupiedSlots(selectedDate, selectedStage) : []}
+                                      stage={selectedStage}
+                                      allowOverlap={allowBookingOverlap}
+                                      stageTimeLimits={configStageTimes[selectedStage]} // ✅ PASSA OS LIMITES DE HORÁRIO
+                                    />
+                                      {selectedDate && stageTimes.startTime && stageTimes.endTime && (
+                                        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={() => confirmStage(selectedStage)} className="mt-6 w-full bg-green-600 text-white font-bold rounded-lg py-3 hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+                                          Adicionar {selectedStage} ao Resumo
+                                        </motion.button>
                                       )}
-                                    </>
+                                    </motion.div>
                                   )}
-                                </td>              {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">                           {/* <button onClick={() => handleGeneratePDF(u)} className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</button> */}
-                                  {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha Detalhada</button>}
-                                  {/* <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button> */}
-                                </td>}
-                                <td className="px-6 py-4 text-center align-top">
-                                  <div className="flex items-center justify-center space-x-2">                  {!viewOnly ? (
-                                      <>
-                                        <button onClick={() => handleOpenModal(u)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Ver Contatos"><Contact size={18} /></button>
-                                        <button onClick={() => handleDelete(u.id)} className="p-2 text-red-500 hover:bg-red-100 rounded-full" title="Excluir Inscrição"><Trash2 size={18} /></button>
-                                      </>                                 ) : (
-                                      <button onClick={() => handleToggleAccordion(u.id)} className={`flex items-center justify-center gap-2 px-3 py-2 font-semibold rounded-lg text-sm w-28 ${openAccordionId === u.id ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'}`}>
-                                        <Eye size={16} />{openAccordionId === u.id ? 'Fechar' : 'Avaliar'}
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
+                                </AnimatePresence>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                              {openAccordionId === u.id && viewOnly && (
-                                <tr>
-                                  <td colSpan={10}>
-                                    <AnimatePresence>
-                                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                                        <EvaluationDrawer 
-                                          user={u} 
-                                          criteria={evaluationCriteria} 
-                                          evaluatorEmail={evaluatorEmail} 
-                                          onSaveSuccess={fetchData}
-                                        />
-                                      </motion.div>
-                                    </AnimatePresence>
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={8} className="text-center py-10 text-gray-500">{`Nenhuma inscrição de '${inscricoesTab}' encontrada.`}</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+              <div className="bg-white p-6 rounded-2xl shadow-md">
+                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
+                <ul className="space-y-3 text-sm text-gray-600">
+                  {stageOrder.flatMap((etapa) => {
+if (etapa === 'evento' || etapa === 'ensaio') {
+	                      // Para etapas de agendamento múltiplo (ensaio e evento)
+	                      const currentStageArray = resumo[etapa];
+	                      if (currentStageArray && Array.isArray(currentStageArray) && currentStageArray.length > 0) {
+	                        return currentStageArray.map((item, idx) => {
+	                          if (!item || !item.date || !item.start || !item.end) return null;
+	                          const stageName = capitalize(etapa);
+	                          return (
+	                            <li key={`${etapa}-${idx}`} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                              <div><span className="font-semibold text-gray-800">{stageName} {idx + 1}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                              <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa, idx }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                            </li>
+	                          );
+	                        });
+	                      }
+	                    } else {
+	                      // Para outras etapas (montagem, desmontagem)
+	                      if (resumo[etapa]) {
+	                        const item = resumo[etapa];
+	                        if (!item || !item.date || !item.start || !item.end) return null;
+	                        return (
+	                          <li key={etapa} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+	                            <div><span className="font-semibold text-gray-800">{capitalize(etapa)}:</span> {new Date(item.date).toLocaleDateString("pt-BR")} | {item.start} - {item.end}</div>
+	                            <button onClick={() => setPendingRemovals([...pendingRemovals, { etapa }])} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>
+	                          </li>
+	                        );
+	                      }
+	                    }
+                    return [];
+                  })}
+                  {(!resumo.evento || resumo.evento.length === 0) && !resumo.ensaio && !resumo.montagem && !resumo.desmontagem && <p className="text-center text-gray-400 py-4">Nenhuma etapa adicionada ainda.</p>}
+                </ul>
+
+                {pendingRemovals.length > 0 && (
+                  <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-sm">
+                    <p className="text-yellow-800 font-semibold mb-2">Você marcou {pendingRemovals.length} item(ns) para remoção.</p>
+                    <button onClick={handleConfirmRemovals} className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-bold">Confirmar Cancelamento</button>
                   </div>
                 )}
-              </div>
-            )}
-            {mainTab === 'configuracoes_gerais' && !viewOnly && (
-              <div className="space-y-8">
-                
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Type size={20} /> Título da Página de Agendamento</h3>
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label className="block font-semibold text-gray-600 mb-2">Título do Edital Atual</label>
-                      <input type="text" value={pageTitle} onChange={(e) => setPageTitle(e.target.value)} className="p-3 border rounded-lg w-full" />
-                    </div>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ pageTitle })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Título
+
+                <div className="mt-6 border-t pt-6">
+                  {!firstStepDone ? (
+                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
+                      Confirmar 1ª Etapa e Agendar
                     </button>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                  </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsId: extractIdFromUrl(formsId), sheetId: extractIdFromUrl(sheetId) })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <Settings size={20} /> Controle da Página Inicial
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div><label htmlFor="enable-internal" className="font-semibold text-gray-700">Ativar "Edital Interno"</label></div>
-                      <label htmlFor="enable-internal" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="enable-internal" className="sr-only peer" checked={enableInternalEdital} onChange={() => setEnableInternalEdital(!enableInternalEdital)} />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Etapa 1 Concluída!</div>
+                      <button onClick={handleDownloadPDF} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
+                        <Download size={20}/> Baixar Comprovante em PDF
+                      </button>
+                      <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
+                        Ir para a 2ª Etapa <ArrowRight size={20}/>
+                      </button>
                     </div>
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="enable-external-edital" className="font-semibold text-gray-700">Ativar "Edital Externo"</label>
-                        <label htmlFor="enable-external" className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" id="enable-external" className="sr-only peer" checked={enableExternalEdital} onChange={() => setEnableExternalEdital(!enableExternalEdital)} />
-                          <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                      </div>
-                      <div className="mt-4">
-                        <label htmlFor="external-edital-text" className="block text-sm font-medium text-gray-500">Texto do Botão</label>
-                        <input
-                          id="external-edital-text"
-                          type="text"
-                          value={buttonExternalEditalText}
-                          onChange={(e) => setButtonExternalEditalText(e.target.value)}
-                          className="p-2 border rounded-lg w-full text-sm"
-                          maxLength="50"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div><label htmlFor="enable-rehearsal" className="font-semibold text-gray-700">Ativar "Agendar Apenas Ensaio"</label></div>
-                      <label htmlFor="enable-rehearsal" className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" id="enable-rehearsal" className="sr-only peer" checked={enableRehearsal} onChange={() => setEnableRehearsal(!enableRehearsal)} />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      </label>
-                    </div>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ enableInternalEdital, enableExternalEdital, enableRehearsal, buttonExternalEditalText })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Status dos Botões
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <Settings size={20} /> Regras do Calendário
-                  </h3>
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <label htmlFor="allow-overlap" className="font-semibold text-gray-700">Permitir Disputa de Horários</label>
-                      <p className="text-sm text-gray-500">
-                        Se ativado, permite que múltiplos proponentes solicitem o mesmo horário, gerando uma disputa.
-                      </p>
-                    </div>
-                    <label htmlFor="allow-overlap" className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" id="allow-overlap" className="sr-only peer" checked={allowBookingOverlap} onChange={() => setAllowBookingOverlap(!allowBookingOverlap)} />
-                      <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ allowBookingOverlap: allowBookingOverlap })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Regra do Calendário
-                    </button>
-                  </div>
-                </div>
-
-                {/* ✅ NOVO PAINEL DE CONTROLE DE CALENDÁRIO */}
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <FileClock size={20} /> Controle de Horários e Datas
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Configuração de Horários */}
-                    <div className="border p-4 rounded-lg">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-700">Horários Limite por Etapa</h4>
-                      <p className="text-sm text-gray-500 mb-4">Defina o horário de início mais cedo e o horário de fim mais tarde permitidos para cada tipo de agendamento.</p>
-                      {Object.keys(stageTimes).map((stage) => (
-                        <div key={stage} className="flex items-center gap-4 mb-3">
-                          <label className="w-24 capitalize font-medium text-gray-600">{stage}:</label>
-                          <input
-                            type="time"
-                            value={stageTimes[stage].start}
-                            onChange={(e) => setStageTimes(prev => ({ ...prev, [stage]: { ...prev[stage], start: e.target.value } }))}
-                            className="p-2 border rounded-lg text-sm w-28"
-                          />
-                          <span className="text-gray-500">-</span>
-                          <input
-                            type="time"
-                            value={stageTimes[stage].end}
-                            onChange={(e) => setStageTimes(prev => ({ ...prev, [stage]: { ...prev[stage], end: e.target.value } }))}
-                            className="p-2 border rounded-lg text-sm w-28"
-                          />
-                        </div>
-                      ))}
-                      <div className="mt-4">
-                        <button onClick={() => handleSaveConfig({ stageTimes })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                          <Save size={18} /> Salvar Horários
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Bloqueio de Datas */}
-                    <div className="border p-4 rounded-lg">
-                      <h4 className="font-semibold text-lg mb-3 text-gray-700">Bloqueio de Datas Específicas</h4>
-                      <p className="text-sm text-gray-500 mb-4">Selecione uma data para bloquear ou desbloquear no calendário de agendamento.</p>
-                      <div className="flex gap-4 items-end">
-                        <div className="flex-grow">
-                          <label htmlFor="block-date" className="block font-medium text-gray-600 mb-2">Data a Bloquear/Desbloquear</label>
-                          <input
-                            type="date"
-                            id="block-date"
-                            className="p-2 border rounded-lg w-full"
-                            value={dateToToggle}
-                            onChange={(e) => setDateToToggle(e.target.value)}
-                          />
-                        </div>
-                        <button onClick={handleToggleDate} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 h-10" disabled={!dateToToggle}>
-                          <Save size={18} /> Salvar Datas
-                        </button>
-                      </div>
-                      <div className="mt-4">
-                        <h5 className="font-medium text-gray-600 mb-2">Datas Bloqueadas Atualmente:</h5>
-                        <div className="flex flex-wrap gap-2">
-                          {/* ✅ NOVA DATA TEMPORÁRIA (A SER SALVA) */}
-                          {dateToToggle && !blockedDates.includes(dateToToggle) && (
-                            <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm flex items-center gap-1 opacity-70">
-                              {new Date(dateToToggle + 'T00:00:00').toLocaleDateString('pt-BR')} (Prévia)
-                            </span>
-                          )}
-                          {blockedDates.length > 0 ? (
-                            blockedDates.map(date => (
-                              <span key={date} className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm flex items-center gap-1">
-                                {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                <button onClick={() => handleToggleDateFromList(date)} className="text-red-500 hover:text-red-700 ml-1">
-                                  <X size={14} />
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-gray-500 text-sm">Nenhuma data bloqueada.</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
-            {mainTab === 'configuracoes_avaliacao' && !viewOnly && (
-              <div className="space-y-8">
-                {/* ✅ NOVO PAINEL DE REGRAS DE AVALIAÇÃO */}
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <UserCheck size={20} /> Regras de Avaliação
-                  </h3>
-                  <div className="grid grid-cols-1 gap-6">
-                    <div>
-                      <label htmlFor="required-assessments" className="block font-semibold text-gray-600 mb-2">
-                        Avaliações Necessárias por Inscrição
-                      </label>
-                      <input
-                        id="required-assessments"
-                        type="number"
-                        min="1"
-                        value={requiredAssessments}
-                        onChange={(e) => setRequiredAssessments(parseInt(e.target.value, 10) || 1)}
-                        className="p-3 border rounded-lg w-full max-w-xs"
-                      />
-                      <p className="text-sm text-gray-500 mt-2">
-                        Define o número de avaliações para uma inscrição ser considerada "concluída".
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ requiredAssessments })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Regra de Avaliação
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Scale size={20} /> Critérios de Avaliação</h3>
-                  <div className="space-y-6">
-                    {evaluationCriteria.map((crit) => (
-                      <div key={crit.id} className="p-4 border rounded-lg bg-gray-50 relative transition-all hover:shadow-sm">
-                        <button onClick={() => handleRemoveCriterion(crit.id)} className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-100 rounded-full transition-colors" title="Remover Critério">
-                          <Trash2 size={16} />
-                        </button>
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                          <div className="md:col-span-5">
-                            <label className="block font-semibold text-gray-600 mb-1 text-sm">Título do Critério</label>
-                            <input type="text" value={crit.title} onChange={(e) => handleCriterionChange(crit.id, 'title', e.target.value)} className="p-2 border rounded-md w-full" />
-                          </div>
-                          <div className="md:col-span-5">
-                            <label className="block font-semibold text-gray-600 mb-1 text-sm">Conceituação (Descrição)</label>
-                            <textarea value={crit.description} onChange={(e) => handleCriterionChange(crit.id, 'description', e.target.value)} className="p-2 border rounded-md w-full text-sm" rows="3"></textarea>
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block font-semibold text-gray-600 mb-1 text-sm">Peso da Nota</label>
-                            <input type="number" min="0" step="1" value={crit.weight} onChange={(e) => handleCriterionChange(crit.id, 'weight', parseFloat(e.target.value) || 0)} className="p-2 border rounded-md w-full" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {evaluationCriteria.length === 0 && (<p className="text-center text-gray-500 py-4">Nenhum critério definido. Adicione o primeiro critério abaixo.</p>)}
-                  </div>
-                  <div className="mt-6 flex items-center gap-4 border-t pt-6">
-                    <button onClick={handleAddCriterion} className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">
-                      <PlusCircle size={18} /> Adicionar Critério
-                    </button>
-                    <button onClick={handleSaveCriteria} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Todos os Critérios
-                    </button>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-md">
-                  <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2">
-                    <UserCheck size={20} /> Gerenciar Avaliadores
-                  </h3>
-                  <div className="mb-4">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">E-mail do Avaliador</label>
-                    <div className="flex gap-2">
-                      <input type="email" placeholder="Ex: joao.silva@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
-                      <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block font-semibold text-gray-600 mb-2 text-sm">Avaliadores Atuais</label>
-                    {evaluators.length > 0 ? (
-                      evaluators.map((evaluator) => (
-                        <div key={evaluator.id || evaluator.email} className="flex items-center justify-between bg-gray-50 p-2 rounded-md">
-                          <span className="text-gray-700">{evaluator.email}</span>
-                          <button onClick={() => handleRemoveEvaluator(evaluator.id)} className="p-1 text-red-500 hover:bg-red-100 rounded-full" title="Remover Avaliador">
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-gray-500 py-2">Nenhum avaliador cadastrado.</p>
-                    )}
-                  </div>
-                  <div className="mt-6 border-t pt-6">
-                    <button onClick={handleSaveEvaluators} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Lista de Avaliadores
-                    </button>
-                  </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </motion.div>
-        </AnimatePresence>
+        )}
       </div>
-      <AnimatePresence>
-        {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
-      {/* NOVO MODAL */}
-      {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
-      </AnimatePresence>
-      {showSlidesViewer && slidesData && (
-        <SlidesViewer
-          analysisData={slidesData}
-          onClose={() => setShowSlidesViewer(false)}
-        />
-      )}
     </div>
   );
 };
 
-export default Admin;
+export default AppVertical;
