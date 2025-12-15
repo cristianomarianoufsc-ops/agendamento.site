@@ -125,8 +125,8 @@ const [conflictDetails, setConflictDetails] = useState(null); // Para guardar os
     const now = new Date();
     const occupiedByDate = {};
     
-    // 🔄 Busca eventos dos próximos 12 meses
-    for (let i = 0; i < 12; i++) {
+    // 🔄 Busca eventos dos próximos 13 meses (mês atual + 12 meses futuros)
+    for (let i = 0; i < 13; i++) {
       const monthDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const year = monthDate.getFullYear();
       const month = (monthDate.getMonth() + 1).toString().padStart(2, '0');
