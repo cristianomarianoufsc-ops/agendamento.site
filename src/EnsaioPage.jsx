@@ -433,12 +433,11 @@ const EnsaioPage = () => {
 <Modal
   isOpen={showConflictModal}
   onClose={() => setShowConflictModal(false)}
-  title="Atenção: Horário em Parcial!"
+  title="Atenção: Conflito de Horários"
   showDefaultButton={false}
 >
   <p className="text-center text-gray-600 mb-6">
-    O horário que você selecionou já foi solicitado por outro proponente.
-    Ao continuar, você entrará na disputa por esta vaga. A alocação final será decidida pela sua pontuação no edital.
+    O hAs datas e horários marcados em amarelo já foram solicitadas por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital..
   </p>
   <div className="flex gap-4 mt-4">
     <button
