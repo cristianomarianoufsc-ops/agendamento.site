@@ -7,6 +7,7 @@ import {
   PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
 } from "lucide-react";
 import EvaluationDrawer from './EvaluationDrawer';
+import Calendar from '../Calendar'; // ✅ Importação do componente Calendar
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
 import SlidesViewer from './SlidesViewer';
 import { v4 as uuidv4 } from 'uuid';
