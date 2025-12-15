@@ -135,8 +135,9 @@ const Admin = ({ viewOnly = false }) => {
       const slots = [];
       const addSlot = (inicio, fim) => {
         if (inicio && fim) {
-          // Normaliza o slot para a chave de conflito (data + hora de início/fim)
-          const key = `${new Date(inicio).toDateString()}-${new Date(inicio).toTimeString().substring(0, 5)}-${new Date(fim).toTimeString().substring(0, 5)}`;
+          // Normaliza o slot para a chave de conflito (data + hora de início/fim + local)
+          // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
+          const key = `${new Date(inicio).toDateString()}-${new Date(inicio).toTimeString().substring(0, 5)}-${new Date(fim).toTimeString().substring(0, 5)}-${item.local}`;
           slots.push(key);
         }
       };
@@ -157,15 +158,15 @@ const Admin = ({ viewOnly = false }) => {
     dadosParaProcessar.forEach(item => {
       item.conflictGroup = null; // Inicializa o campo de grupo
       item.conflictColor = null; // Inicializa o campo de cor
-      if (item.hasConflict) {
-        const slots = getSlots(item);
-        slots.forEach(slot => {
-          if (!conflitosPorSlot.has(slot)) {
-            conflitosPorSlot.set(slot, new Set());
-          }
-          conflitosPorSlot.get(slot).add(item.id);
-        });
-      }
+      
+      // ✅ NOVO: A lógica de conflito deve ser aplicada a TODOS os itens, não apenas aos que já têm hasConflict
+      const slots = getSlots(item);
+      slots.forEach(slot => {
+        if (!conflitosPorSlot.has(slot)) {
+          conflitosPorSlot.set(slot, new Set());
+        }
+        conflitosPorSlot.get(slot).add(item.id);
+      });
     });
 
     // 2. Atribui um ID de grupo e cor para cada inscrição em conflito
