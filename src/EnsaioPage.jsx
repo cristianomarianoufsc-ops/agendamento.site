@@ -546,7 +546,7 @@ const EnsaioPage = () => {
 	                <h3 className="font-bold text-xl mb-4 text-gray-700">Resumo da Solicitação</h3>
 	                <ul className="space-y-3 text-sm text-gray-600">
 	                  {resumo.ensaio && Array.isArray(resumo.ensaio) && resumo.ensaio.length > 0 ? (
-{resumo.ensaio.map((ensaio, index) => (
+  {resumo.ensaio.map((ensaio, index) => (
                             <li key={index} className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
                               <div><span className="font-semibold text-gray-800">Ensaio {index + 1}:</span> {new Date(ensaio.date).toLocaleDateString("pt-BR")} | {ensaio.start} - {ensaio.end}</div>
                              <button onClick={() => handleRemoveEnsaio(index)} className="p-2 text-red-500 hover:bg-red-100 rounded-full transition-colors"><Trash2 size={16} /></button>                            </li>
