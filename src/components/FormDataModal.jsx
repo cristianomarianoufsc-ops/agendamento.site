@@ -56,7 +56,7 @@ const FormDataModal = ({ inscricao, onClose }) => {
       <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 30, opacity: 0 }} className="bg-white rounded-2xl shadow-xl p-6 m-4 w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-4 border-b pb-3">
           <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <FileText size={24} /> Ficha de Inscrição Detalhada (Etapa 2)
+            <FileText size={24} /> Ficha de Inscrição Detalhada
           </h3>
           <div className="flex items-center gap-2">
             <button 
