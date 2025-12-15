@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Calendar from "./components/Calendar";
 import TimeBlockSelector from "./components/TimeBlockSelector";
 import { Theater, Church, Calendar as CalendarIcon, Clock, User, Trash2, ArrowRight, CheckCircle, ArrowLeft, PartyPopper, ChevronDown } from "lucide-react";
@@ -34,6 +34,9 @@ const EnsaioPage = () => {
   });
   const [blockedDates, setBlockedDates] = useState([]); // Datas bloqueadas do Admin
   const [pageTitle, setPageTitle] = useState("Agendamento de Ensaios"); 
+
+  // ✅ NOVO: Ref para a seção de horários
+  const timeSelectorRef = useRef(null);
 
 
   // ✅ Efeito para buscar configurações globais uma vez
@@ -166,7 +169,17 @@ const EnsaioPage = () => {
     setShowConfirmNextEventModal(false); // Resetar o novo estado
   };
 
-  const handleDateSelect = (date) => { setSelectedDate(date); setStageTimes({ startTime: null, endTime: null }); };
+  const handleDateSelect = (date) => { 
+    setSelectedDate(date); 
+    setStageTimes({ startTime: null, endTime: null }); 
+    
+    // ✅ Scroll automático para a seção de horários (aguarda renderização)
+    setTimeout(() => {
+      if (timeSelectorRef.current) {
+        timeSelectorRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }, 100); // Aguarda 100ms para o React renderizar o componente
+  };
 
   const toMinutes = (t) => { if (!t) return 0; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 
@@ -520,7 +533,7 @@ const EnsaioPage = () => {
 		                <p className="text-sm text-gray-600 mb-4 p-2 bg-yellow-50 rounded-lg border border-yellow-200">
 		                  <strong>Atenção: As datas e horários marcados em amarelo já foram solicitados por outro proponente. Você pode se inscrever nessas horas e concorrer à vaga mesmo assim. A alocação final será definida para a proposta que obtiver a maior pontuação, conforme os critérios estabelecidos no item 8 do edital.</strong>
 		                </p>
-	                <div className="flex flex-col space-y-3">
+	                <div className="flex flex-col space-y-3" ref={timeSelectorRef}>
 	                  
 	                        <div className="flex flex-col">
 	                          <button
