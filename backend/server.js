@@ -1618,6 +1618,10 @@ app.get("/api/occupied-slots/:local/:month", async (req, res) => {const { local,
   // Para simplificar, vamos apenas retornar a concatenação, pois o frontend já lida com a lógica de disputa.
   
   res.json({ eventos: allEvents });
+  } catch (error) {
+    console.error("Erro ao buscar eventos:", error);
+    res.status(500).json({ error: "Erro interno do servidor ao buscar eventos." });
+  }
 });
 
 // --- 19. ROTA PARA SALVAR AVALIAÇÃO ---
