@@ -904,6 +904,7 @@ const Admin = ({ viewOnly = false }) => {
                                           criteria={evaluationCriteria} 
                                           evaluatorEmail={evaluatorEmail} 
                                           onSaveSuccess={fetchData}
+                                          onClose={() => setSelectedUser(null)}
                                         />
                                       </motion.div>
                                     </AnimatePresence>
