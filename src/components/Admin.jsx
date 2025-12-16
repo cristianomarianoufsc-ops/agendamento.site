@@ -187,7 +187,7 @@ const Admin = ({ viewOnly = false }) => {
         // 1. Mesmo local
         // 2. Mesmo dia
         // 3. Horários sobrepostos
-        if (slot1.local === slot2.local && slot1.dateStr === slot2.dateStr && checkOverlap(slot1, slot2)) {
+        if (slot1.dateStr === slot2.dateStr && checkOverlap(slot1, slot2)) {
           // Conflito encontrado: unir os grupos de conflito
           const group1 = conflitos.get(slot1.id);
           const group2 = conflitos.get(slot2.id);
