@@ -854,24 +854,7 @@ const Admin = ({ viewOnly = false }) => {
                           {isGeneratingSlides ? 'Gerando...' : 'Gerar Slides'}
                         </button>
 
-                        {/* ✅ BOTÃO CONSOLIDAR AGENDA */}
-                        <button 
-                          onClick={handleConsolidateAgenda} 
-                          disabled={isDownloading}
-                          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
-                        >
-                          {isDownloading ? (
-                            <>
-                              <Loader className="animate-spin" size={16} />
-                              Gerando PDF...
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={16} />
-                              Consolidar Agenda Final (PDF)
-                            </>
-                          )}
-                        </button>
+
                         
                         {/* ✅ BOTÃO LIMPEZA GERAL */}
                         <button onClick={handleForceCleanup} className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white font-semibold rounded-lg hover:bg-red-800 text-sm"><AlertTriangle size={16} /> Limpeza Geral</button>
@@ -1315,13 +1298,33 @@ const Admin = ({ viewOnly = false }) => {
                     )}
                   </div>
                   <div className="mt-6 border-t pt-6">
-                    <button onClick={handleSaveEvaluators} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
-                      <Save size={18} /> Salvar Lista de Avaliadores
+                    <button onClick={handleSaveEvaluators} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 text-sm">
+                      <Save size={16} /> Salvar Avaliadores
                     </button>
                   </div>
                 </div>
-              </div>
-            )}
+                
+                {/* ✅ NOVO BOTÃO: CONSOLIDAR AGENDA FINAL (no rodapé) */}
+                <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end">
+                  <button 
+                    onClick={handleConsolidateAgenda} 
+                    disabled={isDownloading}
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-base disabled:opacity-50 transition-colors shadow-lg"
+                  >
+                    {isDownloading ? (
+                      <>
+                        <Loader className="animate-spin" size={20} />
+                        <span>Gerando PDF...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileText size={20} />
+                        <span>Consolidar Agenda Final</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>            )}
           </motion.div>
         </AnimatePresence>
       </div>
