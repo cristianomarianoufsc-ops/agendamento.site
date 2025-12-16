@@ -9,6 +9,7 @@ import {
 import EvaluationDrawer from './EvaluationDrawer';
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
 import SlidesViewer from './SlidesViewer';
+import MarkdownModal from './MarkdownModal'; // ✅ NOVO: Modal para conteúdo Markdown
 import { v4 as uuidv4 } from 'uuid';
 
 // Componente Modal (sem alterações)
@@ -40,6 +41,10 @@ const Admin = ({ viewOnly = false }) => {
   const [selectedFormData, setSelectedFormData] = useState(null); // ✅ NOVO ESTADO
   const [slidesData, setSlidesData] = useState(null); // NOVO ESTADO
   const [openAccordionId, setOpenAccordionId] = useState(null);
+  
+  // ✅ NOVOS ESTADOS PARA O MODAL DA AGENDA CONSOLIDADA
+  const [showAgendaModal, setShowAgendaModal] = useState(false);
+  const [agendaMarkdown, setAgendaMarkdown] = useState('');
   
   // Estados de Configuração
   
@@ -667,40 +672,10 @@ const Admin = ({ viewOnly = false }) => {
       content += `\n`;
     }
 
-    // 3. Enviar o conteúdo Markdown para o backend para conversão em PDF
-    setIsDownloading(true);
-    try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ markdown: content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao gerar PDF: ${response.statusText}`);
-      }
-
-      // 4. Receber o PDF e forçar o download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click(); // <-- Ação de clique para iniciar o download
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      alert("✅ PDF da Agenda Final Consolidada gerado com sucesso!");
-
-    } catch (err) {
-      console.error("Erro no download do PDF:", err);
-      alert(`❌ Falha ao gerar PDF: ${err.message}. Verifique o console para detalhes.`);
-    } finally {
-      setIsDownloading(false);
-    }
+    // 3. Abrir o modal com o conteúdo Markdown
+    setAgendaMarkdown(content);
+    setShowAgendaModal(true);
+    setIsDownloading(false); // Garante que o botão volte ao normal
   };
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
@@ -1332,6 +1307,14 @@ const Admin = ({ viewOnly = false }) => {
         {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
       {/* NOVO MODAL */}
       {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
+      {/* ✅ NOVO MODAL PARA AGENDA CONSOLIDADA */}
+      {showAgendaModal && (
+        <MarkdownModal 
+          title="Agenda Final Consolidada (Simulação)" 
+          markdownContent={agendaMarkdown} 
+          onClose={() => setShowAgendaModal(false)} 
+        />
+      )}
       </AnimatePresence>
       {showSlidesViewer && slidesData && (
         <SlidesViewer
