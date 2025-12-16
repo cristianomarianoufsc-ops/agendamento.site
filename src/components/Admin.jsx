@@ -124,12 +124,16 @@ const Admin = ({ viewOnly = false }) => {
     let dadosParaProcessar = [...unificados];
 
     // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
+    // NOVO: Mapa para armazenar o índice de cor por data de conflito
+    const corPorData = new Map(); // Key: 'YYYY-MM-DD', Value: ColorIndex
+    let corIndex = 0;
     const conflitosPorSlot = new Map();
     const coresConflito = [
       'bg-red-100 text-red-800', 'bg-blue-100 text-blue-800', 'bg-green-100 text-green-800', 
-      'bg-yellow-100 text-yellow-800', 'bg-purple-100 text-purple-800', 'bg-pink-100 text-pink-800'
+      'bg-yellow-100 text-yellow-800', 'bg-purple-100 text-purple-800', 'bg-pink-100 text-pink-800',
+      'bg-indigo-100 text-indigo-800', 'bg-teal-100 text-teal-800', 'bg-orange-100 text-orange-800',
+      'bg-cyan-100 text-cyan-800', 'bg-lime-100 text-lime-800', 'bg-fuchsia-100 text-fuchsia-800'
     ];
-    let corIndex = 0;
 
     const getSlots = (item) => {
       const slots = [];
@@ -137,8 +141,11 @@ const Admin = ({ viewOnly = false }) => {
         if (inicio && fim) {
           // Normaliza o slot para a chave de conflito (data + hora de início/fim + local)
           // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
-          const key = `${new Date(inicio).toDateString()}-${new Date(inicio).toTimeString().substring(0, 5)}-${new Date(fim).toTimeString().substring(0, 5)}-${item.local}`;
-          slots.push(key);
+          const dateStr = new Date(inicio).toISOString().substring(0, 10); // YYYY-MM-DD
+          const timeStart = new Date(inicio).toTimeString().substring(0, 5);
+          const timeEnd = new Date(fim).toTimeString().substring(0, 5);
+          const key = `${dateStr}-${timeStart}-${timeEnd}-${item.local}`;
+          slots.push({ key, dateStr });
         }
       };
 
@@ -162,37 +169,34 @@ const Admin = ({ viewOnly = false }) => {
       // ✅ NOVO: A lógica de conflito deve ser aplicada a TODOS os itens, não apenas aos que já têm hasConflict
       const slots = getSlots(item);
       slots.forEach(slot => {
-        if (!conflitosPorSlot.has(slot)) {
-          conflitosPorSlot.set(slot, new Set());
+        if (!conflitosPorSlot.has(slot.key)) {
+          conflitosPorSlot.set(slot.key, { ids: new Set(), dateStr: slot.dateStr });
         }
-        conflitosPorSlot.get(slot).add(item.id);
+        conflitosPorSlot.get(slot.key).ids.add(item.id);
       });
     });
 
-    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito
+    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito, agrupando por DATA de conflito
     const gruposConflito = new Map(); // Map<id_inscricao, id_grupo>
-    const slotsConflitantes = Array.from(conflitosPorSlot.keys()).filter(slot => conflitosPorSlot.get(slot).size > 1);
+    const slotsConflitantes = Array.from(conflitosPorSlot.entries()).filter(([, data]) => data.ids.size > 1);
 
-    slotsConflitantes.forEach(slot => {
-      const idsConflito = Array.from(conflitosPorSlot.get(slot));
-      let grupoExistente = null;
+    slotsConflitantes.forEach(([slotKey, data]) => {
+      const idsConflito = Array.from(data.ids);
+      const dateStr = data.dateStr;
 
-      // Verifica se algum item do conflito já pertence a um grupo
-      for (const id of idsConflito) {
-        if (gruposConflito.has(id)) {
-          grupoExistente = gruposConflito.get(id);
-          break;
-        }
+      // 1. Garante que a data de conflito tenha um índice de cor
+      if (!corPorData.has(dateStr)) {
+        corPorData.set(dateStr, corIndex++);
       }
+      const grupoPorData = corPorData.get(dateStr);
 
-      // Se não houver grupo, cria um novo
-      if (!grupoExistente) {
-        grupoExistente = corIndex++;
-      }
-
-      // Adiciona todos os itens do conflito ao grupo
+      // 2. Para cada inscrição em conflito, armazena o grupo (índice de cor)
       idsConflito.forEach(id => {
-        gruposConflito.set(id, grupoExistente);
+        // Se a inscrição já tiver um grupo, mantém o grupo existente (para evitar sobrescrever se houver conflitos em datas diferentes)
+        // O primeiro conflito encontrado define a cor.
+        if (!gruposConflito.has(id)) {
+          gruposConflito.set(id, grupoPorData);
+        }
       });
     });
 
@@ -201,9 +205,9 @@ const Admin = ({ viewOnly = false }) => {
       if (gruposConflito.has(item.id)) {
         const grupo = gruposConflito.get(item.id);
         item.conflictGroup = grupo;
+        // A cor é determinada pelo índice do grupo (que agora representa a data do conflito)
         item.conflictColor = coresConflito[grupo % coresConflito.length];
-
-
+        item.hasConflict = true; // ✅ Adicionado para o filtro 'Apenas Conflitos' funcionar
       }
       return item;
     });
