@@ -202,6 +202,7 @@ const Admin = ({ viewOnly = false }) => {
         const grupo = gruposConflito.get(item.id);
         item.conflictGroup = grupo;
         item.conflictColor = coresConflito[grupo % coresConflito.length];
+        console.log(`Inscrição ${item.id}: Grupo ${item.conflictGroup}, Cor ${item.conflictColor}`); // LOG DE DEBUG
       }
       return item;
     });
