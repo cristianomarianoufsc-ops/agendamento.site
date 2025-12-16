@@ -15,9 +15,11 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
   const evaluationSectionRef = useRef(null);
 
   useEffect(() => {
-    // Tenta focar no topo do drawer para evitar que o scroll vá para o topo da página
-    if (drawerRef.current) {
-      drawerRef.current.focus();
+    // Scroll automático para o topo do drawer quando abrir
+    if (drawerRef.current && user) {
+      setTimeout(() => {
+        drawerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   }, [user]); // Roda quando o drawer é aberto/atualizado com um novo usuário
 
@@ -66,15 +68,9 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
 
   // Lógica para salvar a avaliação
   const scrollToEvaluation = () => {
-<<<<<<< HEAD
     // Usando 'block: "start"' para garantir que o elemento fique no topo da área visível
     evaluationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-=======
-    evaluationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
->>>>>>> bb803da35aff1d4362f7df1499c2daaa0a20c9ab
   const handleSaveAssessment = async () => {
     if (!criteria || criteria.length === 0) {
       alert("❌ Não há critérios de avaliação definidos.");
