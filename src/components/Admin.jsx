@@ -9,6 +9,7 @@ import {
 import EvaluationDrawer from './EvaluationDrawer';
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
 import SlidesViewer from './SlidesViewer';
+import ConsolidacaoModal from './ConsolidacaoModal'; // ✅ Importação do novo modal
 import { v4 as uuidv4 } from 'uuid';
 
 // Componente Modal (sem alterações)
@@ -37,6 +38,8 @@ const Admin = ({ viewOnly = false }) => {
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false); // NOVO ESTADO
   const [showSlidesViewer, setShowSlidesViewer] = useState(false); // NOVO ESTADO
   const [showFormDataModal, setShowFormDataModal] = useState(false); // ✅ NOVO ESTADO
+  const [showConsolidacaoModal, setShowConsolidacaoModal] = useState(false); // ✅ NOVO ESTADO
+  const [consolidacaoData, setConsolidacaoData] = useState(null); // ✅ NOVO ESTADO
   const [selectedFormData, setSelectedFormData] = useState(null); // ✅ NOVO ESTADO
   const [slidesData, setSlidesData] = useState(null); // NOVO ESTADO
   const [openAccordionId, setOpenAccordionId] = useState(null);
@@ -555,39 +558,10 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleGeneratePDF = async (inscricao) => {
-    try {
-      const response = await fetch(`/api/gerar-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inscricao }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `inscricao_${inscricao.id}_${inscricao.evento_nome.replace(/\s/g, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert(`Erro ao gerar PDF: ${error.message}. Verifique o console para mais detalhes.`);
-    }
-  };
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = async () => {
-    // Plano C: Gerar o relatório em Markdown diretamente no frontend
     const inscricoes = unificados; // Usar a lista de inscrições já carregada
 
     // 1. Classificar e contar
@@ -613,95 +587,23 @@ const Admin = ({ viewOnly = false }) => {
       }
     });
 
-    // 2. Gerar o conteúdo em Markdown
-    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
-    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
+    // 2. Criar objeto de dados para o modal
+    const data = {
+      totalInscricoes: inscricoes.length,
+      aprovadas: aprovadas,
+      reprovadas: reprovadas,
+      naoAvaliadas: naoAvaliadas,
+      listaAprovadas: listaAprovadas,
+      listaReprovadas: listaReprovadas,
+      listaNaoAvaliadas: listaNaoAvaliadas,
+    };
 
-    // Resumo
-    content += `## Resumo da Classificação\n\n`;
-    content += `| Categoria | Quantidade |\n`;
-    content += `| :--- | :--- |\n`;
-    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota >= 2.00) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota < 2.00) | ${reprovadas} |\n`;
-    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
-
-    // Lista de Aprovadas
-    content += `## Inscrições Aprovadas\n\n`;
-    if (listaAprovadas.length === 0) {
-      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
-    } else {
-      listaAprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Reprovadas
-    content += `## Inscrições Reprovadas\n\n`;
-    if (listaReprovadas.length === 0) {
-      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
-    } else {
-      listaReprovadas.forEach((inscricao, index) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Não Avaliadas
-    content += `## Inscrições Não Avaliadas\n\n`;
-    if (listaNaoAvaliadas.length === 0) {
-      content += `Nenhuma inscrição não avaliada.\n\n`;
-    } else {
-      listaNaoAvaliadas.forEach((inscricao, index) => {
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
-      });
-      content += `\n`;
-    }
-
-    // 3. Enviar o conteúdo Markdown para o backend para conversão em PDF
-    setIsDownloading(true);
-    try {
-      const response = await fetch("/api/generate-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ markdown: content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ao gerar PDF: ${response.statusText}`);
-      }
-
-      // 4. Receber o PDF e forçar o download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Agenda_Final_Consolidada_${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click(); // <-- Ação de clique para iniciar o download
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      alert("✅ PDF da Agenda Final Consolidada gerado com sucesso!");
-
-    } catch (err) {
-      console.error("Erro no download do PDF:", err);
-      alert(`❌ Falha ao gerar PDF: ${err.message}. Verifique o console para detalhes.`);
-    } finally {
-      setIsDownloading(false);
-    }
+    // 3. Abrir o modal com os dados
+    setConsolidacaoData(data);
+    setShowConsolidacaoModal(true);
   };
+
+
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
@@ -1308,20 +1210,10 @@ const Admin = ({ viewOnly = false }) => {
                 <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end">
                   <button 
                     onClick={handleConsolidateAgenda} 
-                    disabled={isDownloading}
-                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-base disabled:opacity-50 transition-colors shadow-lg"
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-base transition-colors shadow-lg"
                   >
-                    {isDownloading ? (
-                      <>
-                        <Loader className="animate-spin" size={20} />
-                        <span>Gerando PDF...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText size={20} />
-                        <span>Consolidar Agenda Final</span>
-                      </>
-                    )}
+                    <FileText size={20} />
+                    <span>Consolidar Agenda Final</span>
                   </button>
                 </div>
               </div>            )}
@@ -1332,6 +1224,14 @@ const Admin = ({ viewOnly = false }) => {
         {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
       {/* NOVO MODAL */}
       {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showConsolidacaoModal && consolidacaoData && (
+          <ConsolidacaoModal
+            data={consolidacaoData}
+            onClose={() => setShowConsolidacaoModal(false)}
+          />
+        )}
       </AnimatePresence>
       {showSlidesViewer && slidesData && (
         <SlidesViewer
