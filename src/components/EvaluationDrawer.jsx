@@ -10,7 +10,7 @@ const SmartInfoRow = ({ label, value }) => { const isLink = (text) => typeof tex
 const InfoRow = ({ label, value }) => ( <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-2 border-b border-gray-100"> <div className="text-sm font-bold text-gray-600">{label}</div> <div className="col-span-2 text-sm text-gray-800">{value || <span className="italic text-gray-400">Não informado</span>}</div> </div> );
 
 // --- COMPONENTE PRINCIPAL ---
-const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => {
+const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess, onClose }) => {
   const drawerRef = useRef(null);
   const evaluationSectionRef = useRef(null);
 
@@ -98,6 +98,10 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
         setHasBeenAssessed(true);
         if (onSaveSuccess) {
           onSaveSuccess();
+        }
+        // Adicionado: Chama onClose para fechar a gaveta após o salvamento bem-sucedido
+        if (onClose) {
+          onClose();
         }
       } else {
         const result = await response.json();
