@@ -141,11 +141,14 @@ const Admin = ({ viewOnly = false }) => {
         if (inicio && fim) {
           // Normaliza o slot para a chave de conflito (data + hora de início/fim + local)
           // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
-          const dateStr = new Date(inicio).toISOString().substring(0, 10); // YYYY-MM-DD
+          // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
+          const dateStrForConflict = new Date(inicio).toDateString(); // Ex: "Mon Jan 03 2022"
+          const dateStrForColor = new Date(inicio).toISOString().substring(0, 10); // Ex: "2022-01-03"
           const timeStart = new Date(inicio).toTimeString().substring(0, 5);
           const timeEnd = new Date(fim).toTimeString().substring(0, 5);
-          const key = `${dateStr}-${timeStart}-${timeEnd}-${item.local}`;
-          slots.push({ key, dateStr });
+          const key = `${dateStrForConflict}-${timeStart}-${timeEnd}-${item.local}`;
+          // Usamos dateStrForColor (YYYY-MM-DD) para o agrupamento de cores
+          slots.push({ key, dateStr: dateStrForColor });
         }
       };
 
@@ -182,7 +185,7 @@ const Admin = ({ viewOnly = false }) => {
 
     slotsConflitantes.forEach(([slotKey, data]) => {
       const idsConflito = Array.from(data.ids);
-      const dateStr = data.dateStr;
+      const dateStr = data.dateStr; // YYYY-MM-DD
 
       // 1. Garante que a data de conflito tenha um índice de cor
       if (!corPorData.has(dateStr)) {
