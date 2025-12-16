@@ -636,11 +636,10 @@ const Admin = ({ viewOnly = false }) => {
     if (listaAprovadas.length === 0) {
       content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
     } else {
-      listaAprovadas.forEach((inscricao, index) => {
+      listaAprovadas.forEach((inscricao) => {
         const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
         const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+        content += `* **${eventoNome}** (${inscricao.local}) - Nota: ${nota} | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
       });
       content += `\n`;
     }
@@ -650,11 +649,10 @@ const Admin = ({ viewOnly = false }) => {
     if (listaReprovadas.length === 0) {
       content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
     } else {
-      listaReprovadas.forEach((inscricao, index) => {
+      listaReprovadas.forEach((inscricao) => {
         const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
         const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: ${nota}\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+        content += `* **${eventoNome}** (${inscricao.local}) - Nota: ${nota} | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
       });
       content += `\n`;
     }
@@ -664,10 +662,9 @@ const Admin = ({ viewOnly = false }) => {
     if (listaNaoAvaliadas.length === 0) {
       content += `Nenhuma inscrição não avaliada.\n\n`;
     } else {
-      listaNaoAvaliadas.forEach((inscricao, index) => {
+      listaNaoAvaliadas.forEach((inscricao) => {
         const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `${index + 1}. **${eventoNome}** (${inscricao.local}) - Nota: N/A\n`;
-        content += `   *Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}*\n`;
+        content += `* **${eventoNome}** (${inscricao.local}) - Nota: N/A | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
       });
       content += `\n`;
     }
