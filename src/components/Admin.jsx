@@ -125,7 +125,7 @@ const Admin = ({ viewOnly = false }) => {
 
     // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
     // NOVO: Mapa para armazenar o índice de cor por data de conflito
-    const corPorData = new Map(); // Key: 'YYYY-MM-DD', Value: ColorIndex
+    const corPorSlot = new Map(); // Key: slotKey (data-hora-local), Value: ColorIndex
     let corIndex = 0;
     const conflitosPorSlot = new Map();
     const coresConflito = [
@@ -179,26 +179,26 @@ const Admin = ({ viewOnly = false }) => {
       });
     });
 
-    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito, agrupando por DATA de conflito
+    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito, agrupando por SLOT de conflito (data, hora, local)
     const gruposConflito = new Map(); // Map<id_inscricao, id_grupo>
     const slotsConflitantes = Array.from(conflitosPorSlot.entries()).filter(([, data]) => data.ids.size > 1);
 
     slotsConflitantes.forEach(([slotKey, data]) => {
       const idsConflito = Array.from(data.ids);
-      const dateStr = data.dateStr; // YYYY-MM-DD
+      // A chave do slot já está disponível no escopo do forEach
 
-      // 1. Garante que a data de conflito tenha um índice de cor
-      if (!corPorData.has(dateStr)) {
-        corPorData.set(dateStr, corIndex++);
+      // 1. Garante que o slot de conflito tenha um índice de cor
+      if (!corPorSlot.has(slotKey)) {
+        corPorSlot.set(slotKey, corIndex++);
       }
-      const grupoPorData = corPorData.get(dateStr);
+      const grupoPorSlot = corPorSlot.get(slotKey);
 
       // 2. Para cada inscrição em conflito, armazena o grupo (índice de cor)
       idsConflito.forEach(id => {
         // Se a inscrição já tiver um grupo, mantém o grupo existente (para evitar sobrescrever se houver conflitos em datas diferentes)
         // O primeiro conflito encontrado define a cor.
         if (!gruposConflito.has(id)) {
-          gruposConflito.set(id, grupoPorData);
+          gruposConflito.set(id, grupoPorSlot);
         }
       });
     });
@@ -208,7 +208,7 @@ const Admin = ({ viewOnly = false }) => {
       if (gruposConflito.has(item.id)) {
         const grupo = gruposConflito.get(item.id);
         item.conflictGroup = grupo;
-        // A cor é determinada pelo índice do grupo (que agora representa a data do conflito)
+        // A cor é determinada pelo índice do grupo (que agora representa o slot de conflito)
         item.conflictColor = coresConflito[grupo % coresConflito.length];
         item.hasConflict = true; // ✅ Adicionado para o filtro 'Apenas Conflitos' funcionar
       }
@@ -918,7 +918,7 @@ const Admin = ({ viewOnly = false }) => {
                             <React.Fragment key={u.id}>
                               <tr className={`bg-white border-b hover:bg-gray-50 ${u.conflictColor ? u.conflictColor.split(' ')[0] : ''}`}>
                                 <td className="px-4 py-4 font-medium text-gray-900 align-top">{String(u.id).padStart(2, '0')}</td>
-                                <td className={`px-6 py-4 font-semibold align-top break-words ${!u.etapa2_ok ? 'text-red-500' : ''}`}>{u.evento_nome}</td>
+                                <td className={`px-6 py-4 font-semibold align-top break-words ${!u.etapa2_ok ? 'text-red-500' : ''} ${u.conflictColor ? u.conflictColor.split(' ')[1] : ''}`}>{u.evento_nome}</td>
                                 <td className="px-6 py-4 align-top">
                                   <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${u.local === 'teatro' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                     {u.local === 'teatro' ? <Theater size={12} /> : <Church size={12} />}
