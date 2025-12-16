@@ -201,8 +201,7 @@ const Admin = ({ viewOnly = false }) => {
       if (gruposConflito.has(item.id)) {
         const grupo = gruposConflito.get(item.id);
         item.conflictGroup = grupo;
-        // item.conflictColor = coresConflito[grupo % coresConflito.length]; // Lógica original
-        item.conflictColor = 'bg-red-100 text-red-800'; // COR DE TESTE FORÇADA
+        item.conflictColor = coresConflito[grupo % coresConflito.length];
 
 
       }
