@@ -569,7 +569,7 @@ const Admin = ({ viewOnly = false }) => {
       if (rawScore === null || rawScore === undefined || rawScore === "" || isNaN(nota)) { // Se for null, undefined, string vazia ou NaN após parseFloat
         naoAvaliadas++;
         listaNaoAvaliadas.push(inscricao);
-      } else if (nota > 0) {
+      } else if (nota >= 2.00) { // Alterado de nota > 0 para nota >= 2.00
         aprovadas++;
         listaAprovadas.push(inscricao);
       } else {
@@ -587,8 +587,8 @@ const Admin = ({ viewOnly = false }) => {
     content += `| Categoria | Quantidade |\n`;
     content += `| :--- | :--- |\n`;
     content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota > 0) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota <= 0) | ${reprovadas} |\n`;
+    content += `| Aprovadas (Nota >= 2.00) | ${aprovadas} |\n`;
+    content += `| Reprovadas (Nota < 2.00) | ${reprovadas} |\n`;
     content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
 
     // Lista de Aprovadas
