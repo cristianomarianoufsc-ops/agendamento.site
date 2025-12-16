@@ -92,7 +92,7 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess, onClo
         body: JSON.stringify(finalPayload ),
       });
       if (response.ok) {
-        alert(`✅ Avaliação salva com sucesso!`);
+        // alert(`✅ Avaliação salva com sucesso!`); // Removido a pedido do usuário
         // A lógica do seu backup: atualiza o estado local e notifica o pai.
         setIsEditing(false);
         setHasBeenAssessed(true);
