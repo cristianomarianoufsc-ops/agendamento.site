@@ -12,6 +12,7 @@ const InfoRow = ({ label, value }) => ( <div className="grid grid-cols-1 sm:grid
 // --- COMPONENTE PRINCIPAL ---
 const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => {
   const drawerRef = useRef(null);
+  const evaluationSectionRef = useRef(null);
 
   useEffect(() => {
     // Tenta focar no topo do drawer para evitar que o scroll vá para o topo da página
@@ -64,6 +65,10 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
   };
 
   // Lógica para salvar a avaliação
+  const scrollToEvaluation = () => {
+    evaluationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleSaveAssessment = async () => {
     if (!criteria || criteria.length === 0) {
       alert("❌ Não há critérios de avaliação definidos.");
@@ -145,11 +150,11 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
       </div>
       <div className="mt-6 border-t pt-4">
         {isEditing ? (
-          <button onClick={handleSaveAssessment} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+          <button onClick={() => { handleSaveAssessment(); scrollToEvaluation(); }} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
             <Save size={18} /> Salvar Avaliação
           </button>
         ) : (
-          <button onClick={() => setIsEditing(true)} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
+          <button onClick={() => { setIsEditing(true); scrollToEvaluation(); }} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
             <Edit size={18} /> Editar Avaliação
           </button>
         )}
@@ -183,7 +188,7 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
         </Section>
         
         {/* Painel de avaliação SEMPRE aparece por último */}
-        {EvaluationSection}
+        <div ref={evaluationSectionRef}>{EvaluationSection}</div>
       </div>
     </div>
   );
