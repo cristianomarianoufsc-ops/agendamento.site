@@ -907,7 +907,7 @@ const Admin = ({ viewOnly = false }) => {
                         {dadosProcessados.length > 0 ? (
                           dadosProcessados.map((u) => (
                             <React.Fragment key={u.id}>
-                              <tr className="bg-white border-b hover:bg-gray-50" style={{ backgroundColor: u.conflictColor ? u.conflictColor.split(' ')[0].replace('bg-', '#') : undefined }}>
+                              <tr className={`bg-white border-b hover:bg-gray-50 ${u.conflictColor ? u.conflictColor.split(' ')[0] : ''}`}>
                                 <td className="px-4 py-4 font-medium text-gray-900 align-top">{String(u.id).padStart(2, '0')}</td>
                                 <td className={`px-6 py-4 font-semibold align-top break-words ${!u.etapa2_ok ? 'text-red-500' : ''}`}>{u.evento_nome}</td>
                                 <td className="px-6 py-4 align-top">
@@ -918,7 +918,7 @@ const Admin = ({ viewOnly = false }) => {
                                 </td>
                                 <td className="px-6 py-4 align-top">
   {/* ✅ A classe 'text-red-500' é adicionada se 'u.hasConflict' for verdadeiro */}
-  <div className={`space-y-1 text-sm ${u.conflictColor ? u.conflictColor.split(' ')[1] : (u.hasConflict ? 'text-red-500 font-bold' : '')}`}>
+  <div className={`space-y-1 text-sm ${u.conflictColor ? u.conflictColor.split(' ')[1] : ''}`}>
     {u.ensaio_inicio && <div className="whitespace-nowrap"><strong>Ensaio:</strong>{` ${new Date(u.ensaio_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.ensaio_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.ensaio_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
     {u.montagem_inicio && <div className="whitespace-nowrap"><strong>Montagem:</strong>{` ${new Date(u.montagem_inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(u.montagem_inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(u.montagem_fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>}
     {u.eventos_json && JSON.parse(u.eventos_json).map((ev, i) => ( <div key={`evento-${i}`} className="whitespace-nowrap"><strong>Evento {i + 1}:</strong>{` ${new Date(ev.inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' })}, ${new Date(ev.inicio).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })} - ${new Date(ev.fim).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}`}</div>))}
