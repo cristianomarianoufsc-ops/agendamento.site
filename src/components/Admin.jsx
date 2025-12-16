@@ -123,11 +123,7 @@ const Admin = ({ viewOnly = false }) => {
  const dadosProcessados = useMemo(() => {
     let dadosParaProcessar = [...unificados];
 
-    // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
-    // NOVO: Mapa para armazenar o índice de cor por data de conflito
-    const corPorSlot = new Map(); // Key: slotKey (data-hora-local), Value: ColorIndex
-    let corIndex = 0;
-    const conflitosPorSlot = new Map();
+    // --- LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS (REVISADA PARA SOBREPOSIÇÃO) ---
     const coresConflito = [
       'bg-red-100 text-red-800', 'bg-blue-100 text-blue-800', 'bg-green-100 text-green-800', 
       'bg-yellow-100 text-yellow-800', 'bg-purple-100 text-purple-800', 'bg-pink-100 text-pink-800',
@@ -135,86 +131,116 @@ const Admin = ({ viewOnly = false }) => {
       'bg-cyan-100 text-cyan-800', 'bg-lime-100 text-lime-800', 'bg-fuchsia-100 text-fuchsia-800'
     ];
 
+    // Função auxiliar para extrair todos os slots de tempo de um item
     const getSlots = (item) => {
       const slots = [];
-      const addSlot = (inicio, fim) => {
+      const addSlot = (inicio, fim, tipo) => {
         if (inicio && fim) {
-          // Normaliza o slot para a chave de conflito (data + hora de início/fim + local)
-          // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
-          // ✅ NOVO: Inclui o local na chave para que o conflito seja detectado entre locais diferentes
-          const dateStrForConflict = new Date(inicio).toDateString(); // Ex: "Mon Jan 03 2022"
-          const dateStrForColor = new Date(inicio).toISOString().substring(0, 10); // Ex: "2022-01-03"
-          const timeStart = new Date(inicio).toTimeString().substring(0, 5);
-          const timeEnd = new Date(fim).toTimeString().substring(0, 5);
-          const key = `${dateStrForConflict}-${timeStart}-${timeEnd}-${item.local}`;
-          // Usamos dateStrForColor (YYYY-MM-DD) para o agrupamento de cores
-          slots.push({ key, dateStr: dateStrForColor });
+          const start = new Date(inicio);
+          const end = new Date(fim);
+          // A sobreposição só é relevante se for no mesmo dia e local
+          const dateStr = start.toISOString().substring(0, 10); // YYYY-MM-DD
+          slots.push({
+            id: item.id,
+            nome: item.evento_nome,
+            local: item.local,
+            start: start.getTime(),
+            end: end.getTime(),
+            dateStr: dateStr,
+            tipo: tipo,
+          });
         }
       };
 
-      addSlot(item.ensaio_inicio, item.ensaio_fim);
-      addSlot(item.montagem_inicio, item.montagem_fim);
-      addSlot(item.desmontagem_inicio, item.desmontagem_fim);
+      addSlot(item.ensaio_inicio, item.ensaio_fim, 'ensaio');
+      addSlot(item.montagem_inicio, item.montagem_fim, 'montagem');
+      addSlot(item.desmontagem_inicio, item.desmontagem_fim, 'desmontagem');
       
       if (item.eventos_json) {
         try {
-          JSON.parse(item.eventos_json).forEach(ev => addSlot(ev.inicio, ev.fim));
+          JSON.parse(item.eventos_json).forEach(ev => addSlot(ev.inicio, ev.fim, 'evento'));
         } catch (e) { /* ignore */ }
       }
       return slots;
     };
 
-    // 1. Mapeia todos os slots e identifica os conflitos
-    dadosParaProcessar.forEach(item => {
-      item.conflictGroup = null; // Inicializa o campo de grupo
-      item.conflictColor = null; // Inicializa o campo de cor
-      
-      // ✅ NOVO: A lógica de conflito deve ser aplicada a TODOS os itens, não apenas aos que já têm hasConflict
-      const slots = getSlots(item);
-      slots.forEach(slot => {
-        if (!conflitosPorSlot.has(slot.key)) {
-          conflitosPorSlot.set(slot.key, { ids: new Set(), dateStr: slot.dateStr });
+    // 1. Coletar todos os slots de todos os eventos
+    const allSlots = dadosParaProcessar.flatMap(item => getSlots(item));
+
+    // 2. Identificar grupos de conflito (usando Union-Find ou um algoritmo de agrupamento simples)
+    // Usaremos um mapa para rastrear os conflitos: Map<id_evento, Set<id_evento_conflitante>>
+    const conflitos = new Map();
+    dadosParaProcessar.forEach(item => conflitos.set(item.id, new Set([item.id])));
+
+    // Função para verificar sobreposição: [A, B] e [C, D] se sobrepõem se A < D e C < B
+    const checkOverlap = (slot1, slot2) => {
+      return slot1.start < slot2.end && slot2.start < slot1.end;
+    };
+
+    // Iterar sobre todos os pares de slots para encontrar sobreposições
+    for (let i = 0; i < allSlots.length; i++) {
+      for (let j = i + 1; j < allSlots.length; j++) {
+        const slot1 = allSlots[i];
+        const slot2 = allSlots[j];
+
+        // Conflito se:
+        // 1. Mesmo local
+        // 2. Mesmo dia
+        // 3. Horários sobrepostos
+        if (slot1.local === slot2.local && slot1.dateStr === slot2.dateStr && checkOverlap(slot1, slot2)) {
+          // Conflito encontrado: unir os grupos de conflito
+          const group1 = conflitos.get(slot1.id);
+          const group2 = conflitos.get(slot2.id);
+
+          if (group1 !== group2) {
+            // Unir os dois grupos
+            const newGroup = new Set([...group1, ...group2]);
+            // Atualizar todos os membros dos grupos 1 e 2 para apontar para o novo grupo
+            group1.forEach(id => conflitos.set(id, newGroup));
+            group2.forEach(id => conflitos.set(id, newGroup));
+          }
         }
-        conflitosPorSlot.get(slot.key).ids.add(item.id);
-      });
-    });
-
-    // 2. Atribui um ID de grupo e cor para cada inscrição em conflito, agrupando por SLOT de conflito (data, hora, local)
-    const gruposConflito = new Map(); // Map<id_inscricao, id_grupo>
-    const slotsConflitantes = Array.from(conflitosPorSlot.entries()).filter(([, data]) => data.ids.size > 1);
-
-    slotsConflitantes.forEach(([slotKey, data]) => {
-      const idsConflito = Array.from(data.ids);
-      // A chave do slot já está disponível no escopo do forEach
-
-      // 1. Garante que o slot de conflito tenha um índice de cor
-      if (!corPorSlot.has(slotKey)) {
-        corPorSlot.set(slotKey, corIndex++);
       }
-      const grupoPorSlot = corPorSlot.get(slotKey);
+    }
 
-      // 2. Para cada inscrição em conflito, armazena o grupo (índice de cor)
-      idsConflito.forEach(id => {
-        // Se a inscrição já tiver um grupo, mantém o grupo existente (para evitar sobrescrever se houver conflitos em datas diferentes)
-        // O primeiro conflito encontrado define a cor.
-        if (!gruposConflito.has(id)) {
-          gruposConflito.set(id, grupoPorSlot);
+    // 3. Extrair os grupos únicos de conflito (apenas aqueles com mais de 1 membro)
+    const gruposUnicos = new Map(); // Map<Set<id_evento>, id_grupo>
+    let corIndex = 0;
+
+    conflitos.forEach(group => {
+      if (group.size > 1) {
+        // Usar o primeiro ID como chave para o grupo (para garantir unicidade do Set)
+        const key = Array.from(group).sort().join(',');
+        if (!gruposUnicos.has(key)) {
+          gruposUnicos.set(key, corIndex++);
         }
-      });
+      }
     });
 
-    // 3. Aplica o grupo e a cor aos dados
+    // 4. Aplicar a cor aos dados
     dadosParaProcessar = dadosParaProcessar.map(item => {
-      if (gruposConflito.has(item.id)) {
-        const grupo = gruposConflito.get(item.id);
-        item.conflictGroup = grupo;
-        // A cor é determinada pelo índice do grupo (que agora representa o slot de conflito)
-        item.conflictColor = coresConflito[grupo % coresConflito.length];
-        item.hasConflict = true; // ✅ Adicionado para o filtro 'Apenas Conflitos' funcionar
+      item.conflictGroup = null;
+      item.conflictColor = null;
+      item.hasConflict = false;
+
+      const group = conflitos.get(item.id);
+      if (group && group.size > 1) {
+        item.hasConflict = true;
+        const key = Array.from(group).sort().join(',');
+        const grupoIndex = gruposUnicos.get(key);
+        
+        item.conflictGroup = grupoIndex;
+        item.conflictColor = coresConflito[grupoIndex % coresConflito.length];
+        
+        // Log de depuração
+        console.log(`[Conflito Real] Evento ID: ${item.id}, Nome: ${item.evento_nome}, Local: ${item.local}, Grupo: ${item.conflictGroup}, Cor: ${item.conflictColor}`);
+      } else {
+        // Log de depuração para eventos sem conflito
+        // console.log(`[Sem Conflito] Evento ID: ${item.id}, Nome: ${item.evento_nome}`);
       }
       return item;
     });
-    // --- FIM DA LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS ---
+    // --- FIM DA LÓGICA DE AGRUPAMENTO E COLORAÇÃO DE CONFLITOS (REVISADA) ---
 
 
     // Lógica de filtro
