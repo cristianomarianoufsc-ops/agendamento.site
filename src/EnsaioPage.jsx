@@ -378,11 +378,13 @@ const EnsaioPage = () => {
 
   const isFormValid = () => userData.name.trim() && userData.email.trim() && userData.phone.trim() && userData.eventName.trim() && resumo.ensaio && resumo.ensaio.length > 0;
 
+  /* 
   const handleGoToSecondStep = () => {
     // Lógica placeholder para a segunda etapa
     setAlertMessage({type: 'warning', text: "A segunda etapa ainda não está implementada."});
     setTimeout(() => setAlertMessage(null), 3000);
   };
+  */
 
   const handleFinalize = () => {
     setShowCompletionMessage(true);
@@ -659,17 +661,29 @@ const EnsaioPage = () => {
 
 	                <div className="mt-6 border-t pt-6">
 	                  {!firstStepDone ? (
-	                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
-	                      Confirmar 1ª Etapa e Agendar
-	                    </button>
-	                  ) : (
-	                    <div className="space-y-3">
-	                      <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Etapa 1 Concluída!</div>
-	                      <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
-	                        Ir para a 2ª Etapa <ArrowRight size={20}/>
-	                      </button>
-	                    </div>
-	                  )}
+                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
+                      Confirmar Ensaio
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-4 bg-green-100 text-green-800 rounded-lg text-center font-semibold flex items-center justify-center gap-2"><CheckCircle size={20}/> Ensaio Confirmado!</div>
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <p className="text-sm font-bold text-gray-700 mb-2">Detalhes do Agendamento:</p>
+                        <ul className="space-y-1">
+                          {resumo.ensaio.map((ensaio, idx) => (
+                            <li key={idx} className="text-xs text-gray-600">
+                              • {new Date(ensaio.date).toLocaleDateString("pt-BR")} | {ensaio.start} - {ensaio.end}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      {/* 
+                      <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
+                        Ir para a 2ª Etapa <ArrowRight size={20}/>
+                      </button>
+                      */}
+                    </div>
+                  )}
 	                </div>
 	              </div>
 	            </div>
