@@ -1420,18 +1420,23 @@ app.post("/api/create-events", async (req, res) => {
         desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
         eventos_json: '[]'
       };
-      const eventosExtras = [];
+      
+      const todosEventos = [];
       etapasComId.forEach(e => {
         const nome = e.nome.toLowerCase();
-        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+        
+        // Adiciona ao array geral de eventos para o JSON
+        todosEventos.push({ nome: e.nome, inicio: e.inicio, fim: e.fim, eventId: e.eventId });
+
+        // Mantém compatibilidade com colunas legadas (pega o primeiro de cada tipo)
+        if (dbPayload.hasOwnProperty(`${nome}_inicio`) && !dbPayload[`${nome}_inicio`]) {
           dbPayload[`${nome}_inicio`] = e.inicio;
           dbPayload[`${nome}_fim`] = e.fim;
           dbPayload[`${nome}_eventId`] = e.eventId;
-        } else if (nome === 'evento') {
-          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
         }
       });
-      dbPayload.eventos_json = JSON.stringify(eventosExtras);
+      
+      dbPayload.eventos_json = JSON.stringify(todosEventos);
       
       await query(
         `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
