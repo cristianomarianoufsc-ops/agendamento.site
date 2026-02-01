@@ -1439,15 +1439,24 @@ app.post("/api/create-events", async (req, res) => {
       
       dbPayload.eventos_json = JSON.stringify(todosEventos);
       
-      await query(
-        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-      );
-      console.log("💾 Inscrição salva no banco com sucesso!");
-           const message = calendarError || eventosCriados.length < etapas.length 
-        ? "Inscrição salva no banco, mas houve erro na sincronização com o Google Calendar." 
+      try {
+        await query(
+          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+        );
+        console.log("💾 Inscrição salva no banco com sucesso!");
+      } catch (dbErr) {
+        console.error("⚠️ Erro ao salvar no banco de dados, mas o evento foi criado no Calendar:", dbErr.message);
+        // Se o evento foi criado no Calendar mas o banco falhou, ainda podemos considerar "sucesso" para o usuário não travar
+        // mas avisamos no log. Se ambos falharem, aí sim é erro total.
+        if (eventosCriados.length === 0) throw dbErr;
+      }
+
+      const message = calendarError || eventosCriados.length < etapas.length 
+        ? "Inscrição processada, mas houve erro na sincronização total com o Google Calendar." 
         : "Eventos criados e inscrição salva com sucesso!";
       
+      // Envia a resposta ANTES do e-mail para evitar timeout ou erros de e-mail bloquearem o frontend
       res.json({ 
         success: true, 
         message: message, 
@@ -1455,11 +1464,15 @@ app.post("/api/create-events", async (req, res) => {
         calendarError: calendarError ? calendarError.message : (eventosCriados.length < etapas.length ? "Alguns eventos não foram criados no Calendar" : null)
       });
 
-		      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
-			      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+      // Envia o e-mail de confirmação da Etapa 1 em segundo plano
+      setTimeout(() => {
+        sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })))
+          .catch(mailErr => console.error("❌ Erro no envio de e-mail em background:", mailErr.message));
+      }, 100);
+
     } catch (err) {
-      console.error("❌ Erro ao salvar inscrição no banco:", err.message);
-      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
+      console.error("❌ Erro ao processar inscrição:", err.message);
+      res.status(500).json({ success: false, error: "Erro ao salvar inscrição no banco de dados." });
     }
     } catch (err) {
       console.error("❌ Erro no endpoint /api/create-events (catch final):", err);
