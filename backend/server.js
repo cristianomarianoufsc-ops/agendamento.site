@@ -1755,6 +1755,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
     try {
       const payload = {
         sender: { email: remetente, name: "Sistema de Agendamento UFSC" },
+        replyTo: { email: remetente, name: "Sistema de Agendamento UFSC" },
         to: [{ email: email, name: nome }],
         subject: subject,
         htmlContent: htmlContent
