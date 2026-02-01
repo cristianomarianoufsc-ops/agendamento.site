@@ -264,7 +264,7 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
   }
 
   const mailOptions = {
-    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: `Confirmação de Inscrição: ${inscricao.evento_nome || 'Evento'} - #${inscricao.id}`,
     html: `
@@ -280,7 +280,7 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
         <li><strong>E-mail de Contato:</strong> ${email}</li>
       </ul>
       <p>Em caso de dúvidas, entre em contato com a organização.</p>
-      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
     `,
     attachments: [
       {
@@ -318,7 +318,7 @@ async function sendEvaluatorCredentials(email, password) {
   }
 
   const mailOptions = {
-    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: 'Credenciais de Acesso - Sistema de Avaliação UFSC',
     html: `
@@ -331,7 +331,7 @@ async function sendEvaluatorCredentials(email, password) {
       </ul>
       <p>Acesse o sistema em: <a href="http://localhost:5173/admin-viewer">http://localhost:5173/admin-viewer</a></p>
       <p><strong>Importante:</strong> Guarde suas credenciais em local seguro. Você poderá alterar sua senha após o primeiro acesso.</p>
-      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
     `
   };
 
@@ -1061,16 +1061,16 @@ async function sendConsolidationEmail(email, nome, isWinner) {
     <h2>Parabéns, ${nome}! Seu agendamento foi confirmado.</h2>
     <p>Após a consolidação da agenda, sua proposta obteve a maior pontuação e seu agendamento foi confirmado no calendário oficial.</p>
     <p>Você pode verificar os detalhes do seu agendamento no sistema.</p>
-    <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+    <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
   ` : `
     <h2>Atenção, ${nome}. Seu agendamento foi cancelado.</h2>
     <p>Após a consolidação da agenda, sua proposta não obteve a maior pontuação para o horário solicitado, e o agendamento foi cancelado.</p>
     <p>Você pode acessar o sistema para verificar a possibilidade de reagendamento em outras datas ou horários.</p>
-    <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+    <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
   `;
 
   const mailOptions = {
-    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: subject,
     html: body
@@ -1741,7 +1741,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
 		          ${etapasHtml}
 		        </ul>    <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
 	        <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
-	        <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+	        <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
 		      </div>
 		    `;
   
@@ -1754,8 +1754,8 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (brevoApiKey) {
     try {
       const payload = {
-        sender: { email: remetente, name: "Sistema de Agendamento UFSC" },
-        replyTo: { email: remetente, name: "Sistema de Agendamento UFSC" },
+        sender: { email: remetente, name: "Sistema de Agendamento DAC" },
+        replyTo: { email: remetente, name: "Sistema de Agendamento DAC" },
         to: [{ email: email, name: nome }],
         subject: subject,
         htmlContent: htmlContent
@@ -1789,7 +1789,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: `"Sistema de Agendamento UFSC" <${remetente}>`,
+        from: `"Sistema de Agendamento DAC" <${remetente}>`,
         to: [email],
         subject: subject,
         html: htmlContent,
@@ -1812,7 +1812,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (transporter) {
     try {
       const mailOptions = {
-        from: `"Sistema de Agendamento UFSC" <${remetente}>`,
+        from: `"Sistema de Agendamento DAC" <${remetente}>`,
         to: email,
         subject: subject,
         html: htmlContent,
