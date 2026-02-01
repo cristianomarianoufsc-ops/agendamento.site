@@ -1364,7 +1364,10 @@ app.get("/api/master-sheet-link", (req, res) => {
 app.post("/api/create-events", async (req, res) => {
   try {
     const { local, resumo, etapas, userData } = req.body;
+    console.log("📥 Recebida requisição /api/create-events:", { local, resumo, etapasCount: etapas?.length, userDataEmail: userData?.email });
+    
     if (!calendarIds[local]) {
+      console.error("❌ Calendário não encontrado para o local:", local);
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
 
@@ -1395,19 +1398,17 @@ app.post("/api/create-events", async (req, res) => {
           eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
 
         } catch (err) {
-          console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
-          // Se falhar a criação de um evento, considera-se falha total do agendamento.
-          throw err;
+          console.error(`⚠️ Falha ao criar evento "${event.summary}" no Google Calendar:`, err.message);
+          // Não lançamos o erro para permitir que a inscrição seja salva no banco
+          etapasComId.push({ ...etapa, eventId: null });
         }
       }
     } catch (err) {
       // Captura erro de inicialização do Google Calendar (ex: invalid_grant)
       calendarError = err;
-      console.error("❌ Erro de inicialização ou criação de eventos do Google Calendar:", err.message);
-      // NOVO: Log mais detalhado do erro
-      console.error("❌ DETALHES DO ERRO DO GOOGLE CALENDAR:", err);
-      // Se houver um erro crítico (como credenciais inválidas), aborta o processo de agendamento.
-      return res.status(500).json({ success: false, error: "Erro crítico na sincronização com o Google Calendar. Verifique as credenciais." });
+      console.error("⚠️ Erro de inicialização do Google Calendar:", err.message);
+      console.error("⚠️ DETALHES DO ERRO DO GOOGLE CALENDAR:", err);
+      // Continuamos o processo para salvar no banco de dados
     }
 
     // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
@@ -1443,8 +1444,16 @@ app.post("/api/create-events", async (req, res) => {
         [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
       );
       console.log("💾 Inscrição salva no banco com sucesso!");
+           const message = calendarError || eventosCriados.length < etapas.length 
+        ? "Inscrição salva no banco, mas houve erro na sincronização com o Google Calendar." 
+        : "Eventos criados e inscrição salva com sucesso!";
       
-      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+      res.json({ 
+        success: true, 
+        message: message, 
+        eventos: eventosCriados,
+        calendarError: calendarError ? calendarError.message : (eventosCriados.length < etapas.length ? "Alguns eventos não foram criados no Calendar" : null)
+      });
 
 		      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
 			      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
@@ -1453,9 +1462,14 @@ app.post("/api/create-events", async (req, res) => {
       res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
     }
     } catch (err) {
-      console.error("❌ Erro no endpoint /api/create-events:", err.message);
+      console.error("❌ Erro no endpoint /api/create-events (catch final):", err);
       // Se o erro for propagado do bloco try/catch do Calendar, ele será capturado aqui.
-      res.status(500).json({ success: false, error: "Erro interno ao criar eventos. A inscrição não foi salva devido a uma falha na criação do evento no Google Calendar." });
+      res.status(500).json({ 
+        success: false, 
+        error: "Erro interno ao criar eventos.",
+        details: err.message,
+        stack: err.stack
+      });
     }
 });
 
