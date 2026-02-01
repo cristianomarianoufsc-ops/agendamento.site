@@ -264,7 +264,7 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: `Confirmação de Inscrição: ${inscricao.evento_nome || 'Evento'} - #${inscricao.id}`,
     html: `
@@ -318,7 +318,7 @@ async function sendEvaluatorCredentials(email, password) {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: 'Credenciais de Acesso - Sistema de Avaliação UFSC',
     html: `
@@ -1070,7 +1070,7 @@ async function sendConsolidationEmail(email, nome, isWinner) {
   `;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento UFSC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: subject,
     html: body
@@ -1788,7 +1788,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: remetente,
+        from: `"Sistema de Agendamento UFSC" <${remetente}>`,
         to: [email],
         subject: subject,
         html: htmlContent,
