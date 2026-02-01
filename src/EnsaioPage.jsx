@@ -677,6 +677,9 @@ const EnsaioPage = () => {
                           ))}
                         </ul>
                       </div>
+                      <div className="p-3 bg-blue-50 text-blue-700 rounded-lg text-center text-sm font-medium">
+                        O seu agendamento foi registrado. Você já pode fechar esta página.
+                      </div>
                       {/* 
                       <button onClick={handleGoToSecondStep} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 text-gray-900 rounded-lg font-bold hover:bg-yellow-600 transition-transform duration-200 hover:scale-[1.02]">
                         Ir para a 2ª Etapa <ArrowRight size={20}/>
