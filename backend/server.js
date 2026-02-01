@@ -2371,6 +2371,7 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // Servir arquivos estáticos (CSS, JS, Imagens)
 app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);

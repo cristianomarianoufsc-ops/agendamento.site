@@ -8,7 +8,7 @@
     "start": "node backend/server.js",
     "build": "VITE_API_URL=$VITE_API_URL npx vite build",
     "test": "vitest",
-    "postbuild": "rm -rf backend/public && cp -r dist backend/public",
+    "postbuild": "rm -rf backend/public && cp -r dist backend/public && mkdir -p backend/public/js && cp public/js/html2pdf.bundle.min.js backend/public/js/",
     "preview": "vite preview"
   },
   "keywords": [
