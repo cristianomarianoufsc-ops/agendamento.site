@@ -343,9 +343,6 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
 
 // Função para atualizar o cache de horários ocupados
 async function atualizarCache() {
-  console.log("🔄 Atualizando cache de horários ocupados...");
-  // Implementação futura ou conforme necessário
-}
 
 // --- 5. INICIALIZAÇÃO DAS GOOGLE APIS ---
 async function initializeGoogleAPIs() {
@@ -550,47 +547,13 @@ app.post('/api/auth/admin', async (req, res) => {
 
 
 
-// --- ROTAS E FUNÇÕES RESTAURADAS ---
+
+
+// --- ROTAS RESTAURADAS (SEM DUPLICATAS) ---
 
 let cacheEventos = {};
 
-async function atualizarCache() {
-  const timestamp = new Date().toLocaleString('pt-BR');
-  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
-  
-  try {
-    const agora = new Date();
-    const start = agora.toISOString();
-    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
-
-    for (const local in calendarIds) {
-      try {
-        console.log(`  📅 Buscando eventos para: ${local}`);
-        const events = await calendar.events.list({
-          calendarId: calendarIds[local],
-          timeMin: start,
-          timeMax: end,
-          singleEvents: true,
-          orderBy: 'startTime',
-        });
-        const numEventos = events.data.items ? events.data.items.length : 0;
-        cacheEventos[local] = events.data.items || [];
-        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
-      } catch (err) {
-        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
-      }
-    }
-    console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
-  } catch (err) {
-    console.error(`❌ [${timestamp}] Erro ao atualizar cache:`, err.message);
-  }
-}
-
 async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapas) {
-  if (!transporter) {
-    console.warn("⚠️ Transporter de e-mail não configurado. Pular envio de e-mail da Etapa 1.");
-    return false;
-  }
 
   const locaisNomes = {
     teatro: "Teatro Carmen Fossari",
@@ -839,35 +802,40 @@ async function startServer() {
 startServer();
 
 
+
+
+// --- ROTAS RESTAURADAS (SEM DUPLICATAS) ---
+
+
+
+// Fallback para o React Router
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).send('API endpoint not found');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// --- INICIALIZAÇÃO DO SERVIDOR ---
+async function startServer() {
+  try {
+    await initializeGoogleAPIs();
+    app.listen(port, () => {
+      console.log(`🚀 Servidor rodando em http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error('❌ Erro ao iniciar o servidor:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+
 // --- ROTAS E FUNÇÕES RESTAURADAS ---
 
 let cacheEventos = {};
 
-async function atualizarCache() {
-  const timestamp = new Date().toLocaleString('pt-BR');
-  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
-  
-  try {
-    const agora = new Date();
-    const start = agora.toISOString();
-    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
-
-    for (const local in calendarIds) {
-      try {
-        console.log(`  📅 Buscando eventos para: ${local}`);
-        const events = await calendar.events.list({
-          calendarId: calendarIds[local],
-          timeMin: start,
-          timeMax: end,
-          singleEvents: true,
-          orderBy: 'startTime',
-        });
-        const numEventos = events.data.items ? events.data.items.length : 0;
-        cacheEventos[local] = events.data.items || [];
-        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
-      } catch (err) {
-        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
-      }
     }
     console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
   } catch (err) {
@@ -875,11 +843,6 @@ async function atualizarCache() {
   }
 }
 
-async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapas) {
-  if (!transporter) {
-    console.warn("⚠️ Transporter de e-mail não configurado. Pular envio de e-mail da Etapa 1.");
-    return false;
-  }
 
   const locaisNomes = {
     teatro: "Teatro Carmen Fossari",
@@ -925,77 +888,7 @@ async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapa
   }
 }
 
-app.post("/api/create-events", async (req, res) => {
-  try {
-    const { local, resumo, etapas, userData } = req.body;
-    if (!calendarIds[local]) {
-      return res.status(400).json({ success: false, error: "Calendário não encontrado." });
-    }
-    const eventosCriados = [];
-    const etapasComId = [];
-    for (const etapa of etapas) {
-      const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
-      const event = {
-        summary: `${nomeEtapaCapitalizado} - ${resumo}`,
-        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
-        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
-        description: "EM ANÁLISE - Horário sujeito a alteração conforme resultado do edital.",
-        extendedProperties: {
-          private: {
-            managedBy: "sistema-edital-dac",
-            status: "pending_evaluation"
-          }
-        }
-      };
-      try {
-        const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
-        etapasComId.push({ ...etapa, eventId: response.data.id });
-        eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
-      } catch (err) {
-        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
-      }
-    }
-    try {
-      const dbPayload = {
-        nome: userData.name, email: userData.email, telefone: userData.phone,
-        evento_nome: userData.eventName || resumo, local,
-        ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
-        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
-        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
-        eventos_json: '[]'
-      };
-      const eventosExtras = [];
-      etapasComId.forEach(e => {
-        const nome = e.nome.toLowerCase();
-        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
-          dbPayload[`${nome}_inicio`] = e.inicio;
-          dbPayload[`${nome}_fim`] = e.fim;
-          dbPayload[`${nome}_eventId`] = e.eventId;
-        } else if (nome === 'evento') {
-          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
-        }
-      });
-      dbPayload.eventos_json = JSON.stringify(eventosExtras);
-      
-      await query(
-        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-      );
-      console.log("💾 Inscrição salva no banco com sucesso!");
-      
-      // Envia o e-mail de confirmação da Etapa 1
-      await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
 
-      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
-    } catch (err) {
-      console.error("❌ Erro ao salvar inscrição no banco:", err.message);
-      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
-    }
-  } catch (err) {
-    console.error("❌ Erro no endpoint /api/create-events:", err.message);
-    res.status(500).json({ success: false, error: "Erro interno ao criar eventos." });
-  }
-});
 
 app.delete("/api/cancel-events/:local", async (req, res) => {
     const { local } = req.params;
