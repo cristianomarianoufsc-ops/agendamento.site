@@ -651,12 +651,16 @@ app.post("/api/config", async (req, res) => {
 
     // 1. Busca a configuração atual do banco de dados
     try {
+      console.log("🔍 Buscando config atual no banco...");
       const result = await query('SELECT config_json FROM config WHERE id = 1');
       if (result.rows.length > 0) {
         currentConfig = JSON.parse(result.rows[0].config_json);
+        console.log("✅ Config atual carregada.");
+      } else {
+        console.log("ℹ️ Nenhuma config encontrada no banco (ID=1).");
       }
     } catch (e) {
-      console.warn("⚠️ Nenhuma configuração encontrada no banco ou erro ao ler.");
+      console.warn("⚠️ Erro ao ler config do banco:", e.message);
     }
 
     // 2. Mescla a configuração atual com os novos dados recebidos
@@ -692,22 +696,28 @@ app.post("/api/config", async (req, res) => {
 
     // 3. Salva no banco de dados
     const configJson = JSON.stringify(updatedConfig);
-    console.log("📦 Salvando no banco de dados...");
+    console.log("📦 Tentando salvar no banco de dados...");
     
-    await query(`
-      INSERT INTO config (id, config_json, updated_at)
-      VALUES (1, $1, CURRENT_TIMESTAMP)
-      ON CONFLICT (id) 
-      DO UPDATE SET config_json = $1, updated_at = CURRENT_TIMESTAMP
-    `, [configJson]);
-    
-    console.log("✅ Configurações salvas no banco!");
+    try {
+      await query(`
+        INSERT INTO config (id, config_json, updated_at)
+        VALUES (1, $1, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) 
+        DO UPDATE SET config_json = $1, updated_at = CURRENT_TIMESTAMP
+      `, [configJson]);
+      console.log("✅ Configurações salvas no banco com sucesso!");
+    } catch (dbSaveError) {
+      console.error("❌ Erro fatal ao salvar no banco:", dbSaveError.message);
+      throw dbSaveError; // Repassa para o catch principal
+    }
 
     // 4. Backup em arquivo local
     try {
+      console.log("💾 Tentando backup local em config.json...");
       fs.writeFileSync("config.json", JSON.stringify(updatedConfig, null, 2));
+      console.log("✅ Backup local concluído.");
     } catch (fsError) {
-      console.warn("⚠️ Erro backup local:", fsError.message);
+      console.warn("⚠️ Erro backup local (não fatal):", fsError.message);
     }
     
     res.json({ success: true, config: updatedConfig });
