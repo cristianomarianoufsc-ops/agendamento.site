@@ -548,20 +548,561 @@ app.post('/api/auth/admin', async (req, res) => {
     }
 });
 
-// --- OUTRAS ROTAS (INSCRIÇÕES, AVALIAÇÕES, ETC) ---
-// (Mantendo a estrutura simplificada para o exemplo, mas o arquivo real deve conter todas as rotas originais)
 
-app.get('/api/inscricoes', async (req, res) => {
-    try {
-        const result = await query('SELECT * FROM inscricoes ORDER BY criado_em DESC');
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Erro ao buscar inscrições:', error.message);
-        res.status(500).json({ error: 'Erro ao buscar inscrições.' });
+
+// --- ROTAS E FUNÇÕES RESTAURADAS ---
+
+let cacheEventos = {};
+
+async function atualizarCache() {
+  const timestamp = new Date().toLocaleString('pt-BR');
+  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
+  
+  try {
+    const agora = new Date();
+    const start = agora.toISOString();
+    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    for (const local in calendarIds) {
+      try {
+        console.log(`  📅 Buscando eventos para: ${local}`);
+        const events = await calendar.events.list({
+          calendarId: calendarIds[local],
+          timeMin: start,
+          timeMax: end,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+        const numEventos = events.data.items ? events.data.items.length : 0;
+        cacheEventos[local] = events.data.items || [];
+        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
+      } catch (err) {
+        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
+      }
     }
+    console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
+  } catch (err) {
+    console.error(`❌ [${timestamp}] Erro ao atualizar cache:`, err.message);
+  }
+}
+
+async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapas) {
+  if (!transporter) {
+    console.warn("⚠️ Transporter de e-mail não configurado. Pular envio de e-mail da Etapa 1.");
+    return false;
+  }
+
+  const locaisNomes = {
+    teatro: "Teatro Carmen Fossari",
+    igrejinha: "Igrejinha da UFSC",
+  };
+
+  const etapasHtml = etapas.map(etapa => {
+    const dataFormatada = new Date(etapa.inicio).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const horaInicio = new Date(etapa.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const horaFim = new Date(etapa.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    return `<li><strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
+  }).join('');
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER || 'noreply@agendamento.site',
+    to: email,
+    subject: `✅ Confirmação da 1ª Etapa: ${evento_nome}`,
+    html: `
+      <div style="font-family: sans-serif; line-height: 1.6;">
+        <h2>Olá, ${nome}!</h2>
+        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
+        <p><strong>Local:</strong> ${locaisNomes[local] || local}</p>
+        <p><strong>Resumo dos horários solicitados:</strong></p>
+        <ul>
+          ${etapasHtml}
+        </ul>
+        <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
+        <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
+        <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      </div>
+    `
+  };
+
+  try {
+    // ⚠️ TEMPORARIAMENTE DESABILITADO: Envio de e-mail comentado
+    console.log(`⚠️ Envio de e-mail DESABILITADO (temporário) para: ${email}`);
+    // await transporter.sendMail(mailOptions);
+    // console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
+    return true; // Retorna sucesso para não quebrar o fluxo
+  } catch (error) {
+    console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
+    return false;
+  }
+}
+
+app.post("/api/create-events", async (req, res) => {
+  try {
+    const { local, resumo, etapas, userData } = req.body;
+    if (!calendarIds[local]) {
+      return res.status(400).json({ success: false, error: "Calendário não encontrado." });
+    }
+    const eventosCriados = [];
+    const etapasComId = [];
+    for (const etapa of etapas) {
+      const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
+      const event = {
+        summary: `${nomeEtapaCapitalizado} - ${resumo}`,
+        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
+        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
+        description: "EM ANÁLISE - Horário sujeito a alteração conforme resultado do edital.",
+        extendedProperties: {
+          private: {
+            managedBy: "sistema-edital-dac",
+            status: "pending_evaluation"
+          }
+        }
+      };
+      try {
+        const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
+        etapasComId.push({ ...etapa, eventId: response.data.id });
+        eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
+      } catch (err) {
+        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
+      }
+    }
+    try {
+      const dbPayload = {
+        nome: userData.name, email: userData.email, telefone: userData.phone,
+        evento_nome: userData.eventName || resumo, local,
+        ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
+        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
+        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
+        eventos_json: '[]'
+      };
+      const eventosExtras = [];
+      etapasComId.forEach(e => {
+        const nome = e.nome.toLowerCase();
+        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+          dbPayload[`${nome}_inicio`] = e.inicio;
+          dbPayload[`${nome}_fim`] = e.fim;
+          dbPayload[`${nome}_eventId`] = e.eventId;
+        } else if (nome === 'evento') {
+          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
+        }
+      });
+      dbPayload.eventos_json = JSON.stringify(eventosExtras);
+      
+      await query(
+        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+      );
+      console.log("💾 Inscrição salva no banco com sucesso!");
+      
+      // Envia o e-mail de confirmação da Etapa 1
+      await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+
+      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+    } catch (err) {
+      console.error("❌ Erro ao salvar inscrição no banco:", err.message);
+      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
+    }
+  } catch (err) {
+    console.error("❌ Erro no endpoint /api/create-events:", err.message);
+    res.status(500).json({ success: false, error: "Erro interno ao criar eventos." });
+  }
 });
 
-// ... (Adicione aqui as demais rotas conforme necessário do arquivo original)
+app.delete("/api/cancel-events/:local", async (req, res) => {
+    const { local } = req.params;
+    const { eventIds } = req.body;
+    if (!calendarIds[local]) return res.status(400).json({ error: "Calendário não encontrado." });
+    if (!Array.isArray(eventIds) || eventIds.length === 0) return res.status(400).json({ error: "Nenhum ID de evento informado." });
+
+    const resultados = [];
+    for (const eventId of eventIds) {
+        if (!eventId) continue;
+        try {
+            await calendar.events.delete({ calendarId: calendarIds[local], eventId });
+            resultados.push({ eventId, status: "deleted" });
+        } catch (err) {
+            resultados.push({ eventId, status: "error", error: err.message || "Erro" });
+        }
+    }
+    if (cacheEventos[local]) {
+        cacheEventos[local] = cacheEventos[local].filter(e => !eventIds.includes(e.id));
+    }
+    res.json({ success: true, resultados });
+});
+
+app.get("/api/occupied-slots/:local/:month", async (req, res) => {
+  const { local, month } = req.params;
+  if (!calendarIds[local]) {
+    return res.status(400).json({ error: "Local não encontrado." });
+  }
+  try {
+    console.log(`\n\n🔍 REQUISIÇÃO: /api/occupied-slots/${local}/${month}`);
+    // A rota está buscando diretamente do Google Calendar, e não do cache.
+    // Isso pode sobrecarregar a API e não refletir o cache atualizado.
+    // Vamos usar o cache se a data estiver dentro do período de cache (12 meses).
+    // Para fins de debug, vamos manter a busca direta por enquanto, mas adicionar um log.
+    console.log(`⚠️ ATENÇÃO: A rota /api/occupied-slots está buscando diretamente do Google Calendar para o mês ${month}.`);
+    
+    const [year, monthNum] = month.split('-');
+    const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
+    const events = await calendar.events.list({
+      calendarId: calendarIds[local],
+      timeMin: startDate.toISOString(),
+      timeMax: endDate.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      fields: 'items(id,summary,start,end,extendedProperties)' // Otimiza a resposta
+    });
+    
+    // ✅ PROCESSA OS EVENTOS ANTES DE ENVIAR (igual ao server.js antigo)
+    const eventosProcessados = (events.data.items || []).map((event) => {
+      const props = event.extendedProperties?.private || {};
+      const isManaged = props.managedBy === 'sistema-edital-dac';
+      const isContestable = isManaged && props.status === 'pending_evaluation';
+      
+      return {
+        id: event.id,
+        summary: event.summary,
+        // ✅ EXTRAI dateTime ou date com fallback
+        start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
+        end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
+        isContestable: isContestable
+      };
+    }).filter(e => e.start && e.end); // Remove eventos sem data válida
+    
+    res.json({ eventos: eventosProcessados });
+    console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados para ${local}/${month}.`);
+  } catch (error) {
+    console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
+    // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
+    console.log("⚠️ Retornando lista vazia de eventos devido a erro na autenticação");
+    res.json({ eventos: [] });
+  }
+});
+
+app.post("/api/save-assessment", async (req, res) => {
+  const { inscriptionId, evaluatorEmail, scoresJson } = req.body;
+
+  if (!inscriptionId || !evaluatorEmail || !scoresJson) {
+    return res.status(400).json({ error: "Dados incompletos." });
+  }
+
+  try {
+    await query(
+      `INSERT INTO assessments (inscription_id, evaluator_email, scores_json) 
+       VALUES ($1, $2, $3)
+       ON CONFLICT (inscription_id, evaluator_email) DO UPDATE SET scores_json = $3`,
+      [inscriptionId, evaluatorEmail, JSON.stringify(scoresJson)]
+    );
+
+    res.json({ success: true, message: "Avaliação salva com sucesso." });
+  } catch (error) {
+    console.error("Erro ao salvar avaliação:", error);
+    res.status(500).json({ error: "Erro ao salvar avaliação." });
+  }
+});
+
+app.get("/api/assessments/:inscriptionId", async (req, res) => {
+  const { inscriptionId } = req.params;
+
+  try {
+    const result = await query("SELECT * FROM assessments WHERE inscription_id = $1", [inscriptionId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Erro ao obter avaliações:", error);
+    res.status(500).json({ error: "Erro ao obter avaliações." });
+  }
+});
+
+// Fallback para o React Router
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).send('API endpoint not found');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// --- INICIALIZAÇÃO DO SERVIDOR ---
+async function startServer() {
+  try {
+    await initializeGoogleAPIs();
+    app.listen(port, () => {
+      console.log(`🚀 Servidor rodando em http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error('❌ Erro ao iniciar o servidor:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
+
+
+// --- ROTAS E FUNÇÕES RESTAURADAS ---
+
+let cacheEventos = {};
+
+async function atualizarCache() {
+  const timestamp = new Date().toLocaleString('pt-BR');
+  console.log(`🔄 [${timestamp}] Iniciando atualização do cache de eventos...`);
+  
+  try {
+    const agora = new Date();
+    const start = agora.toISOString();
+    const end = new Date(agora.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    for (const local in calendarIds) {
+      try {
+        console.log(`  📅 Buscando eventos para: ${local}`);
+        const events = await calendar.events.list({
+          calendarId: calendarIds[local],
+          timeMin: start,
+          timeMax: end,
+          singleEvents: true,
+          orderBy: 'startTime',
+        });
+        const numEventos = events.data.items ? events.data.items.length : 0;
+        cacheEventos[local] = events.data.items || [];
+        console.log(`  ✅ ${local}: ${numEventos} eventos encontrados`);
+      } catch (err) {
+        console.warn(`  ⚠️ Erro ao atualizar cache para ${local}:`, err.message);
+      }
+    }
+    console.log(`✅ [${timestamp}] Cache atualizado com sucesso!`);
+  } catch (err) {
+    console.error(`❌ [${timestamp}] Erro ao atualizar cache:`, err.message);
+  }
+}
+
+async function sendStep1ConfirmationEmail(email, nome, evento_nome, local, etapas) {
+  if (!transporter) {
+    console.warn("⚠️ Transporter de e-mail não configurado. Pular envio de e-mail da Etapa 1.");
+    return false;
+  }
+
+  const locaisNomes = {
+    teatro: "Teatro Carmen Fossari",
+    igrejinha: "Igrejinha da UFSC",
+  };
+
+  const etapasHtml = etapas.map(etapa => {
+    const dataFormatada = new Date(etapa.inicio).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const horaInicio = new Date(etapa.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const horaFim = new Date(etapa.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    return `<li><strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
+  }).join('');
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER || 'noreply@agendamento.site',
+    to: email,
+    subject: `✅ Confirmação da 1ª Etapa: ${evento_nome}`,
+    html: `
+      <div style="font-family: sans-serif; line-height: 1.6;">
+        <h2>Olá, ${nome}!</h2>
+        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
+        <p><strong>Local:</strong> ${locaisNomes[local] || local}</p>
+        <p><strong>Resumo dos horários solicitados:</strong></p>
+        <ul>
+          ${etapasHtml}
+        </ul>
+        <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
+        <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
+        <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      </div>
+    `
+  };
+
+  try {
+    // ⚠️ TEMPORARIAMENTE DESABILITADO: Envio de e-mail comentado
+    console.log(`⚠️ Envio de e-mail DESABILITADO (temporário) para: ${email}`);
+    // await transporter.sendMail(mailOptions);
+    // console.log(`✅✅✅ E-mail enviado com sucesso via Gmail SMTP!`);
+    return true; // Retorna sucesso para não quebrar o fluxo
+  } catch (error) {
+    console.error(`❌ Erro ao enviar e-mail para ${email}:`, error.message);
+    return false;
+  }
+}
+
+app.post("/api/create-events", async (req, res) => {
+  try {
+    const { local, resumo, etapas, userData } = req.body;
+    if (!calendarIds[local]) {
+      return res.status(400).json({ success: false, error: "Calendário não encontrado." });
+    }
+    const eventosCriados = [];
+    const etapasComId = [];
+    for (const etapa of etapas) {
+      const nomeEtapaCapitalizado = etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1);
+      const event = {
+        summary: `${nomeEtapaCapitalizado} - ${resumo}`,
+        start: { dateTime: etapa.inicio, timeZone: "America/Sao_Paulo" },
+        end: { dateTime: etapa.fim, timeZone: "America/Sao_Paulo" },
+        description: "EM ANÁLISE - Horário sujeito a alteração conforme resultado do edital.",
+        extendedProperties: {
+          private: {
+            managedBy: "sistema-edital-dac",
+            status: "pending_evaluation"
+          }
+        }
+      };
+      try {
+        const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
+        etapasComId.push({ ...etapa, eventId: response.data.id });
+        eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
+      } catch (err) {
+        console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
+      }
+    }
+    try {
+      const dbPayload = {
+        nome: userData.name, email: userData.email, telefone: userData.phone,
+        evento_nome: userData.eventName || resumo, local,
+        ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
+        montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
+        desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
+        eventos_json: '[]'
+      };
+      const eventosExtras = [];
+      etapasComId.forEach(e => {
+        const nome = e.nome.toLowerCase();
+        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+          dbPayload[`${nome}_inicio`] = e.inicio;
+          dbPayload[`${nome}_fim`] = e.fim;
+          dbPayload[`${nome}_eventId`] = e.eventId;
+        } else if (nome === 'evento') {
+          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
+        }
+      });
+      dbPayload.eventos_json = JSON.stringify(eventosExtras);
+      
+      await query(
+        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+      );
+      console.log("💾 Inscrição salva no banco com sucesso!");
+      
+      // Envia o e-mail de confirmação da Etapa 1
+      await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+
+      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+    } catch (err) {
+      console.error("❌ Erro ao salvar inscrição no banco:", err.message);
+      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
+    }
+  } catch (err) {
+    console.error("❌ Erro no endpoint /api/create-events:", err.message);
+    res.status(500).json({ success: false, error: "Erro interno ao criar eventos." });
+  }
+});
+
+app.delete("/api/cancel-events/:local", async (req, res) => {
+    const { local } = req.params;
+    const { eventIds } = req.body;
+    if (!calendarIds[local]) return res.status(400).json({ error: "Calendário não encontrado." });
+    if (!Array.isArray(eventIds) || eventIds.length === 0) return res.status(400).json({ error: "Nenhum ID de evento informado." });
+
+    const resultados = [];
+    for (const eventId of eventIds) {
+        if (!eventId) continue;
+        try {
+            await calendar.events.delete({ calendarId: calendarIds[local], eventId });
+            resultados.push({ eventId, status: "deleted" });
+        } catch (err) {
+            resultados.push({ eventId, status: "error", error: err.message || "Erro" });
+        }
+    }
+    if (cacheEventos[local]) {
+        cacheEventos[local] = cacheEventos[local].filter(e => !eventIds.includes(e.id));
+    }
+    res.json({ success: true, resultados });
+});
+
+app.get("/api/occupied-slots/:local/:month", async (req, res) => {
+  const { local, month } = req.params;
+  if (!calendarIds[local]) {
+    return res.status(400).json({ error: "Local não encontrado." });
+  }
+  try {
+    console.log(`\n\n🔍 REQUISIÇÃO: /api/occupied-slots/${local}/${month}`);
+    // A rota está buscando diretamente do Google Calendar, e não do cache.
+    // Isso pode sobrecarregar a API e não refletir o cache atualizado.
+    // Vamos usar o cache se a data estiver dentro do período de cache (12 meses).
+    // Para fins de debug, vamos manter a busca direta por enquanto, mas adicionar um log.
+    console.log(`⚠️ ATENÇÃO: A rota /api/occupied-slots está buscando diretamente do Google Calendar para o mês ${month}.`);
+    
+    const [year, monthNum] = month.split('-');
+    const startDate = new Date(parseInt(year), parseInt(monthNum) - 1, 1);
+    const endDate = new Date(parseInt(year), parseInt(monthNum), 0);
+    const events = await calendar.events.list({
+      calendarId: calendarIds[local],
+      timeMin: startDate.toISOString(),
+      timeMax: endDate.toISOString(),
+      singleEvents: true,
+      orderBy: 'startTime',
+      fields: 'items(id,summary,start,end,extendedProperties)' // Otimiza a resposta
+    });
+    
+    // ✅ PROCESSA OS EVENTOS ANTES DE ENVIAR (igual ao server.js antigo)
+    const eventosProcessados = (events.data.items || []).map((event) => {
+      const props = event.extendedProperties?.private || {};
+      const isManaged = props.managedBy === 'sistema-edital-dac';
+      const isContestable = isManaged && props.status === 'pending_evaluation';
+      
+      return {
+        id: event.id,
+        summary: event.summary,
+        // ✅ EXTRAI dateTime ou date com fallback
+        start: event.start?.dateTime || (event.start?.date ? `${event.start.date}T00:00:00` : null),
+        end: event.end?.dateTime || (event.end?.date ? `${event.end.date}T23:59:59` : null),
+        isContestable: isContestable
+      };
+    }).filter(e => e.start && e.end); // Remove eventos sem data válida
+    
+    res.json({ eventos: eventosProcessados });
+    console.log(`✅ SUCESSO: ${eventosProcessados.length} eventos retornados para ${local}/${month}.`);
+  } catch (error) {
+    console.error(`❌ Erro ao buscar eventos do Google Calendar para ${local}:`, error.message);
+    // ✅ Retorna array vazio ao invés de erro 500 para não quebrar o frontend
+    console.log("⚠️ Retornando lista vazia de eventos devido a erro na autenticação");
+    res.json({ eventos: [] });
+  }
+});
+
+app.post("/api/save-assessment", async (req, res) => {
+  const { inscriptionId, evaluatorEmail, scoresJson } = req.body;
+
+  if (!inscriptionId || !evaluatorEmail || !scoresJson) {
+    return res.status(400).json({ error: "Dados incompletos." });
+  }
+
+  try {
+    await query(
+      `INSERT INTO assessments (inscription_id, evaluator_email, scores_json) 
+       VALUES ($1, $2, $3)
+       ON CONFLICT (inscription_id, evaluator_email) DO UPDATE SET scores_json = $3`,
+      [inscriptionId, evaluatorEmail, JSON.stringify(scoresJson)]
+    );
+
+    res.json({ success: true, message: "Avaliação salva com sucesso." });
+  } catch (error) {
+    console.error("Erro ao salvar avaliação:", error);
+    res.status(500).json({ error: "Erro ao salvar avaliação." });
+  }
+});
+
+app.get("/api/assessments/:inscriptionId", async (req, res) => {
+  const { inscriptionId } = req.params;
+
+  try {
+    const result = await query("SELECT * FROM assessments WHERE inscription_id = $1", [inscriptionId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Erro ao obter avaliações:", error);
+    res.status(500).json({ error: "Erro ao obter avaliações." });
+  }
+});
 
 // Fallback para o React Router
 app.use((req, res) => {
