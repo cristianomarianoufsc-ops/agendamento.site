@@ -645,6 +645,8 @@ app.post('/api/auth/admin', async (req, res) => {
 app.post("/api/config", async (req, res) => {
   try {
     const newConfigData = req.body;
+    console.log("📥 Recebendo novos dados de config:", JSON.stringify(newConfigData));
+    
     let currentConfig = {};
 
     // 1. Busca a configuração atual do banco de dados
@@ -654,53 +656,60 @@ app.post("/api/config", async (req, res) => {
         currentConfig = JSON.parse(result.rows[0].config_json);
       }
     } catch (e) {
-      console.warn("⚠️ Nenhuma configuração encontrada no banco, criando nova.");
+      console.warn("⚠️ Nenhuma configuração encontrada no banco ou erro ao ler.");
     }
 
     // 2. Mescla a configuração atual com os novos dados recebidos
     const updatedConfig = { ...currentConfig, ...newConfigData };
 
-    // ✅ CORREÇÃO: Mapear formsId para formsLink se necessário para compatibilidade com o frontend
-    if (updatedConfig.formsId && !updatedConfig.formsLink) {
+    // ✅ EXTRAÇÃO ROBUSTA DE IDs (Google Forms e Sheets)
+    const extractId = (val) => {
+      if (!val) return "";
+      const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      return match ? match[1] : val;
+    };
+
+    // Se o usuário enviou formsId (pode ser link ou ID), normalizamos
+    if (updatedConfig.formsId) {
+      updatedConfig.formsId = extractId(updatedConfig.formsId);
+      // Sempre gera o link completo para o frontend usar
       updatedConfig.formsLink = `https://docs.google.com/forms/d/e/${updatedConfig.formsId}/viewform`;
     }
 
-    // Validação e limpeza para o novo campo
+    // Se o usuário enviou sheetLink (link completo), extraímos o ID
+    if (updatedConfig.sheetLink) {
+      updatedConfig.sheetId = extractId(updatedConfig.sheetLink);
+    } else if (updatedConfig.sheetId) {
+      // Se enviou apenas sheetId (que pode ser um link), normalizamos também
+      updatedConfig.sheetId = extractId(updatedConfig.sheetId);
+    }
+
+    // Validação de segurança
     if (updatedConfig.buttonExternalEditalText && updatedConfig.buttonExternalEditalText.length > 50) {
         updatedConfig.buttonExternalEditalText = updatedConfig.buttonExternalEditalText.substring(0, 50);
     }
 
-    // ✅ ALTERAÇÃO CRUCIAL: Sempre recalcula o sheetId se o sheetLink existir
-    if (updatedConfig.sheetLink) {
-      const match = updatedConfig.sheetLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      updatedConfig.sheetId = match ? match[1] : ""; 
-    }
-
-    // 3. Salva no banco de dados (INSERT ou UPDATE)
+    // 3. Salva no banco de dados
     const configJson = JSON.stringify(updatedConfig);
-    console.log("📦 Tentando salvar no banco de dados...");
-    try {
-      await query(`
-        INSERT INTO config (id, config_json, updated_at)
-        VALUES (1, $1, CURRENT_TIMESTAMP)
-        ON CONFLICT (id) 
-        DO UPDATE SET config_json = $1, updated_at = CURRENT_TIMESTAMP
-      `, [configJson]);
-      console.log("✅ Configurações salvas com sucesso no banco de dados!");
-    } catch (dbError) {
-      console.error("❌ Erro ao salvar no banco de dados:", dbError.message);
-      throw dbError;
-    }
+    console.log("📦 Salvando no banco de dados...");
+    
+    await query(`
+      INSERT INTO config (id, config_json, updated_at)
+      VALUES (1, $1, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) 
+      DO UPDATE SET config_json = $1, updated_at = CURRENT_TIMESTAMP
+    `, [configJson]);
+    
+    console.log("✅ Configurações salvas no banco!");
 
-    // 4. Também salva no arquivo local (para desenvolvimento/backup)
+    // 4. Backup em arquivo local
     try {
       fs.writeFileSync("config.json", JSON.stringify(updatedConfig, null, 2));
-      console.log("✅ Configurações salvas no arquivo local (backup).");
     } catch (fsError) {
-      console.warn("⚠️ Erro ao salvar config.json local:", fsError.message);
+      console.warn("⚠️ Erro backup local:", fsError.message);
     }
     
-    res.json({ success: true, ...updatedConfig });
+    res.json({ success: true, config: updatedConfig });
     
   } catch (err) {
     console.error("❌ Erro em POST /api/config:", err.message);
