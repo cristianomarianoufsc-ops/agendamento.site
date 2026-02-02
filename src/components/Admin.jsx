@@ -948,7 +948,14 @@ const Admin = ({ viewOnly = false }) => {
                     <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
                     <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
                   </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsId: extractIdFromUrl(formsId), sheetId: extractIdFromUrl(sheetId) })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
+                  <div className="mt-6"><button onClick={() => {
+  const id = extractIdFromUrl(formsId);
+  handleSaveConfig({ 
+    formsId: id, 
+    formsLink: id ? `https://docs.google.com/forms/d/e/${id}/viewform` : "",
+    sheetId: extractIdFromUrl(sheetId) 
+  });
+}} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
