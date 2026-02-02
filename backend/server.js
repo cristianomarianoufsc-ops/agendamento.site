@@ -665,7 +665,8 @@ app.post("/api/config", async (req, res) => {
     // ✅ EXTRAÇÃO ROBUSTA DE IDs (Google Forms e Sheets)
     const extractId = (val) => {
       if (!val) return "";
-      const match = val.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      // Suporta links de forms (/d/e/ID/...) e planilhas (/d/ID/...)
+      const match = val.match(/\/d\/(?:e\/)?([a-zA-Z0-9-_]+)/);
       return match ? match[1] : val;
     };
 
