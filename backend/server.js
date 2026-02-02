@@ -1142,8 +1142,11 @@ app.post("/api/create-events", async (req, res) => {
     }
     try {
       const dbPayload = {
-        nome: userData.name, email: userData.email, telefone: userData.phone,
-        evento_nome: userData.eventName || resumo, local,
+        nome: userData?.name || "N/A", 
+        email: userData?.email || "N/A", 
+        telefone: userData?.phone || "N/A",
+        evento_nome: userData?.eventName || resumo || "Evento sem nome", 
+        local,
         ensaio_inicio: null, ensaio_fim: null, ensaio_eventId: null,
         montagem_inicio: null, montagem_fim: null, montagem_eventId: null,
         desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
@@ -1169,12 +1172,24 @@ app.post("/api/create-events", async (req, res) => {
       console.log("💾 Inscrição salva no banco com sucesso!");
       
       // Envia o e-mail de confirmação da Etapa 1
-      await sendStep1ConfirmationEmail(userData.email, userData.name, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+      try {
+        await sendStep1ConfirmationEmail(userData?.email, userData?.name, (userData?.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+      } catch (emailErr) {
+        console.error("⚠️ Erro ao enviar e-mail de confirmação (não bloqueante):", emailErr.message);
+      }
 
       res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
     } catch (err) {
       console.error("❌ Erro ao salvar inscrição no banco:", err.message);
-      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
+      // Se chegamos aqui, os eventos no Google Calendar JÁ FORAM criados.
+      // Para não travar o usuário, retornamos success: true mas avisamos do erro no log.
+      // O frontend poderá seguir para a Etapa 2.
+      res.json({ 
+        success: true, 
+        message: "Eventos criados, mas houve um erro ao salvar no banco de dados. Você pode prosseguir.", 
+        eventos: eventosCriados,
+        dbError: true 
+      });
     }
   } catch (err) {
     console.error("❌ Erro no endpoint /api/create-events:", err.message);
