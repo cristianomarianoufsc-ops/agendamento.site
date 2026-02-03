@@ -547,15 +547,14 @@ app.post('/api/evaluators', async (req, res) => {
   }
 
   try {
-    // 1. Remover todos os avaliadores antigos
-    await query('DELETE FROM evaluators');
-    
-    // 2. Inserir novos avaliadores com a senha unica
+    // 1. Inserir ou atualizar avaliadores com a senha única
     for (const evaluator of evaluators) {
-      const name = evaluator.name || evaluator.email;
+      const email = evaluator.email;
+      if (!email) continue;
+      
       await query(
-        'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2)',
-        [name, sharedPassword]
+        'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash',
+        [email.trim().toLowerCase(), sharedPassword]
       );
     }
     
@@ -566,6 +565,18 @@ app.post('/api/evaluators', async (req, res) => {
   } catch (error) {
     console.error('Erro ao salvar avaliadores:', error);
     res.status(500).json({ error: 'Erro ao salvar avaliadores.' });
+  }
+});
+
+// Endpoint para remover um avaliador
+app.delete('/api/evaluators/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await query('DELETE FROM evaluators WHERE id = $1', [id]);
+    res.json({ success: true, message: 'Avaliador removido com sucesso.' });
+  } catch (error) {
+    console.error('Erro ao remover avaliador:', error);
+    res.status(500).json({ error: 'Erro ao remover avaliador.' });
   }
 });
 

@@ -60,7 +60,7 @@ const Admin = ({ viewOnly = false }) => {
   const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
   const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços");
   const [evaluationCriteria, setEvaluationCriteria] = useState([]);
-  const [evaluators, setEvaluators] = useState([]);
+  const [evaluators, setEvaluators] = useState([]); // Inicializado como array vazio
   const [allowBookingOverlap, setAllowBookingOverlap] = useState(false);
   // ✅ NOVOS ESTADOS PARA CONTROLE DE CALENDÁRIO
   const [blockedDates, setBlockedDates] = useState([]); // Datas bloqueadas (YYYY-MM-DD)
@@ -346,11 +346,13 @@ const Admin = ({ viewOnly = false }) => {
   const fetchEvaluators = async () => {
     if (viewOnly) return;
     try {
-        const response = await fetch("/api/evaluators"   );
+        const response = await fetch("/api/evaluators");
         const data = await response.json();
-        setEvaluators(data || []);
+        // Garante que evaluators seja sempre um array
+        setEvaluators(Array.isArray(data) ? data : []);
     } catch (error) {
         console.error("Erro ao buscar avaliadores:", error);
+        setEvaluators([]);
     }
   };
 
@@ -511,8 +513,27 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleRemoveEvaluator = (id) => {
-    setEvaluators(prev => prev.filter(e => e.id !== id));
+  const handleRemoveEvaluator = async (id) => {
+    // Se for um avaliador novo (ainda não salvo no banco), remove apenas do estado
+    if (typeof id === 'string' && id.startsWith('new-')) {
+      setEvaluators(prev => prev.filter(e => e.id !== id));
+      return;
+    }
+
+    // Se já estiver no banco, confirma e remove via API
+    if (window.confirm("Tem certeza que deseja remover este avaliador?")) {
+      try {
+        const response = await fetch(`/api/evaluators/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          setEvaluators(prev => prev.filter(e => e.id !== id));
+        } else {
+          alert("Erro ao remover avaliador do servidor.");
+        }
+      } catch (error) {
+        console.error("Erro ao remover avaliador:", error);
+        alert("Erro de comunicação ao remover avaliador.");
+      }
+    }
   };
 
   const handleSaveEvaluators = async () => {
@@ -1235,7 +1256,7 @@ const Admin = ({ viewOnly = false }) => {
                     <label className="block font-semibold text-gray-600 mb-2 text-sm">E-mail do Avaliador</label>
                     <div className="flex gap-2">
                       <input type="email" placeholder="Ex: joao.silva@exemplo.com" className="p-2 border rounded-md w-full" onKeyDown={(e) => { if (e.key === 'Enter') { handleAddEvaluator(e.target.value); e.target.value = ''; } }} />
-                      <button onClick={(e) => { const input = e.currentTarget.previousSibling; handleAddEvaluator(input.value); input.value = ''; }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
+                      <button onClick={(e) => { const input = e.currentTarget.parentElement.querySelector('input[type="email"]'); if (input) { handleAddEvaluator(input.value); input.value = ''; } }} className="px-4 py-2 bg-gray-200 text-gray-800 font-bold rounded-lg hover:bg-gray-300">Adicionar</button>
                     </div>
                   </div>
 
