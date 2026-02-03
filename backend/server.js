@@ -569,7 +569,7 @@ app.post('/api/evaluators', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao salvar avaliadores:', error);
-    res.status(500).json({ error: 'Erro ao salvar avaliadores.' });
+    res.status(500).json({ error: 'Erro ao salvar avaliadores: ' + error.message, details: error });
   }
 });
 
