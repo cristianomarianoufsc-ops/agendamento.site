@@ -547,11 +547,16 @@ app.post('/api/evaluators', async (req, res) => {
   }
 
   try {
+    console.log('Recebido pedido para salvar avaliadores:', { count: evaluators.length });
     // 1. Inserir ou atualizar avaliadores com a senha única
     for (const evaluator of evaluators) {
       const email = evaluator.email;
-      if (!email) continue;
+      if (!email) {
+        console.warn('Avaliador sem email ignorado:', evaluator);
+        continue;
+      }
       
+      console.log('Processando avaliador:', email);
       await query(
         'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash',
         [email.trim().toLowerCase(), sharedPassword]
