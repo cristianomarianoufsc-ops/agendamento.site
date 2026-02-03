@@ -264,7 +264,7 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: `Confirmação de Inscrição: ${inscricao.evento_nome || 'Evento'} - #${inscricao.id}`,
     html: `
@@ -280,7 +280,7 @@ async function sendPdfByEmail(email, filename, pdfBuffer, inscricao) {
         <li><strong>E-mail de Contato:</strong> ${email}</li>
       </ul>
       <p>Em caso de dúvidas, entre em contato com a organização.</p>
-      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
     `,
     attachments: [
       {
@@ -318,7 +318,7 @@ async function sendEvaluatorCredentials(email, password) {
   }
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: 'Credenciais de Acesso - Sistema de Avaliação UFSC',
     html: `
@@ -331,7 +331,7 @@ async function sendEvaluatorCredentials(email, password) {
       </ul>
       <p>Acesse o sistema em: <a href="http://localhost:5173/admin-viewer">http://localhost:5173/admin-viewer</a></p>
       <p><strong>Importante:</strong> Guarde suas credenciais em local seguro. Você poderá alterar sua senha após o primeiro acesso.</p>
-      <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+      <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
     `
   };
 
@@ -482,6 +482,7 @@ app.get("/api/config", async (req, res) => {
       formsLink: "",
       sheetLink: "",
       sheetId: "",
+      useFixedLinks: false,
       weights: { A: 1, B: 1, C: 1, D: 1 },
       pageTitle: "Sistema de Agendamento de Espaços",
       allowBookingOverlap: false,
@@ -504,7 +505,17 @@ app.get("/api/config", async (req, res) => {
       console.warn("⚠️ Erro ao buscar configurações do banco:", dbError.message);
     }
 
-    // 2. Fallback: não há mais leitura de arquivo. Retorna default se não encontrar no DB.
+    // 2. Fallback: Tenta ler do arquivo local (config.json)
+    try {
+      if (fs.existsSync("config.json")) {
+        const fileConfig = JSON.parse(fs.readFileSync("config.json", "utf8"));
+        const fullConfig = { ...defaultConfig, ...fileConfig };
+        console.log("✅ Configurações carregadas do arquivo local.");
+        return res.json(fullConfig);
+      }
+    } catch (fileError) {
+      console.warn("⚠️ Erro ao buscar configurações do arquivo:", fileError.message);
+    }
 
     // 3. Se não encontrou em nenhum lugar, retorna configuração padrão
     console.log("ℹ️ Usando configuração padrão.");
@@ -586,12 +597,18 @@ app.post('/api/auth/viewer', async (req, res) => {
 // --- ROTA PARA BUSCAR DADOS DO FORMS (DINÂMICO) ---
 app.get('/api/forms-data', async (req, res) => {
   try {
-    // ID da planilha fixo, conforme solicitado pelo usuário
-    const FIXED_SHEET_ID = '1Fh8G2vQ1Tu4_qXghW6q5X2noxvUAuJA0m70pAwxka-s';
+    // Busca a configuração atual para pegar o sheetId dinâmico
+    const config = await getConfigFromDB();
+    const sheetId = config.sheetId || '1Fh8G2vQ1Tu4_qXghW6q5X2noxvUAuJA0m70pAwxka-s';
+
+    if (!sheets) {
+        console.warn("⚠️ API do Google Sheets não inicializada.");
+        return res.status(503).json({ error: 'Serviço do Google Sheets não disponível.' });
+    }
 
     // Acessa a API do Google Sheets
     const response = await sheets.spreadsheets.values.get({ 
-      spreadsheetId: FIXED_SHEET_ID, 
+      spreadsheetId: sheetId, 
       range: "A:ZZ" 
     });
     
@@ -665,10 +682,26 @@ app.post("/api/config", async (req, res) => {
         updatedConfig.buttonExternalEditalText = updatedConfig.buttonExternalEditalText.substring(0, 50);
     }
 
-    // ✅ ALTERAÇÃO CRUCIAL: Sempre recalcula o sheetId se o sheetLink existir
+    // Links fixos solicitados pelo usuário
+    const FIXED_FORMS_LINK = "https://docs.google.com/forms/d/e/1FAIpQLScxvwER2fKcTMebfOas0NWm4hn35POVjkmYtbwRLFEKmq3G5w/viewform?usp=dialog";
+    const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
+
+    // Se estiver usando links fixos, sobrescreve os links atuais
+    if (updatedConfig.useFixedLinks) {
+        updatedConfig.formsLink = FIXED_FORMS_LINK;
+        updatedConfig.sheetLink = FIXED_SHEET_LINK;
+    }
+
+    // Sempre recalcula o sheetId com base no sheetLink atual (seja fixo ou manual)
     if (updatedConfig.sheetLink) {
       const match = updatedConfig.sheetLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      updatedConfig.sheetId = match ? match[1] : ""; // Se não encontrar, define como vazio
+      updatedConfig.sheetId = match ? match[1] : updatedConfig.sheetLink;
+    }
+
+    // Sincroniza formsId para compatibilidade se necessário
+    if (updatedConfig.formsLink) {
+        const match = updatedConfig.formsLink.match(/(?:forms\/d\/e\/|spreadsheets\/d\/)([a-zA-Z0-9_-]+)/);
+        updatedConfig.formsId = match ? match[1] : updatedConfig.formsLink;
     }
 
     // 3. Salva no banco de dados (INSERT ou UPDATE)
@@ -1061,16 +1094,16 @@ async function sendConsolidationEmail(email, nome, isWinner) {
     <h2>Parabéns, ${nome}! Seu agendamento foi confirmado.</h2>
     <p>Após a consolidação da agenda, sua proposta obteve a maior pontuação e seu agendamento foi confirmado no calendário oficial.</p>
     <p>Você pode verificar os detalhes do seu agendamento no sistema.</p>
-    <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+    <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
   ` : `
     <h2>Atenção, ${nome}. Seu agendamento foi cancelado.</h2>
     <p>Após a consolidação da agenda, sua proposta não obteve a maior pontuação para o horário solicitado, e o agendamento foi cancelado.</p>
     <p>Você pode acessar o sistema para verificar a possibilidade de reagendamento em outras datas ou horários.</p>
-    <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+    <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
   `;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'seu-email@gmail.com',
+    from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
     to: email,
     subject: subject,
     html: body
@@ -1364,7 +1397,10 @@ app.get("/api/master-sheet-link", (req, res) => {
 app.post("/api/create-events", async (req, res) => {
   try {
     const { local, resumo, etapas, userData } = req.body;
+    console.log("📥 Recebida requisição /api/create-events:", { local, resumo, etapasCount: etapas?.length, userDataEmail: userData?.email });
+    
     if (!calendarIds[local]) {
+      console.error("❌ Calendário não encontrado para o local:", local);
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
 
@@ -1395,19 +1431,17 @@ app.post("/api/create-events", async (req, res) => {
           eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
 
         } catch (err) {
-          console.error(`❌ Falha ao criar evento "${event.summary}":`, err.message);
-          // Se falhar a criação de um evento, considera-se falha total do agendamento.
-          throw err;
+          console.error(`⚠️ Falha ao criar evento "${event.summary}" no Google Calendar:`, err.message);
+          // Não lançamos o erro para permitir que a inscrição seja salva no banco
+          etapasComId.push({ ...etapa, eventId: null });
         }
       }
     } catch (err) {
       // Captura erro de inicialização do Google Calendar (ex: invalid_grant)
       calendarError = err;
-      console.error("❌ Erro de inicialização ou criação de eventos do Google Calendar:", err.message);
-      // NOVO: Log mais detalhado do erro
-      console.error("❌ DETALHES DO ERRO DO GOOGLE CALENDAR:", err);
-      // Se houver um erro crítico (como credenciais inválidas), aborta o processo de agendamento.
-      return res.status(500).json({ success: false, error: "Erro crítico na sincronização com o Google Calendar. Verifique as credenciais." });
+      console.error("⚠️ Erro de inicialização do Google Calendar:", err.message);
+      console.error("⚠️ DETALHES DO ERRO DO GOOGLE CALENDAR:", err);
+      // Continuamos o processo para salvar no banco de dados
     }
 
     // 2. Salva a inscrição no banco de dados, independentemente do sucesso do Calendar
@@ -1420,37 +1454,68 @@ app.post("/api/create-events", async (req, res) => {
         desmontagem_inicio: null, desmontagem_fim: null, desmontagem_eventId: null,
         eventos_json: '[]'
       };
-      const eventosExtras = [];
+      
+      const todosEventos = [];
       etapasComId.forEach(e => {
         const nome = e.nome.toLowerCase();
-        if (dbPayload.hasOwnProperty(`${nome}_inicio`)) {
+        
+        // Adiciona ao array geral de eventos para o JSON
+        todosEventos.push({ nome: e.nome, inicio: e.inicio, fim: e.fim, eventId: e.eventId });
+
+        // Mantém compatibilidade com colunas legadas (pega o primeiro de cada tipo)
+        if (dbPayload.hasOwnProperty(`${nome}_inicio`) && !dbPayload[`${nome}_inicio`]) {
           dbPayload[`${nome}_inicio`] = e.inicio;
           dbPayload[`${nome}_fim`] = e.fim;
           dbPayload[`${nome}_eventId`] = e.eventId;
-        } else if (nome === 'evento') {
-          eventosExtras.push({ inicio: e.inicio, fim: e.fim, eventId: e.eventId });
         }
       });
-      dbPayload.eventos_json = JSON.stringify(eventosExtras);
       
-      await query(
-        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-      );
-      console.log("💾 Inscrição salva no banco com sucesso!");
+      dbPayload.eventos_json = JSON.stringify(todosEventos);
       
-      res.json({ success: true, message: "Eventos criados e inscrição salva com sucesso!", eventos: eventosCriados });
+      try {
+        await query(
+          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
+        );
+        console.log("💾 Inscrição salva no banco com sucesso!");
+      } catch (dbErr) {
+        console.error("⚠️ Erro ao salvar no banco de dados, mas o evento foi criado no Calendar:", dbErr.message);
+        // Se o evento foi criado no Calendar mas o banco falhou, ainda podemos considerar "sucesso" para o usuário não travar
+        // mas avisamos no log. Se ambos falharem, aí sim é erro total.
+        if (eventosCriados.length === 0) throw dbErr;
+      }
 
-		      // Envia o e-mail de confirmação da Etapa 1 em segundo plano (não bloqueia a resposta ao cliente)
-			      sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })));
+      const message = calendarError || eventosCriados.length < etapas.length 
+        ? "Inscrição processada, mas houve erro na sincronização total com o Google Calendar." 
+        : "Eventos criados e inscrição salva com sucesso!";
+      
+      // Envia a resposta ANTES do e-mail para evitar timeout ou erros de e-mail bloquearem o frontend
+      res.json({ 
+        success: true, 
+        message: message, 
+        eventos: eventosCriados,
+        calendarError: calendarError ? calendarError.message : (eventosCriados.length < etapas.length ? "Alguns eventos não foram criados no Calendar" : null)
+      });
+
+      // Envia o e-mail de confirmação da Etapa 1 em segundo plano
+      setTimeout(() => {
+        sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })))
+          .catch(mailErr => console.error("❌ Erro no envio de e-mail em background:", mailErr.message));
+      }, 100);
+
     } catch (err) {
-      console.error("❌ Erro ao salvar inscrição no banco:", err.message);
-      res.status(500).json({ success: false, error: "Erro ao salvar inscrição." });
+      console.error("❌ Erro ao processar inscrição:", err.message);
+      res.status(500).json({ success: false, error: "Erro ao salvar inscrição no banco de dados." });
     }
     } catch (err) {
-      console.error("❌ Erro no endpoint /api/create-events:", err.message);
+      console.error("❌ Erro no endpoint /api/create-events (catch final):", err);
       // Se o erro for propagado do bloco try/catch do Calendar, ele será capturado aqui.
-      res.status(500).json({ success: false, error: "Erro interno ao criar eventos. A inscrição não foi salva devido a uma falha na criação do evento no Google Calendar." });
+      res.status(500).json({ 
+        success: false, 
+        error: "Erro interno ao criar eventos.",
+        details: err.message,
+        stack: err.stack
+      });
     }
 });
 
@@ -1709,7 +1774,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
 		          ${etapasHtml}
 		        </ul>    <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
 	        <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
-	        <p>Atenciosamente,<br>Sistema de Agendamento UFSC</p>
+	        <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
 		      </div>
 		    `;
   
@@ -1722,7 +1787,8 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (brevoApiKey) {
     try {
       const payload = {
-        sender: { email: remetente, name: "Sistema de Agendamento UFSC" },
+        sender: { email: remetente, name: "Sistema de Agendamento DAC" },
+        replyTo: { email: remetente, name: "Sistema de Agendamento DAC" },
         to: [{ email: email, name: nome }],
         subject: subject,
         htmlContent: htmlContent
@@ -1756,7 +1822,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (resend) {
     try {
       const { data, error } = await resend.emails.send({
-        from: remetente,
+        from: `"Sistema de Agendamento DAC" <${remetente}>`,
         to: [email],
         subject: subject,
         html: htmlContent,
@@ -1779,7 +1845,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   if (transporter) {
     try {
       const mailOptions = {
-        from: `"Sistema de Agendamento UFSC" <${remetente}>`,
+        from: `"Sistema de Agendamento DAC" <${remetente}>`,
         to: email,
         subject: subject,
         html: htmlContent,
@@ -1978,84 +2044,8 @@ app.get("/api/slides-viewer", async (req, res) => {
 app.use("/slides-content", express.static("slides-edital-ufsc"));
 
 
-// --- ROTAS DE CONFIGURAÇÃO ---
-
-// --- 24. ROTA: GERAR PDF COM DADOS DO GOOGLE SHEETS ---
-// --- ROTAS DE CONFIGURAÇÃO (GET E POST /api/config) ---
-
-// GET /api/config - Ler configurações do banco
-app.get("/api/config", async (req, res) => {
-  try {
-    const result = await query("SELECT config_json FROM config WHERE id = 1");
-    
-    if (result.rows.length > 0) {
-      const config = JSON.parse(result.rows[0].config_json);
-      res.json(config);
-    } else {
-      // Se não existe, retorna config vazio
-      res.json({
-        formsLink: "",
-        sheetLink: "",
-        sheetId: "",
-        pageTitle: "Sistema de Agendamento de Espaços",
-        allowBookingOverlap: false,
-        blockedDates: [],
-        stageTimes: {
-          ensaio: { start: "08:00", end: "21:00" },
-          montagem: { start: "08:00", end: "21:00" },
-          evento: { start: "08:00", end: "21:00" },
-          desmontagem: { start: "08:00", end: "21:00" }
-        },
-        enableInternalEdital: true,
-        enableExternalEdital: true,
-        enableRehearsal: true
-      });
-    }
-  } catch (error) {
-    console.error("Erro ao ler configurações:", error);
-    res.status(500).json({ error: "Erro ao ler configurações" });
-  }
-});
-
-// POST /api/config - Salvar configurações no banco
-app.post("/api/config", async (req, res) => {
-  try {
-    // Ler config atual
-    const currentResult = await query("SELECT config_json FROM config WHERE id = 1");
-    let currentConfig = {};
-    
-    if (currentResult.rows.length > 0) {
-      currentConfig = JSON.parse(currentResult.rows[0].config_json);
-    }
-    
-    // Merge com novos dados
-    const newConfig = { ...currentConfig, ...req.body };
-    
-    // Extrair sheetId do sheetLink se fornecido
-    if (newConfig.sheetLink) {
-      const match = newConfig.sheetLink.match(/\/d\/([a-zA-Z0-9-_]+)/);
-      if (match) {
-        newConfig.sheetId = match[1];
-        console.log(`✅ SheetId extraído: ${newConfig.sheetId}`);
-      }
-    }
-    
-    // Salvar no banco (INSERT ou UPDATE)
-    await query(`
-      INSERT INTO config (id, config_json, updated_at)
-      VALUES (1, $1, NOW())
-      ON CONFLICT (id) DO UPDATE
-      SET config_json = $1, updated_at = NOW()
-    `, [JSON.stringify(newConfig)]);
-    
-    console.log("✅ Configurações salvas no banco:", newConfig);
-    res.json({ success: true });
-    
-  } catch (error) {
-    console.error("Erro ao salvar configurações:", error);
-    res.status(500).json({ error: "Erro ao salvar configurações" });
-  }
-});
+// --- ROTAS DE CONFIGURAÇÃO REMOVIDAS (DUPLICADAS) ---
+// As rotas oficiais estão definidas anteriormente nas linhas 472 (GET) e 645 (POST).
 app.get("/api/gerar-pdf/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -2366,6 +2356,7 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // Servir arquivos estáticos (CSS, JS, Imagens)
 app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);

@@ -10,13 +10,16 @@ const SmartInfoRow = ({ label, value }) => { const isLink = (text) => typeof tex
 const InfoRow = ({ label, value }) => ( <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 py-2 border-b border-gray-100"> <div className="text-sm font-bold text-gray-600">{label}</div> <div className="col-span-2 text-sm text-gray-800">{value || <span className="italic text-gray-400">Não informado</span>}</div> </div> );
 
 // --- COMPONENTE PRINCIPAL ---
-const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => {
+const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess, onClose }) => {
   const drawerRef = useRef(null);
+  const evaluationSectionRef = useRef(null);
 
   useEffect(() => {
-    // Tenta focar no topo do drawer para evitar que o scroll vá para o topo da página
-    if (drawerRef.current) {
-      drawerRef.current.focus();
+    // Scroll automático para o topo do drawer quando abrir
+    if (drawerRef.current && user) {
+      setTimeout(() => {
+        drawerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   }, [user]); // Roda quando o drawer é aberto/atualizado com um novo usuário
 
@@ -64,6 +67,10 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
   };
 
   // Lógica para salvar a avaliação
+  const scrollToEvaluation = () => {
+    // Usando 'block: "start"' para garantir que o elemento fique no topo da área visível
+    evaluationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   const handleSaveAssessment = async () => {
     if (!criteria || criteria.length === 0) {
       alert("❌ Não há critérios de avaliação definidos.");
@@ -85,12 +92,16 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
         body: JSON.stringify(finalPayload ),
       });
       if (response.ok) {
-        alert(`✅ Avaliação salva com sucesso!`);
+        // alert(`✅ Avaliação salva com sucesso!`); // Removido a pedido do usuário
         // A lógica do seu backup: atualiza o estado local e notifica o pai.
         setIsEditing(false);
         setHasBeenAssessed(true);
         if (onSaveSuccess) {
           onSaveSuccess();
+        }
+        // Adicionado: Chama onClose para fechar a gaveta após o salvamento bem-sucedido
+        if (onClose) {
+          onClose();
         }
       } else {
         const result = await response.json();
@@ -145,11 +156,11 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
       </div>
       <div className="mt-6 border-t pt-4">
         {isEditing ? (
-          <button onClick={handleSaveAssessment} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
+          <button onClick={() => { handleSaveAssessment(); scrollToEvaluation(); }} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-transform duration-200 hover:scale-[1.02]">
             <Save size={18} /> Salvar Avaliação
           </button>
         ) : (
-          <button onClick={() => setIsEditing(true)} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
+          <button onClick={() => { setIsEditing(true); scrollToEvaluation(); }} className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-transform duration-200 hover:scale-[1.02]">
             <Edit size={18} /> Editar Avaliação
           </button>
         )}
@@ -183,7 +194,7 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess }) => 
         </Section>
         
         {/* Painel de avaliação SEMPRE aparece por último */}
-        {EvaluationSection}
+        <div ref={evaluationSectionRef}>{EvaluationSection}</div>
       </div>
     </div>
   );

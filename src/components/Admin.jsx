@@ -9,7 +9,7 @@ import {
 import EvaluationDrawer from './EvaluationDrawer';
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
 import SlidesViewer from './SlidesViewer';
-import MarkdownModal from './MarkdownModal'; // ✅ NOVO: Modal para conteúdo Markdown
+import ConsolidacaoModal from './ConsolidacaoModal'; // ✅ Importação do novo modal
 import { v4 as uuidv4 } from 'uuid';
 
 // Componente Modal (sem alterações)
@@ -38,13 +38,11 @@ const Admin = ({ viewOnly = false }) => {
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false); // NOVO ESTADO
   const [showSlidesViewer, setShowSlidesViewer] = useState(false); // NOVO ESTADO
   const [showFormDataModal, setShowFormDataModal] = useState(false); // ✅ NOVO ESTADO
+  const [showConsolidacaoModal, setShowConsolidacaoModal] = useState(false); // ✅ NOVO ESTADO
+  const [consolidacaoData, setConsolidacaoData] = useState(null); // ✅ NOVO ESTADO
   const [selectedFormData, setSelectedFormData] = useState(null); // ✅ NOVO ESTADO
   const [slidesData, setSlidesData] = useState(null); // NOVO ESTADO
   const [openAccordionId, setOpenAccordionId] = useState(null);
-  
-  // ✅ NOVOS ESTADOS PARA O MODAL DA AGENDA CONSOLIDADA
-  const [showAgendaModal, setShowAgendaModal] = useState(false);
-  const [agendaMarkdown, setAgendaMarkdown] = useState('');
   
   // Estados de Configuração
   
@@ -54,8 +52,12 @@ const Admin = ({ viewOnly = false }) => {
     setBlockedDates(newBlockedDates);
     handleSaveConfig({ blockedDates: newBlockedDates });
   };
-  const [formsId, setFormsId] = useState("");
-  const [sheetId, setSheetId] = useState("");
+  const [formsLink, setFormsLink] = useState("");
+  const [sheetLink, setSheetLink] = useState("");
+  const [useFixedLinks, setUseFixedLinks] = useState(false);
+
+  const FIXED_FORMS_LINK = "https://docs.google.com/forms/d/e/1FAIpQLScxvwER2fKcTMebfOas0NWm4hn35POVjkmYtbwRLFEKmq3G5w/viewform?usp=dialog";
+  const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
   const [pageTitle, setPageTitle] = useState("Sistema de Agendamento de Espaços");
   const [evaluationCriteria, setEvaluationCriteria] = useState([]);
   const [evaluators, setEvaluators] = useState([]);
@@ -357,8 +359,9 @@ const Admin = ({ viewOnly = false }) => {
     if (!viewOnly) {
       fetchEvaluators();
       fetch("/api/config"   ).then(res => res.json()).then(data => {
-        if (data.formsId) setFormsId(data.formsId);
-        if (data.sheetId) setSheetId(data.sheetId);
+        if (data.formsLink) setFormsLink(data.formsLink);
+        if (data.sheetLink) setSheetLink(data.sheetLink);
+        if (data.useFixedLinks !== undefined) setUseFixedLinks(data.useFixedLinks);
         if (data.pageTitle) setPageTitle(data.pageTitle);
         if (data.allowBookingOverlap) setAllowBookingOverlap(data.allowBookingOverlap);
         // ✅ CARREGA NOVAS CONFIGURAÇÕES DE CALENDÁRIO
@@ -560,39 +563,10 @@ const Admin = ({ viewOnly = false }) => {
     }
   };
 
-  const handleGeneratePDF = async (inscricao) => {
-    try {
-      const response = await fetch(`/api/gerar-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ inscricao }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`Erro HTTP: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `inscricao_${inscricao.id}_${inscricao.evento_nome.replace(/\s/g, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert(`Erro ao gerar PDF: ${error.message}. Verifique o console para mais detalhes.`);
-    }
-  };
 
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = async () => {
-    // Plano C: Gerar o relatório em Markdown diretamente no frontend
     const inscricoes = unificados; // Usar a lista de inscrições já carregada
 
     // 1. Classificar e contar
@@ -618,62 +592,23 @@ const Admin = ({ viewOnly = false }) => {
       }
     });
 
-    // 2. Gerar o conteúdo em Markdown
-    let content = `# Simulação de Consolidação da Agenda Final\n\n`;
-    content += `Gerado em: ${new Date().toLocaleString('pt-BR')}\n\n`;
+    // 2. Criar objeto de dados para o modal
+    const data = {
+      totalInscricoes: inscricoes.length,
+      aprovadas: aprovadas,
+      reprovadas: reprovadas,
+      naoAvaliadas: naoAvaliadas,
+      listaAprovadas: listaAprovadas,
+      listaReprovadas: listaReprovadas,
+      listaNaoAvaliadas: listaNaoAvaliadas,
+    };
 
-    // Resumo
-    content += `## Resumo da Classificação\n\n`;
-    content += `| Categoria | Quantidade |\n`;
-    content += `| :--- | :--- |\n`;
-    content += `| Total de Inscrições | ${inscricoes.length} |\n`;
-    content += `| Aprovadas (Nota >= 2.00) | ${aprovadas} |\n`;
-    content += `| Reprovadas (Nota < 2.00) | ${reprovadas} |\n`;
-    content += `| Não Avaliadas | ${naoAvaliadas} |\n\n`;
-
-    // Lista de Aprovadas
-    content += `## Inscrições Aprovadas\n\n`;
-    if (listaAprovadas.length === 0) {
-      content += `Nenhuma inscrição aprovada nesta simulação.\n\n`;
-    } else {
-      listaAprovadas.forEach((inscricao) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : 'N/A';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `* **${eventoNome}** (${inscricao.local}) - Nota: ${nota} | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Reprovadas
-    content += `## Inscrições Reprovadas\n\n`;
-    if (listaReprovadas.length === 0) {
-      content += `Nenhuma inscrição reprovada nesta simulação.\n\n`;
-    } else {
-      listaReprovadas.forEach((inscricao) => {
-        const nota = inscricao.finalScore !== null ? inscricao.finalScore.toFixed(2) : '0.00';
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `* **${eventoNome}** (${inscricao.local}) - Nota: ${nota} | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
-      });
-      content += `\n`;
-    }
-
-    // Lista de Não Avaliadas
-    content += `## Inscrições Não Avaliadas\n\n`;
-    if (listaNaoAvaliadas.length === 0) {
-      content += `Nenhuma inscrição não avaliada.\n\n`;
-    } else {
-      listaNaoAvaliadas.forEach((inscricao) => {
-        const eventoNome = inscricao.evento_nome || 'Evento Sem Nome';
-        content += `* **${eventoNome}** (${inscricao.local}) - Nota: N/A | Proponente: ${inscricao.nome || 'Desconhecido'} | ID: ${inscricao.id}\n`;
-      });
-      content += `\n`;
-    }
-
-    // 3. Abrir o modal com o conteúdo Markdown
-    setAgendaMarkdown(content);
-    setShowAgendaModal(true);
-    setIsDownloading(false); // Garante que o botão volte ao normal
+    // 3. Abrir o modal com os dados
+    setConsolidacaoData(data);
+    setShowConsolidacaoModal(true);
   };
+
+
 
   const handleForceCleanup = async () => { if (window.confirm("⚠️ ATENÇÃO! ⚠️\n\nTem certeza que deseja limpar TODOS os dados?")) { try { await fetch("/api/cleanup/force", { method: "POST" }   ); setUnificados([]); alert(`✅ Limpeza concluída!`); } catch (err) { alert("❌ Erro ao executar a limpeza."); } } };
   // --- RENDERIZAÇÃO ---
@@ -974,6 +909,7 @@ const Admin = ({ viewOnly = false }) => {
                                           criteria={evaluationCriteria} 
                                           evaluatorEmail={evaluatorEmail} 
                                           onSaveSuccess={fetchData}
+                                          onClose={() => setOpenAccordionId(null)}
                                         />
                                       </motion.div>
                                     </AnimatePresence>
@@ -1014,10 +950,59 @@ const Admin = ({ viewOnly = false }) => {
                 <div className="bg-white p-6 rounded-2xl shadow-md">
                   <h3 className="font-bold text-xl mb-4 text-gray-700 flex items-center gap-2"><Settings size={20} /> Configurações de Links</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label><input type="text" value={formsId} onChange={(e) => setFormsId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
-                    <div><label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label><input type="text" value={sheetId} onChange={(e) => setSheetId(e.target.value)} className="p-3 border rounded-lg w-full" /></div>
+                    <div className="flex items-center gap-2 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                      <input 
+                        type="checkbox" 
+                        id="useFixedLinks" 
+                        checked={useFixedLinks} 
+                        onChange={(e) => {
+                          const newValue = e.target.checked;
+                          setUseFixedLinks(newValue);
+                          handleSaveConfig({ useFixedLinks: newValue });
+                        }}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <label htmlFor="useFixedLinks" className="font-bold text-blue-800 cursor-pointer">
+                        Usar Links Fixos do Sistema (Segurança)
+                      </label>
+                    </div>
+
+                    <div className={useFixedLinks ? "opacity-50 pointer-events-none" : ""}>
+                      <div className="mb-4">
+                        <label className="block font-semibold text-gray-600 mb-2">Link do Google Forms (Etapa 2)</label>
+                        <input 
+                          type="text" 
+                          value={useFixedLinks ? FIXED_FORMS_LINK : formsLink} 
+                          onChange={(e) => setFormsLink(e.target.value)} 
+                          className="p-3 border rounded-lg w-full" 
+                          placeholder="https://docs.google.com/forms/d/..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-gray-600 mb-2">Link da Planilha de Respostas (CSV)</label>
+                        <input 
+                          type="text" 
+                          value={useFixedLinks ? FIXED_SHEET_LINK : sheetLink} 
+                          onChange={(e) => setSheetLink(e.target.value)} 
+                          className="p-3 border rounded-lg w-full" 
+                          placeholder="https://docs.google.com/spreadsheets/d/..."
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="mt-6"><button onClick={() => handleSaveConfig({ formsId: extractIdFromUrl(formsId), sheetId: extractIdFromUrl(sheetId) })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"><Save size={18} /> Salvar IDs</button></div>
+                  <div className="mt-6">
+                    <button 
+                      onClick={() => handleSaveConfig({ 
+                        formsLink: formsLink, 
+                        sheetLink: sheetLink,
+                        useFixedLinks: useFixedLinks
+                      })} 
+                      disabled={useFixedLinks}
+                      className={`flex items-center gap-2 px-4 py-2 font-bold rounded-lg transition-colors ${useFixedLinks ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
+                      <Save size={18} /> Salvar Links Manuais
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl shadow-md">
@@ -1280,20 +1265,10 @@ const Admin = ({ viewOnly = false }) => {
                 <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end">
                   <button 
                     onClick={handleConsolidateAgenda} 
-                    disabled={isDownloading}
-                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-base disabled:opacity-50 transition-colors shadow-lg"
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-base transition-colors shadow-lg"
                   >
-                    {isDownloading ? (
-                      <>
-                        <Loader className="animate-spin" size={20} />
-                        <span>Gerando PDF...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FileText size={20} />
-                        <span>Consolidar Agenda Final</span>
-                      </>
-                    )}
+                    <FileText size={20} />
+                    <span>Consolidar Agenda Final</span>
                   </button>
                 </div>
               </div>            )}
@@ -1304,14 +1279,14 @@ const Admin = ({ viewOnly = false }) => {
         {showModal && <Modal user={selectedUser} onClose={() => setShowModal(false)} />}
       {/* NOVO MODAL */}
       {showFormDataModal && selectedFormData && <FormDataModal inscricao={selectedFormData} onClose={() => setShowFormDataModal(false)} />}
-      {/* ✅ NOVO MODAL PARA AGENDA CONSOLIDADA */}
-      {showAgendaModal && (
-        <MarkdownModal 
-          title="Agenda Final Consolidada (Simulação)" 
-          markdownContent={agendaMarkdown} 
-          onClose={() => setShowAgendaModal(false)} 
-        />
-      )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showConsolidacaoModal && consolidacaoData && (
+          <ConsolidacaoModal
+            data={consolidacaoData}
+            onClose={() => setShowConsolidacaoModal(false)}
+          />
+        )}
       </AnimatePresence>
       {showSlidesViewer && slidesData && (
         <SlidesViewer
