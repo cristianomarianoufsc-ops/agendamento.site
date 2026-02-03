@@ -78,13 +78,13 @@ async function initializeTables() {
         local TEXT,
         ensaio_inicio TEXT,
         ensaio_fim TEXT,
-        ensaio_eventId TEXT,
+        ensaio_eventid TEXT,
         montagem_inicio TEXT,
         montagem_fim TEXT,
-        montagem_eventId TEXT,
+        montagem_eventid TEXT,
         desmontagem_inicio TEXT,
         desmontagem_fim TEXT,
-        desmontagem_eventId TEXT,
+        desmontagem_eventid TEXT,
         eventos_json TEXT,
         hasConflict INTEGER DEFAULT 0,
         criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1091,6 +1091,7 @@ app.get("/api/master-sheet-link", (req, res) => {
 app.post("/api/create-events", async (req, res) => {
   try {
     const { local, resumo, etapas, userData } = req.body;
+    console.log("📥 Recebida solicitação /api/create-events:", { local, resumo, etapasCount: etapas?.length, userDataEmail: userData?.email });
     if (!calendarIds[local]) {
       return res.status(400).json({ success: false, error: "Calendário não encontrado." });
     }
@@ -1111,6 +1112,7 @@ app.post("/api/create-events", async (req, res) => {
         }
       };
       try {
+        console.log(`📅 Tentando criar evento no Google Calendar: ${event.summary}`);
         const response = await calendar.events.insert({ calendarId: calendarIds[local], resource: event });
         etapasComId.push({ ...etapa, eventId: response.data.id });
         eventosCriados.push({ etapa: etapa.nome, id: response.data.id, summary: response.data.summary, inicio: etapa.inicio });
@@ -1140,10 +1142,50 @@ app.post("/api/create-events", async (req, res) => {
       });
       dbPayload.eventos_json = JSON.stringify(eventosExtras);
       
-      await query(
-        `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-        [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
-      );
+      // ✅ CORREÇÃO: Verifica quais colunas realmente existem antes de inserir
+      const columnsResult = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'inscricoes'
+      `);
+      const existingColumns = columnsResult.rows.map(r => r.column_name);
+      
+      const insertData = {
+        nome: dbPayload.nome,
+        email: dbPayload.email,
+        telefone: dbPayload.telefone,
+        evento_nome: dbPayload.evento_nome,
+        local: dbPayload.local,
+        ensaio_inicio: dbPayload.ensaio_inicio,
+        ensaio_fim: dbPayload.ensaio_fim,
+        ensaio_eventid: dbPayload.ensaio_eventId,
+        montagem_inicio: dbPayload.montagem_inicio,
+        montagem_fim: dbPayload.montagem_fim,
+        montagem_eventid: dbPayload.montagem_eventId,
+        desmontagem_inicio: dbPayload.desmontagem_inicio,
+        desmontagem_fim: dbPayload.desmontagem_fim,
+        desmontagem_eventid: dbPayload.desmontagem_eventId,
+        eventos_json: dbPayload.eventos_json
+      };
+
+      const finalColumns = [];
+      const finalValues = [];
+      const placeholders = [];
+
+      Object.keys(insertData).forEach((col, index) => {
+        if (existingColumns.includes(col)) {
+          finalColumns.push(col);
+          finalValues.push(insertData[col]);
+          placeholders.push(`$${finalValues.length}`);
+        }
+      });
+
+      if (finalColumns.length > 0) {
+        const sql = `INSERT INTO inscricoes (${finalColumns.join(', ')}) VALUES (${placeholders.join(', ')})`;
+        await query(sql, finalValues);
+      } else {
+        console.warn("⚠️ Nenhuma coluna válida encontrada para inserção na tabela 'inscricoes'.");
+      }
       console.log("💾 Inscrição salva no banco com sucesso!");
       
       // Envia o e-mail de confirmação da Etapa 1
