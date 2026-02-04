@@ -481,6 +481,9 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 // --- 9. ROTA PARA OBTER CONFIGURAÇÕES ---
 app.get("/api/config", async (req, res) => {
   try {
+    const FIXED_FORMS_LINK = "https://docs.google.com/forms/d/e/1FAIpQLScxvwER2fKcTMebfOas0NWm4hn35POVjkmYtbwRLFEKmq3G5w/viewform?usp=dialog";
+    const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
+
     const defaultConfig = {
       blockedDates: [],
       stageTimes: {
@@ -489,8 +492,8 @@ app.get("/api/config", async (req, res) => {
         desmontagem: { start: "08:00", end: "21:00" },
       },
       buttonExternalEditalText: "Edital Externo",
-      formsLink: "",
-      sheetLink: "",
+      formsLink: FIXED_FORMS_LINK,
+      sheetLink: FIXED_SHEET_LINK,
       sheetId: "",
       useFixedLinks: true,
       weights: { A: 1, B: 1, C: 1, D: 1 },
@@ -508,6 +511,13 @@ app.get("/api/config", async (req, res) => {
       if (result.rows.length > 0) {
         const savedConfig = JSON.parse(result.rows[0].config_json);
         const fullConfig = { ...defaultConfig, ...savedConfig };
+
+        // Se useFixedLinks estiver ativo, força o uso dos links fixos
+        if (fullConfig.useFixedLinks) {
+          fullConfig.formsLink = FIXED_FORMS_LINK;
+          fullConfig.sheetLink = FIXED_SHEET_LINK;
+        }
+
         console.log("✅ Configurações carregadas do banco de dados.");
         return res.json(fullConfig);
       }
@@ -520,6 +530,13 @@ app.get("/api/config", async (req, res) => {
       if (fs.existsSync("config.json")) {
         const fileConfig = JSON.parse(fs.readFileSync("config.json", "utf8"));
         const fullConfig = { ...defaultConfig, ...fileConfig };
+
+        // Se useFixedLinks estiver ativo, força o uso dos links fixos
+        if (fullConfig.useFixedLinks) {
+          fullConfig.formsLink = FIXED_FORMS_LINK;
+          fullConfig.sheetLink = FIXED_SHEET_LINK;
+        }
+
         console.log("✅ Configurações carregadas do arquivo local.");
         return res.json(fullConfig);
       }
