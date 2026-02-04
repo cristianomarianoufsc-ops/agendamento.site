@@ -54,7 +54,7 @@ const Admin = ({ viewOnly = false }) => {
   };
   const [formsLink, setFormsLink] = useState("");
   const [sheetLink, setSheetLink] = useState("");
-  const [useFixedLinks, setUseFixedLinks] = useState(false);
+  const [useFixedLinks, setUseFixedLinks] = useState(true);
 
   const FIXED_FORMS_LINK = "https://docs.google.com/forms/d/e/1FAIpQLScxvwER2fKcTMebfOas0NWm4hn35POVjkmYtbwRLFEKmq3G5w/viewform?usp=dialog";
   const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";

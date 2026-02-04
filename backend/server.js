@@ -492,7 +492,7 @@ app.get("/api/config", async (req, res) => {
       formsLink: "",
       sheetLink: "",
       sheetId: "",
-      useFixedLinks: false,
+      useFixedLinks: true,
       weights: { A: 1, B: 1, C: 1, D: 1 },
       pageTitle: "Sistema de Agendamento de Espaços",
       allowBookingOverlap: false,
