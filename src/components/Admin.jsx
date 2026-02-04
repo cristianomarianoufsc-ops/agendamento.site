@@ -375,6 +375,9 @@ const Admin = ({ viewOnly = false }) => {
             <button onClick={() => setMainTab('configuracoes_avaliacao')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold whitespace-nowrap transition-colors ${mainTab === 'configuracoes_avaliacao' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
               <Scale size={20} /> Configurações de Avaliação
             </button>
+            <button onClick={() => setMainTab('debug_inscricoes')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold whitespace-nowrap transition-colors ${mainTab === 'debug_inscricoes' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              <AlertTriangle size={20} /> Novas Inscrições (Debug)
+            </button>
           </div>
         )}
 
@@ -440,6 +443,30 @@ const Admin = ({ viewOnly = false }) => {
                   sortOrder={sortOrder}
                   assessmentFilter={assessmentFilter}
                   viewOnly={viewOnly}
+                  evaluatorEmail={evaluatorEmail}
+                  onShowFormData={handleShowFormDataModal}
+                  onDelete={handleDelete}
+                  onEdit={(u) => { setSelectedUser(u); setShowModal(true); }}
+                  onEvaluate={(u) => { setSelectedUser(u); setShowModal(true); }}
+                />
+              </div>
+            )}
+
+            {mainTab === 'debug_inscricoes' && (
+              <div className="bg-white p-6 rounded-2xl shadow-md border-2 border-yellow-400">
+                <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h3 className="font-bold text-xl text-yellow-800 flex items-center gap-2"><AlertTriangle size={24} /> Modo de Depuração: Novas Inscrições</h3>
+                  <p className="text-sm text-yellow-700 mt-1">Esta aba força a exibição de todas as inscrições recebidas, ignorando filtros de "etapa 2 concluída". Se os dados da primeira etapa foram salvos, eles DEVEM aparecer aqui.</p>
+                </div>
+                
+                <InscricoesRecebidasNew 
+                  unificados={unificados}
+                  loading={loading}
+                  inscricoesTab="eventos" // Força aba de eventos
+                  localFilters={{ teatro: true, igrejinha: true }} // Força todos os locais
+                  sortOrder="id_asc"
+                  assessmentFilter="todos"
+                  viewOnly={false}
                   evaluatorEmail={evaluatorEmail}
                   onShowFormData={handleShowFormDataModal}
                   onDelete={handleDelete}
