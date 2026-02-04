@@ -88,7 +88,8 @@ const Admin = ({ viewOnly = false }) => {
   const [sortOrder, setSortOrder] = useState('id_asc');
   const [assessmentFilter, setAssessmentFilter] = useState('todos');
   const [evaluatorEmail, setEvaluatorEmail] = useState(localStorage.getItem('evaluatorEmail') || '');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail')); // NOVO ESTADO
+  // ✅ ACESSO LIVRE TEMPORÁRIO: Forçamos isAuthenticated como true
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Antigo: !!localStorage.getItem('evaluatorEmail')
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
    // ✅ NOVO: Senha única para todos os avaliadores
@@ -677,8 +678,9 @@ const Admin = ({ viewOnly = false }) => {
     );
   }
   
-  // ✅ TELA DE LOGIN PARA AVALIADOR
-   if (viewOnly && !isAuthenticated) { // AGORA USA isAuthenticated
+  // ✅ TELA DE LOGIN PARA AVALIADOR (ESCONDIDA TEMPORARIAMENTE)
+  /* 
+   if (viewOnly && !isAuthenticated) { 
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
@@ -692,7 +694,7 @@ const Admin = ({ viewOnly = false }) => {
             className="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-blue-500 focus:border-blue-500"
           />
           <div className="relative mb-6">
-            <input // NOVO CAMPO DE SENHA
+            <input 
               type={showEvaluatorPassword ? "text" : "password"}
               placeholder="Sua Senha"
               value={evaluatorPassword}
@@ -719,6 +721,7 @@ const Admin = ({ viewOnly = false }) => {
       </div>
     );
   }
+  */
   return (
     <div className="bg-gray-50 min-h-screen font-sans p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
