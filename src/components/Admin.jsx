@@ -462,16 +462,9 @@ const Admin = ({ viewOnly = false }) => {
                 <InscricoesRecebidasNew 
                   unificados={unificados}
                   loading={loading}
-                  inscricoesTab="eventos" // Força aba de eventos
-                  localFilters={{ teatro: true, igrejinha: true }} // Força todos os locais
-                  sortOrder="id_asc"
-                  assessmentFilter="todos"
-                  viewOnly={false}
-                  evaluatorEmail={evaluatorEmail}
                   onShowFormData={handleShowFormDataModal}
                   onDelete={handleDelete}
                   onEdit={(u) => { setSelectedUser(u); setShowModal(true); }}
-                  onEvaluate={(u) => { setSelectedUser(u); setShowModal(true); }}
                 />
               </div>
             )}
