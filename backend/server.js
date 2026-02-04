@@ -903,6 +903,7 @@ app.get("/api/inscricoes", async (req, res) => {
       const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
       const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
       
+      console.log(`🔍 [DEBUG] Cruzando dados para inscrição #${inscricao.id} (${emailEtapa1})`);
       const match = formsDataRows.find(rowData => {
         let emailForms = '', telForms = '';
         for (const key in rowData) {
@@ -921,7 +922,9 @@ app.get("/api/inscricoes", async (req, res) => {
               telForms = value.replace(/\D/g, "");
             }
         }
-        return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        if (isMatch) console.log(`✅ [DEBUG] Match encontrado na planilha para ${emailEtapa1}`);
+        return isMatch;
       });
 
       let proponenteTipo = 'Não identificado';
