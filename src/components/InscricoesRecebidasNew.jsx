@@ -30,9 +30,12 @@ const InscricoesRecebidasNew = ({
 
       // Filtro de Tipo (Evento vs Ensaio)
       // No sistema original, 'eventos' inclui montagem/desmontagem ou eventos_json preenchido
+      // Se não houver nenhum dado de agendamento, ainda assim queremos mostrar na aba de eventos se for uma inscrição válida
       const temEvento = (item.eventos_json && item.eventos_json !== '[]') || 
                         item.montagem_inicio || 
-                        item.desmontagem_inicio;
+                        item.desmontagem_inicio ||
+                        item.ensaio_inicio ||
+                        item.evento_nome; // Se tem nome de evento, é um evento
       
       const tipoCorreto = (inscricoesTab === 'eventos') ? temEvento : !temEvento;
       if (!tipoCorreto) return false;
@@ -64,10 +67,13 @@ const InscricoesRecebidasNew = ({
   // --- FUNÇÕES AUXILIARES DE RENDERIZAÇÃO ---
   const formatarDataHora = (isoString) => {
     if (!isoString) return '';
-    const date = new Date(isoString);
+    // Adiciona o fuso horário se não houver, para evitar problemas de data mudando por causa do UTC
+    const date = isoString.includes('T') ? new Date(isoString) : new Date(isoString + 'T00:00:00');
+    
     return date.toLocaleString('pt-BR', { 
       day: '2-digit', 
-      month: '2-digit', 
+      month: '2-digit',
+      year: '2-digit',
       hour: '2-digit', 
       minute: '2-digit' 
     });
@@ -85,7 +91,8 @@ const InscricoesRecebidasNew = ({
       try {
         const evs = JSON.parse(u.eventos_json);
         evs.forEach((ev, i) => {
-          etapas.push({ nome: `Evento ${i + 1}`, inicio: ev.inicio, fim: ev.fim });
+          // Evita duplicar se já estiver nas colunas fixas (opcional, mas bom para clareza)
+          etapas.push({ nome: ev.nome || `Evento ${i + 1}`, inicio: ev.inicio, fim: ev.fim });
         });
       } catch (e) {}
     }
@@ -93,13 +100,20 @@ const InscricoesRecebidasNew = ({
       etapas.push({ nome: 'Desmontagem', inicio: u.desmontagem_inicio, fim: u.desmontagem_fim });
     }
 
+    // Remover duplicatas baseadas em nome e início (caso o JSON tenha o que já está nas colunas)
+    const etapasUnicas = etapas.reduce((acc, current) => {
+      const x = acc.find(item => item.nome === current.nome && item.inicio === current.inicio);
+      if (!x) return acc.concat([current]);
+      else return acc;
+    }, []);
+
     return (
       <div className="flex flex-col gap-1 text-xs">
-        {etapas.map((et, idx) => (
+        {etapasUnicas.length > 0 ? etapasUnicas.map((et, idx) => (
           <div key={idx} className="whitespace-nowrap">
             <span className="font-bold">{et.nome}:</span> {formatarDataHora(et.inicio)} - {new Date(et.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </div>
-        ))}
+        )) : <span className="text-gray-400 italic">Sem etapas registradas</span>}
       </div>
     );
   };
