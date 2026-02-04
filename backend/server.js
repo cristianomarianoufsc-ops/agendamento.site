@@ -37,11 +37,17 @@ console.log('  EMAIL_USER:', process.env.EMAIL_USER ? '✅ Definida' : '❌ Não
 console.log('  EMAIL_PASS:', process.env.EMAIL_PASS ? '✅ Definida' : '❌ Não encontrada');
 
 // --- 1. CONFIGURAÇÕES GERAIS E BANCO DE DADOS ---
+// No Render, a DATABASE_URL pode ser Interna ou Externa.
+// Se o hostname contiver 'dpg-' e terminar com '-a', é um hostname interno do Render.
+// Hostnames internos do Render não suportam SSL/TLS.
+const databaseUrl = process.env.DATABASE_URL;
+const isInternalRenderHost = databaseUrl && databaseUrl.includes('dpg-') && databaseUrl.includes('-a');
+
 const pool = new Pool(
-  process.env.DATABASE_URL
+  databaseUrl
     ? {
-        connectionString: process.env.DATABASE_URL,
-        ssl: {
+        connectionString: databaseUrl,
+        ssl: isInternalRenderHost ? false : {
           rejectUnauthorized: false, // Necessário para conexões externas no Render
         },
       }
@@ -53,6 +59,10 @@ const pool = new Pool(
         database: process.env.DB_NAME || 'edital_ufsc',
       }
 );
+
+if (isInternalRenderHost) {
+  console.log('🌐 Detectado Hostname Interno do Render. SSL desabilitado para esta conexão.');
+}
 
 // Função auxiliar para executar queries
 async function query(text, params = []) {
