@@ -843,9 +843,11 @@ const Admin = ({ viewOnly = false }) => {
                       <thead className="text-xs text-gray-700 uppercase bg-gray-100">
                         <tr>
                           <th scope="col" className="px-4 py-3 w-[5%]">#</th>
-                          <th scope="col" className="px-6 py-3 w-[20%]">Evento</th>
+                          <th scope="col" className="px-6 py-3 w-[15%]">Evento</th>
+                          <th scope="col" className="px-6 py-3 w-[10%]">E-mail (Etapa 1)</th>
+                          <th scope="col" className="px-6 py-3 w-[10%]">Telefone (Etapa 1)</th>
                           <th scope="col" className="px-6 py-3 w-[10%]">Local</th>
-                          <th scope="col" className="px-6 py-3 w-[25%]">Etapas Agendadas</th>
+                          <th scope="col" className="px-6 py-3 w-[20%]">Etapas Agendadas</th>
                           {!viewOnly && inscricoesTab === 'eventos' && <th scope="col" className="px-6 py-3 text-center w-[10%]">Nota Final</th>}
                           {(inscricoesTab === 'eventos' || viewOnly) && <th scope="col" className="px-6 py-3 text-center w-[5%]">Status</th>}
                           {!viewOnly && <th scope="col" className="px-6 py-3 w-[15%]">Arquivos</th>}
@@ -859,6 +861,8 @@ const Admin = ({ viewOnly = false }) => {
                               <tr className={`bg-white border-b hover:bg-gray-50 ${u.conflictColor ? u.conflictColor.split(' ')[0] : ''}`}>
                                 <td className="px-4 py-4 font-medium text-gray-900 align-top">{String(u.id).padStart(2, '0')}</td>
                                 <td className={`px-6 py-4 font-semibold align-top break-words ${!u.etapa2_ok ? 'text-red-500' : ''} ${u.conflictColor ? u.conflictColor.split(' ')[1] : ''}`}>{u.evento_nome}</td>
+                                <td className="px-6 py-4 align-top break-all">{u.email}</td>
+                                <td className="px-6 py-4 align-top whitespace-nowrap">{u.telefone}</td>
                                 <td className="px-6 py-4 align-top">
                                   <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${u.local === 'teatro' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                                     {u.local === 'teatro' ? <Theater size={12} /> : <Church size={12} />}
