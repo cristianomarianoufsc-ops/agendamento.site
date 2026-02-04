@@ -1826,8 +1826,9 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   
   const subject = `✅ Confirmação da 1ª Etapa: ${evento_nome}`;
   const remetente = process.env.EMAIL_REMETENTE_VALIDADO || 'noreply@agendamento.site';
+  const adminEmail = 'pautas.dac@contato.ufsc.br';
   
-  console.log(`✅ Tentando enviar e-mail de confirmação da Etapa 1 para: ${email}`);
+  console.log(`✅ Tentando enviar e-mail de confirmação da Etapa 1 para: ${email} (com cópia para ${adminEmail})`);
 
   // --- 1. Tenta Brevo API (Prioridade) ---
   if (brevoApiKey) {
@@ -1835,7 +1836,10 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
       const payload = {
         sender: { email: remetente, name: "Sistema de Agendamento DAC" },
         replyTo: { email: remetente, name: "Sistema de Agendamento DAC" },
-        to: [{ email: email, name: nome }],
+        to: [
+          { email: email, name: nome },
+          { email: adminEmail, name: "Administrador DAC" }
+        ],
         subject: subject,
         htmlContent: htmlContent
       };
@@ -1869,7 +1873,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
     try {
       const { data, error } = await resend.emails.send({
         from: `"Sistema de Agendamento DAC" <${remetente}>`,
-        to: [email],
+        to: [email, adminEmail],
         subject: subject,
         html: htmlContent,
       });
@@ -1892,7 +1896,7 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
     try {
       const mailOptions = {
         from: `"Sistema de Agendamento DAC" <${remetente}>`,
-        to: email,
+        to: [email, adminEmail],
         subject: subject,
         html: htmlContent,
       };
