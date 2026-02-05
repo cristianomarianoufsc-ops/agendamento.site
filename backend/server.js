@@ -815,7 +815,7 @@ app.post('/api/criteria', async (req, res) => {
 // --- 11. ROTA PARA OBTER INSCRIÇÕES ---
 app.get("/api/inscricoes", async (req, res) => {
   try {
-    const criteria = await getEvaluationCriteria();
+    const criteria = await getEvaluationCriteria() || [];
     const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
     const inscriptions = inscriptionsResult.rows;
     
@@ -855,12 +855,14 @@ app.get("/api/inscricoes", async (req, res) => {
           let singleEvaluationScore = 0;
           let totalWeight = 0;
 
-          criteria.forEach(crit => {
-            const scoreValue = scores[crit.id] || 0;
-            const weightValue = crit.weight || 1;
-            singleEvaluationScore += scoreValue * weightValue;
-            totalWeight += weightValue;
-          });
+          if (Array.isArray(criteria)) {
+            criteria.forEach(crit => {
+              const scoreValue = scores[crit.id] || 0;
+              const weightValue = crit.weight || 1;
+              singleEvaluationScore += scoreValue * weightValue;
+              totalWeight += weightValue;
+            });
+          }
 
           const weightedAverage = totalWeight > 0 ? singleEvaluationScore / totalWeight : 0;
           totalScoreSum += weightedAverage;
@@ -1297,7 +1299,7 @@ async function consolidateSchedule() {
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
 app.get("/api/admin/data-for-analysis", async (req, res) => {
   try {
-    const criteria = await getEvaluationCriteria();
+    const criteria = await getEvaluationCriteria() || [];
     const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
     const inscriptions = inscriptionsResult.rows;
     
