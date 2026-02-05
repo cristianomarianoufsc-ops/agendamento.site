@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Download, Search, Calendar, User, Mail, ArrowLeft, Theater, Church, CheckCircle } from 'lucide-react';
+import { FileText, Download, Search, Calendar, User, Mail, ArrowLeft, Theater, Church, CheckCircle, Table } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -138,13 +138,36 @@ const MeusComprovantes = () => {
     }
   };
 
+  const renderEtapas = (u) => {
+    const etapas = [];
+    if (u.ensaio_inicio) etapas.push({ nome: 'Ensaio', inicio: u.ensaio_inicio, fim: u.ensaio_fim });
+    if (u.montagem_inicio) etapas.push({ nome: 'Montagem', inicio: u.montagem_inicio, fim: u.montagem_fim });
+    if (u.eventos_json) {
+      try {
+        const evs = JSON.parse(u.eventos_json);
+        evs.forEach((ev, i) => {
+          etapas.push({ nome: ev.nome || `Evento ${i + 1}`, inicio: ev.inicio, fim: ev.fim });
+        });
+      } catch (e) {}
+    }
+    if (u.desmontagem_inicio) etapas.push({ nome: 'Desmontagem', inicio: u.desmontagem_inicio, fim: u.desmontagem_fim });
+    
+    return etapas.map((et, idx) => (
+      <div key={idx} className="text-xs border-b border-gray-100 last:border-0 py-1">
+        <span className="font-semibold text-blue-600">{et.nome}:</span> {new Date(et.inicio).toLocaleDateString('pt-BR')} {new Date(et.inicio).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}-{new Date(et.fim).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}
+      </div>
+    ));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Cabeçalho */}
         <div className="mb-10 text-center">
-          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Meus Comprovantes</h1>
-          <p className="text-lg text-gray-500 mt-3">Histórico de inscrições e downloads de comprovantes (1ª Etapa)</p>
+          <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight flex items-center justify-center gap-3">
+            <Table className="text-blue-600" size={40} /> Meus Comprovantes
+          </h1>
+          <p className="text-lg text-gray-500 mt-3">Visualização em planilha das inscrições realizadas (1ª Etapa)</p>
           <div className="mt-6 flex justify-center">
             <Link 
               to="/" 
@@ -156,7 +179,7 @@ const MeusComprovantes = () => {
         </div>
 
         {/* Barra de Pesquisa */}
-        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-2 mb-10">
+        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-2 mb-10 max-w-3xl mx-auto">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
               <Search className="h-6 w-6 text-gray-400" />
@@ -171,14 +194,14 @@ const MeusComprovantes = () => {
           </div>
         </div>
 
-        {/* Lista de Comprovantes */}
+        {/* Tabela de Comprovantes */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-14 w-14 border-b-4 border-blue-600"></div>
-            <p className="mt-6 text-gray-500 font-bold text-xl">Carregando seus comprovantes...</p>
+            <p className="mt-6 text-gray-500 font-bold text-xl">Carregando dados da planilha...</p>
           </div>
         ) : error ? (
-          <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-8 text-center">
+          <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-8 text-center max-w-3xl mx-auto">
             <p className="text-red-700 font-bold text-lg">{error}</p>
             <button 
               onClick={fetchInscricoes}
@@ -188,64 +211,74 @@ const MeusComprovantes = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-8">
-            {inscricoesFiltradas.length === 0 ? (
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-16 text-center">
-                <FileText size={64} className="mx-auto text-gray-200 mb-6" />
-                <h3 className="text-2xl font-bold text-gray-800 mb-2">Nenhum comprovante encontrado</h3>
-                <p className="text-gray-500">Você ainda não realizou nenhuma inscrição ou o termo pesquisado não retornou resultados.</p>
-              </div>
-            ) : (
-              inscricoesFiltradas.map((u) => (
-                <div key={u.id} className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-                  <div className="p-8">
-                    <div className="flex flex-col gap-6">
-                      {/* Status e ID */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-2">
-                            <CheckCircle size={18} /> Etapa 1 Concluída!
-                          </div>
-                          <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider ${u.local === 'teatro' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {u.local === 'teatro' ? <Theater size={16} /> : <Church size={16} />}
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-blue-600 text-white">
+                    <th className="px-6 py-4 font-bold uppercase text-sm">ID</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm">Evento</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm">Responsável</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm">Local</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm">Data de Inscrição</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm">Agendamentos</th>
+                    <th className="px-6 py-4 font-bold uppercase text-sm text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {inscricoesFiltradas.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-6 py-20 text-center">
+                        <FileText size={64} className="mx-auto text-gray-200 mb-6" />
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">Nenhum dado encontrado</h3>
+                        <p className="text-gray-500">Você ainda não realizou nenhuma inscrição ou o termo pesquisado não retornou resultados.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    inscricoesFiltradas.map((u) => (
+                      <tr key={u.id} className="hover:bg-blue-50 transition-colors">
+                        <td className="px-6 py-4 font-mono text-gray-400 text-sm">#{String(u.id).padStart(3, '0')}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-gray-900">{u.evento_nome || "Sem nome"}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-700">{u.nome}</div>
+                          <div className="text-xs text-gray-500">{u.email}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${u.local === 'teatro' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {u.local === 'teatro' ? <Theater size={14} /> : <Church size={14} />}
                             {u.local === 'teatro' ? 'Teatro' : 'Igrejinha'}
                           </span>
-                        </div>
-                        <span className="text-sm text-gray-400 font-mono bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">ID #{String(u.id).padStart(3, '0')}</span>
-                      </div>
-
-                      {/* Título do Evento */}
-                      <div>
-                        <h3 className="text-2xl font-black text-gray-900 leading-tight">{u.evento_nome || "Sem nome do evento"}</h3>
-                        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-gray-500 font-medium">
-                          <div className="flex items-center gap-2">
-                            <User size={18} className="text-blue-500" /> {u.nome}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar size={18} className="text-blue-500" /> {new Date(u.criado_em || u.created_at).toLocaleDateString('pt-BR')}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Botão de Download - O "Backup" solicitado */}
-                      <div className="pt-4 border-t border-gray-50">
-                        <button
-                          onClick={() => handleDownloadPDF(u)}
-                          className="w-full flex items-center justify-center gap-3 px-8 py-4 bg-blue-600 text-white text-lg font-black rounded-2xl hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200 shadow-lg shadow-blue-200 transition-all active:scale-95"
-                        >
-                          <Download size={24} /> Baixar Comprovante em PDF
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600">
+                          {new Date(u.criado_em || u.created_at).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4 min-w-[250px]">
+                          {renderEtapas(u)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => handleDownloadPDF(u)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                            title="Baixar PDF"
+                          >
+                            <Download size={18} /> PDF
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
             
             {inscricoesFiltradas.length > 0 && (
-              <p className="text-center text-gray-400 text-sm font-medium pb-10">
-                Mostrando {inscricoesFiltradas.length} comprovante(s) disponível(is) para download.
-              </p>
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-100">
+                <p className="text-gray-500 text-sm font-medium">
+                  Mostrando {inscricoesFiltradas.length} registro(s) na planilha.
+                </p>
+              </div>
             )}
           </div>
         )}
