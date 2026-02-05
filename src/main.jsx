@@ -29,7 +29,7 @@ const HomePage = () => {
       .catch(err => {
         console.error("Erro ao buscar configurações da página inicial:", err);        setLoading(false);      });  }, []);
   // Componente de botão reutilizável para evitar repetição
-  const ActionButton = ({ to, label, color, enabled }) => {
+  const ActionButton = ({ to, label, color, enabled, external = false }) => {
     const disabledStyle = {
       background: '#9ca3af',
       boxShadow: '0 4px 14px 0 rgba(156, 163, 175, 0.39)',
@@ -58,6 +58,19 @@ const HomePage = () => {
           {label}
         </a>
       );    }
+
+    if (external) {
+      return (
+        <a 
+          href={to} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          style={finalStyle}
+        >
+          {label}
+        </a>
+      );
+    }
 
     return <Link to={to} style={finalStyle}>{label}</Link>;
   };
@@ -120,6 +133,7 @@ const HomePage = () => {
           label="Meus Comprovantes (PDF)"
           color="#6366f1"
           enabled={true}
+          external={true}
         />
         </div>
       </div>
