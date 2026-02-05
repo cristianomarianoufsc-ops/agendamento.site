@@ -12,6 +12,12 @@ const MeusComprovantes = () => {
 
   useEffect(() => {
     fetchInscricoes();
+
+    // Atualiza os dados sempre que o usuário volta para esta aba
+    const handleFocus = () => fetchInscricoes();
+    window.addEventListener('focus', handleFocus);
+    
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const fetchInscricoes = async () => {
