@@ -43,10 +43,27 @@ console.log('  EMAIL_PASS:', process.env.EMAIL_PASS ? '✅ Definida' : '❌ Não
 const databaseUrl = process.env.DATABASE_URL;
 const isInternalRenderHost = databaseUrl && databaseUrl.includes('dpg-') && databaseUrl.includes('-a');
 
+// No Render, se for conexão interna (hostname dpg-...-a), o SSL deve ser desabilitado.
+// Se for conexão externa (contém render.com), o SSL deve estar habilitado.
+// ADICIONADO: Suporte a variável de ambiente DB_SSL para controle manual no Render
+const dbSslEnv = process.env.DB_SSL;
+let sslConfig = false;
+
+if (dbSslEnv === 'true') {
+  sslConfig = { rejectUnauthorized: false };
+} else if (dbSslEnv === 'false') {
+  sslConfig = false;
+} else {
+  // Lógica automática baseada no host se DB_SSL não estiver definida
+  sslConfig = (databaseUrl && databaseUrl.includes('render.com') && !isInternalRenderHost) 
+    ? { rejectUnauthorized: false } 
+    : false;
+}
+
 const pool = databaseUrl 
   ? new Pool({ 
       connectionString: databaseUrl,
-      ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false
+      ssl: sslConfig
     })
   : new Pool({
       user: process.env.DB_USER || 'postgres',
@@ -811,15 +828,26 @@ app.post('/api/criteria', async (req, res) => {
 // --- 11. ROTA PARA OBTER INSCRIÇÕES ---
 app.get("/api/inscricoes", async (req, res) => {
   try {
-    const criteria = await getEvaluationCriteria() || [];
-    const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
-    const inscriptions = inscriptionsResult.rows;
-    
-    const assessmentsResult = await query("SELECT * FROM assessments");
-    const allAssessments = assessmentsResult.rows;
-    
-    const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
-    const totalEvaluators = totalEvaluatorsResult.rows[0].count;
+    let criteria = [];
+    let inscriptions = [];
+    let allAssessments = [];
+    let totalEvaluators = 0;
+
+    try {
+      criteria = await getEvaluationCriteria() || [];
+      const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
+      inscriptions = inscriptionsResult.rows;
+      
+      const assessmentsResult = await query("SELECT * FROM assessments");
+      allAssessments = assessmentsResult.rows;
+      
+      const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
+      totalEvaluators = totalEvaluatorsResult.rows[0].count;
+    } catch (dbError) {
+      console.error("❌ Erro ao buscar dados do banco de dados:", dbError.message);
+      // Se falhar a conexão com o banco, retornamos o que temos (vazio) para não dar 500
+      return res.json({ inscricoes: [], criteria: [], error: "Erro de conexão com o banco de dados" });
+    }
 
     // ✅ LÓGICA DE DETECÇÃO DE CONFLITO
     const allSlots = [];
