@@ -60,6 +60,22 @@ if (dbSslEnv === 'true') {
     : false;
 }
 
+// DEBUG: Log detalhado da conexão (sem expor a senha completa)
+if (databaseUrl) {
+  try {
+    const url = new URL(databaseUrl);
+    console.log('🗄️ DATABASE_URL Detectada:');
+    console.log(`  - Protocolo: ${url.protocol}`);
+    console.log(`  - Host: ${url.hostname}`);
+    console.log(`  - Porta: ${url.port}`);
+    console.log(`  - Database: ${url.pathname}`);
+    console.log(`  - SSL Config: ${JSON.stringify(sslConfig)}`);
+    console.log(`  - DB_SSL Env: ${dbSslEnv}`);
+  } catch (e) {
+    console.log('🗄️ DATABASE_URL detectada, mas não pôde ser parseada como URL.');
+  }
+}
+
 const pool = databaseUrl 
   ? new Pool({ 
       connectionString: databaseUrl,
