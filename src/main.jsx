@@ -133,7 +133,7 @@ const HomePage = () => {
           label="Meus Comprovantes (PDF)"
           color="#6366f1"
           enabled={true}
-          external={true}
+          external={false}
         />
         </div>
       </div>
