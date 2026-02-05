@@ -7,6 +7,7 @@ import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Comp
 import AdminPanel from "./components/Admin.jsx"; // Importando o painel administrativo correto (DEIXADO POR COMPATIBILIDADE)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
 import Pagina from "./pages/Pagina.jsx"; // A NOVA PÁGINA COM DADOS DO CSV
+import MeusComprovantes from "./pages/MeusComprovantes.jsx"; // A NOVA PÁGINA DE COMPROVANTES
 import Admin from "./components/Admin.jsx"; // Este é o AppVertical com props de admin, mas o nome é confuso. Deixando para trás.
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -113,6 +114,13 @@ const HomePage = () => {
           color="#16a34a"
           enabled={config.enableRehearsal}
         />
+
+        <ActionButton
+          to="/meus-comprovantes"
+          label="Meus Comprovantes (PDF)"
+          color="#6366f1"
+          enabled={true}
+        />
         </div>
       </div>
     </div>
@@ -147,6 +155,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         
         {/* Rota para a página de visualização do CSV */}
         <Route path="/csv-data" element={<Pagina />} />
+        <Route path="/meus-comprovantes" element={<MeusComprovantes />} />
         
       </Routes>
     </BrowserRouter>

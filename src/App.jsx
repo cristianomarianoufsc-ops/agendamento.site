@@ -782,7 +782,8 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
                 <PartyPopper size={80} className="text-green-500 mx-auto" />
                 <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mt-6">Obrigado!</h1>
                 <p className="text-lg text-gray-600 mt-2">Sua solicitação de agendamento foi recebida. Continue preenchendo as informações na nova aba que foi aberta.</p>
-                <p className="text-sm text-gray-500 mt-8">Você será redirecionado para a página inicial em 5 segundos...</p>
+                <p className="text-sm text-gray-500 mt-8">Caso precise baixar seu comprovante novamente, acesse a opção <strong>'Meus Comprovantes'</strong> na página inicial.</p>
+                <p className="text-xs text-gray-400 mt-2">Você será redirecionado para a página inicial em alguns segundos...</p>
               </motion.div>
             </motion.div>
           )}
