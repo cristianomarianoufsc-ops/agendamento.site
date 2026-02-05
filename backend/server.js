@@ -47,9 +47,7 @@ const pool = new Pool(
   databaseUrl
     ? {
         connectionString: databaseUrl,
-        ssl: isInternalRenderHost ? false : {
-          rejectUnauthorized: false, // Necessário para conexões externas no Render
-        },
+        ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
       }
     : {
         user: process.env.DB_USER || 'postgres',
