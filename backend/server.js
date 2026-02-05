@@ -43,20 +43,18 @@ console.log('  EMAIL_PASS:', process.env.EMAIL_PASS ? '✅ Definida' : '❌ Não
 const databaseUrl = process.env.DATABASE_URL;
 const isInternalRenderHost = databaseUrl && databaseUrl.includes('dpg-') && databaseUrl.includes('-a');
 
-const pool = new Pool(
-  databaseUrl
-    ? {
-        connectionString: databaseUrl,
-        ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
-      }
-    : {
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'password',
-        host: process.env.DB_HOST || 'localhost',
-        port: process.env.DB_PORT || 5432,
-        database: process.env.DB_NAME || 'edital_ufsc',
-      }
-);
+const pool = databaseUrl 
+  ? new Pool({ 
+      connectionString: databaseUrl,
+      ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : false
+    })
+  : new Pool({
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || 'password',
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
+      database: process.env.DB_NAME || 'edital_ufsc',
+    });
 
 if (isInternalRenderHost) {
   console.log('🌐 Detectado Hostname Interno do Render. SSL desabilitado para esta conexão.');
