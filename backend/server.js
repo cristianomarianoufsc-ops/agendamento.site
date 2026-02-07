@@ -1345,11 +1345,11 @@ async function consolidateSchedule() {
 app.get("/api/admin/data-for-analysis", async (req, res) => {
   try {
     const criteria = await getEvaluationCriteria() || [];
-    c    const inscricoesResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
-    const inscricoes = inscricoesResult.rows.map(inscricao => ({
+    const inscricoesResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
+    const inscriptions = inscricoesResult.rows.map(inscricao => ({
       ...inscricao,
       created_at: inscricao.criado_em // Mapeia criado_em para created_at para compatibilidade com o frontend
-    }));;
+    }));
     
     const assessmentsResult = await query("SELECT * FROM assessments");
     const allAssessments = assessmentsResult.rows;
@@ -1570,9 +1570,8 @@ app.post("/api/create-events", async (req, res) => {
       
       try {
         await query(
-          `INSERT INTO inscricoes (nome, e          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json, hasConflict)`,
-          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json, 0] // hasConflict padrão 0
-        );Payload.eventos_json]
+          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json, hasConflict) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json, 0]
         );
         console.log("💾 Inscrição salva no banco com sucesso!");
       } catch (dbErr) {
