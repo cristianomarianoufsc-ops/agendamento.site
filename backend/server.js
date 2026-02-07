@@ -49,15 +49,23 @@ const isInternalRenderHost = databaseUrl && databaseUrl.includes('dpg-') && data
 const dbSslEnv = process.env.DB_SSL;
 let sslConfig = false;
 
+// No Render, URLs externas (*.render.com) EXIGEM SSL.
+// URLs internas (dpg-*-a) geralmente não usam SSL na rede interna.
 if (dbSslEnv === 'true') {
   sslConfig = { rejectUnauthorized: false };
 } else if (dbSslEnv === 'false') {
   sslConfig = false;
 } else {
-  // Lógica automática baseada no host se DB_SSL não estiver definida
-  sslConfig = (databaseUrl && databaseUrl.includes('render.com') && !isInternalRenderHost) 
-    ? { rejectUnauthorized: false } 
-    : false;
+  // Lógica inteligente: se a URL contém 'render.com', quase certamente é externa e precisa de SSL.
+  // Se contiver 'dpg-' mas não terminar com '-a', também pode ser um host externo.
+  const isExternalRender = databaseUrl && databaseUrl.includes('render.com');
+  
+  if (isExternalRender) {
+    console.log('🔒 Detectada URL externa do Render. Ativando SSL (rejectUnauthorized: false).');
+    sslConfig = { rejectUnauthorized: false };
+  } else {
+    sslConfig = false;
+  }
 }
 
 // DEBUG: Log detalhado da conexão (sem expor a senha completa)
@@ -1569,16 +1577,28 @@ app.post("/api/create-events", async (req, res) => {
       dbPayload.eventos_json = JSON.stringify(todosEventos);
       
       try {
-        await query(
-          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json, hasConflict) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        const dbResult = await query(
+          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json, hasConflict) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
           [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json, 0]
         );
-        console.log("💾 Inscrição salva no banco com sucesso!");
+        
+        const newInscriptionId = dbResult.rows[0]?.id;
+        console.log(`💾 Inscrição #${newInscriptionId} salva no banco com sucesso!`);
+        
+        // Adiciona o ID ao payload para retorno ao frontend
+        dbPayload.id = newInscriptionId;
+
       } catch (dbErr) {
-        console.error("⚠️ Erro ao salvar no banco de dados, mas o evento foi criado no Calendar:", dbErr.message);
-        // Se o evento foi criado no Calendar mas o banco falhou, ainda podemos considerar "sucesso" para o usuário não travar
-        // mas avisamos no log. Se ambos falharem, aí sim é erro total.
-        if (eventosCriados.length === 0) throw dbErr;
+        console.error("❌ ERRO CRÍTICO: Falha ao salvar no banco de dados. Abortando resposta de sucesso.");
+        console.error("Detalhes do erro DB:", dbErr.message);
+        
+        // Se o banco falhou, não podemos deixar o usuário prosseguir, 
+        // pois os dados não aparecerão no Admin.
+        return res.status(500).json({ 
+          success: false, 
+          error: "Erro ao salvar no banco de dados. O agendamento não pôde ser concluído.",
+          details: dbErr.message 
+        });
       }
 
       const message = calendarError || eventosCriados.length < etapas.length 
