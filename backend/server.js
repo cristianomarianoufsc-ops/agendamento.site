@@ -918,30 +918,25 @@ app.get("/api/inscricoes", async (req, res) => {
 
     const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
       const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-      const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+      const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
       
-      console.log(`🔍 [DEBUG] Cruzando dados para inscrição #${inscricao.id} (${emailEtapa1})`);
       const match = formsDataRows.find(rowData => {
         let emailForms = '', telForms = '';
         for (const key in rowData) {
             const normalizedKey = normalizeKey(key);
             const value = (rowData[key] || "").trim();
             
-            // Buscar email: primeiro por nome da coluna, depois por conteúdo com @
             if (normalizedKey.includes('mail')) {
               emailForms = value.toLowerCase();
             } else if (!emailForms && value.includes('@') && value.includes('.')) {
-              // Se ainda não achou email e o valor parece um email, usa ele
               emailForms = value.toLowerCase();
             }
             
             if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) {
-              telForms = value.replace(/\D/g, "");
+              telForms = value.replace(/\D/g, "").replace(/^55/, "");
             }
         }
-        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
-        if (isMatch) console.log(`✅ [DEBUG] Match encontrado na planilha para ${emailEtapa1}`);
-        return isMatch;
+        return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
       });
 
       let proponenteTipo = 'Não identificado';
@@ -2160,9 +2155,9 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
           
           const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
           const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
+          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
           
           return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                  (telForms && telEtapa1 && telForms === telEtapa1);
@@ -2335,9 +2330,9 @@ app.get("/api/download-zip/:id", async (req, res) => {
           
           const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
           const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "") : null;
+          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
           const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "");
+          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
           return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                  (telForms && telEtapa1 && telForms === telEtapa1);
         });
