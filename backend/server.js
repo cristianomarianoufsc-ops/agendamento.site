@@ -2223,32 +2223,42 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
 
     // Dados da 2ª Etapa (do Google Sheets) - SEMPRE MOSTRAR
     doc.font('Helvetica-Bold').fontSize(14).text("3. DETALHAMENTO DO EVENTO (Etapa 2)");
+    
     if (respostaForms) {
       doc.font('Helvetica').fontSize(10);
-      for (const [key, value] of Object.entries(respostaForms)) {
-	        // Ignorar carimbo de data/hora
-	        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
-	        
-	        // Tratar valores vazios de forma mais flexível
-	        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
-        
-        // Se o valor for uma URL do Drive, exibir como link
-        const isDriveLink = typeof value === 'string' && value.includes('drive.google.com');
-        
-        // Escrever o rótulo
-        doc.font('Helvetica-Bold').text(key, { continued: true }).font('Helvetica').text(`: `, { continued: true });
 
-        if (isDriveLink) {
-          // Se for link, exibe o texto "LINK PARA ANEXO" como um link clicável
-          doc.fillColor('blue').text("LINK PARA ANEXO", { 
-            link: value, 
-            underline: true, 
-            continued: false 
-          }).fillColor('black'); // Volta a cor para preto
-        } else {
-          // Caso contrário, exibe o valor normalmente
-          doc.text(displayValue, { continued: false });
+      // --- NOVA SEÇÃO: ARQUIVOS (Links do Drive) ---
+      doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text("ARQUIVOS:", { underline: true });
+      
+      let hasFiles = false;
+      for (const [key, value] of Object.entries(respostaForms)) {
+        if (typeof value === 'string' && value.includes('drive.google.com')) {
+          hasFiles = true;
+          const urls = value.split(', ');
+          urls.forEach((url, idx) => {
+            doc.font('Helvetica-Bold').text(`  • ${key}${urls.length > 1 ? ` (${idx + 1})` : ''}: `, { continued: true })
+               .font('Helvetica').fillColor('blue').text("VER ARQUIVO", { link: url.trim(), underline: true }).fillColor('black');
+          });
         }
+      }
+      
+      if (!hasFiles) {
+        doc.font('Helvetica-Oblique').text("  Nenhum arquivo anexado.");
+      }
+      doc.moveDown(1);
+      // --------------------------------------------
+
+      // Restante dos dados
+      for (const [key, value] of Object.entries(respostaForms)) {
+        // Ignorar carimbo de data/hora e links (que já foram mostrados acima)
+        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
+        if (typeof value === 'string' && value.includes('drive.google.com')) continue;
+        
+        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
+        
+        doc.font('Helvetica-Bold').text(`${key}: `, { continued: true })
+           .font('Helvetica').text(displayValue, { continued: false });
       }
     } else {
       doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
