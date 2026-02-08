@@ -43,59 +43,22 @@ console.log('  EMAIL_PASS:', process.env.EMAIL_PASS ? '✅ Definida' : '❌ Não
 const databaseUrl = process.env.DATABASE_URL;
 const isInternalRenderHost = databaseUrl && databaseUrl.includes('dpg-') && databaseUrl.includes('-a');
 
-// No Render, se for conexão interna (hostname dpg-...-a), o SSL deve ser desabilitado.
-// Se for conexão externa (contém render.com), o SSL deve estar habilitado.
-// ADICIONADO: Suporte a variável de ambiente DB_SSL para controle manual no Render
-const dbSslEnv = process.env.DB_SSL;
-let sslConfig = false;
-
-// No Render, URLs externas (*.render.com) EXIGEM SSL.
-// URLs internas (dpg-*-a) geralmente não usam SSL na rede interna.
-if (dbSslEnv === 'true') {
-  sslConfig = { rejectUnauthorized: false };
-} else if (dbSslEnv === 'false') {
-  sslConfig = false;
-} else {
-  // Lógica inteligente: se a URL contém 'render.com', quase certamente é externa e precisa de SSL.
-  // Se contiver 'dpg-' mas não terminar com '-a', também pode ser um host externo.
-  const isExternalRender = databaseUrl && databaseUrl.includes('render.com');
-  
-  if (isExternalRender) {
-    console.log('🔒 Detectada URL externa do Render. Ativando SSL (rejectUnauthorized: false).');
-    sslConfig = { rejectUnauthorized: false };
-  } else {
-    sslConfig = false;
-  }
-}
-
-// DEBUG: Log detalhado da conexão (sem expor a senha completa)
-if (databaseUrl) {
-  try {
-    const url = new URL(databaseUrl);
-    console.log('🗄️ DATABASE_URL Detectada:');
-    console.log(`  - Protocolo: ${url.protocol}`);
-    console.log(`  - Host: ${url.hostname}`);
-    console.log(`  - Porta: ${url.port}`);
-    console.log(`  - Database: ${url.pathname}`);
-    console.log(`  - SSL Config: ${JSON.stringify(sslConfig)}`);
-    console.log(`  - DB_SSL Env: ${dbSslEnv}`);
-  } catch (e) {
-    console.log('🗄️ DATABASE_URL detectada, mas não pôde ser parseada como URL.');
-  }
-}
-
-const pool = databaseUrl 
-  ? new Pool({ 
-      connectionString: databaseUrl,
-      ssl: sslConfig
-    })
-  : new Pool({
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME || 'edital_ufsc',
-    });
+const pool = new Pool(
+  databaseUrl
+    ? {
+        connectionString: databaseUrl,
+        ssl: isInternalRenderHost ? false : {
+          rejectUnauthorized: false, // Necessário para conexões externas no Render
+        },
+      }
+    : {
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME || 'edital_ufsc',
+      }
+);
 
 if (isInternalRenderHost) {
   console.log('🌐 Detectado Hostname Interno do Render. SSL desabilitado para esta conexão.');
@@ -852,29 +815,15 @@ app.post('/api/criteria', async (req, res) => {
 // --- 11. ROTA PARA OBTER INSCRIÇÕES ---
 app.get("/api/inscricoes", async (req, res) => {
   try {
-    let criteria = [];
-    let inscriptions = [];
-    let allAssessments = [];
-    let totalEvaluators = 0;
-
-    try {
-      criteria = await getEvaluationCriteria() || [];
-      const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
-      inscriptions = inscriptionsResult.rows.map(inscricao => ({
-        ...inscricao,
-        created_at: inscricao.criado_em // Mapeia criado_em para created_at para compatibilidade com o frontend
-      }));
-      
-      const assessmentsResult = await query("SELECT * FROM assessments");
-      allAssessments = assessmentsResult.rows;
-      
-      const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
-      totalEvaluators = totalEvaluatorsResult.rows[0].count;
-    } catch (dbError) {
-      console.error("❌ Erro ao buscar dados do banco de dados:", dbError.message);
-      // Se falhar a conexão com o banco, retornamos o que temos (vazio) para não dar 500
-      return res.json({ inscricoes: [], criteria: [], error: "Erro de conexão com o banco de dados" });
-    }
+    const criteria = await getEvaluationCriteria();
+    const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
+    const inscriptions = inscriptionsResult.rows;
+    
+    const assessmentsResult = await query("SELECT * FROM assessments");
+    const allAssessments = assessmentsResult.rows;
+    
+    const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
+    const totalEvaluators = totalEvaluatorsResult.rows[0].count;
 
     // ✅ LÓGICA DE DETECÇÃO DE CONFLITO
     const allSlots = [];
@@ -906,14 +855,12 @@ app.get("/api/inscricoes", async (req, res) => {
           let singleEvaluationScore = 0;
           let totalWeight = 0;
 
-          if (Array.isArray(criteria)) {
-            criteria.forEach(crit => {
-              const scoreValue = scores[crit.id] || 0;
-              const weightValue = crit.weight || 1;
-              singleEvaluationScore += scoreValue * weightValue;
-              totalWeight += weightValue;
-            });
-          }
+          criteria.forEach(crit => {
+            const scoreValue = scores[crit.id] || 0;
+            const weightValue = crit.weight || 1;
+            singleEvaluationScore += scoreValue * weightValue;
+            totalWeight += weightValue;
+          });
 
           const weightedAverage = totalWeight > 0 ? singleEvaluationScore / totalWeight : 0;
           totalScoreSum += weightedAverage;
@@ -965,10 +912,8 @@ app.get("/api/inscricoes", async (req, res) => {
           formsDataRows = rows.slice(1).map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
         }
       }
-    } catch (formsErr) {
-      console.error("⚠️ Erro ao buscar dados do Forms (Google Sheets) na rota /api/inscricoes:", formsErr.message);
-      console.error("Detalhes do erro do Forms:", formsErr.stack);
-      // Continua mesmo com erro no Forms, para não bloquear as inscrições do DB
+    } catch (e) {
+      console.warn("⚠️ [UNIFY] Aviso: Não foi possível buscar dados da planilha.", e.message);
     }
 
     const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
@@ -1352,12 +1297,9 @@ async function consolidateSchedule() {
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
 app.get("/api/admin/data-for-analysis", async (req, res) => {
   try {
-    const criteria = await getEvaluationCriteria() || [];
-    const inscricoesResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
-    const inscriptions = inscricoesResult.rows.map(inscricao => ({
-      ...inscricao,
-      created_at: inscricao.criado_em // Mapeia criado_em para created_at para compatibilidade com o frontend
-    }));
+    const criteria = await getEvaluationCriteria();
+    const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
+    const inscriptions = inscriptionsResult.rows;
     
     const assessmentsResult = await query("SELECT * FROM assessments");
     const allAssessments = assessmentsResult.rows;
@@ -1577,45 +1519,35 @@ app.post("/api/create-events", async (req, res) => {
       dbPayload.eventos_json = JSON.stringify(todosEventos);
       
       try {
-        const dbResult = await query(
-          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json, hasConflict) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json, 0]
+        await query(
+          `INSERT INTO inscricoes (nome, email, telefone, evento_nome, local, ensaio_inicio, ensaio_fim, ensaio_eventId, montagem_inicio, montagem_fim, montagem_eventId, desmontagem_inicio, desmontagem_fim, desmontagem_eventId, eventos_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          [dbPayload.nome, dbPayload.email, dbPayload.telefone, dbPayload.evento_nome, dbPayload.local, dbPayload.ensaio_inicio, dbPayload.ensaio_fim, dbPayload.ensaio_eventId, dbPayload.montagem_inicio, dbPayload.montagem_fim, dbPayload.montagem_eventId, dbPayload.desmontagem_inicio, dbPayload.desmontagem_fim, dbPayload.desmontagem_eventId, dbPayload.eventos_json]
         );
-        
-        const newInscriptionId = dbResult.rows[0]?.id;
-        console.log(`💾 Inscrição #${newInscriptionId} salva no banco com sucesso!`);
-        
-        // Adiciona o ID ao payload para retorno ao frontend
-        dbPayload.id = newInscriptionId;
-
+        console.log("💾 Inscrição salva no banco com sucesso!");
       } catch (dbErr) {
-        console.error("❌ ERRO CRÍTICO: Falha ao salvar no banco de dados. Abortando resposta de sucesso.");
-        console.error("Detalhes do erro DB:", dbErr.message);
-        
-        // Se o banco falhou, não podemos deixar o usuário prosseguir, 
-        // pois os dados não aparecerão no Admin.
-        return res.status(500).json({ 
-          success: false, 
-          error: "Erro ao salvar no banco de dados. O agendamento não pôde ser concluído.",
-          details: dbErr.message 
-        });
+        console.error("⚠️ Erro ao salvar no banco de dados, mas o evento foi criado no Calendar:", dbErr.message);
+        // Se o evento foi criado no Calendar mas o banco falhou, ainda podemos considerar "sucesso" para o usuário não travar
+        // mas avisamos no log. Se ambos falharem, aí sim é erro total.
+        if (eventosCriados.length === 0) throw dbErr;
       }
 
       const message = calendarError || eventosCriados.length < etapas.length 
         ? "Inscrição processada, mas houve erro na sincronização total com o Google Calendar." 
         : "Eventos criados e inscrição salva com sucesso!";
       
-      // Envia o e-mail de confirmação da Etapa 1 em segundo plano
-      // O envio do e-mail e a resposta ao cliente agora ocorrem APÓS a gravação no banco de dados.
-      await sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })))
-        .catch(mailErr => console.error("❌ Erro no envio de e-mail em background:", mailErr.message));
-
+      // Envia a resposta ANTES do e-mail para evitar timeout ou erros de e-mail bloquearem o frontend
       res.json({ 
         success: true, 
         message: message, 
         eventos: eventosCriados,
         calendarError: calendarError ? calendarError.message : (eventosCriados.length < etapas.length ? "Alguns eventos não foram criados no Calendar" : null)
       });
+
+      // Envia o e-mail de confirmação da Etapa 1 em segundo plano
+      setTimeout(() => {
+        sendStep1ConfirmationEmail(userData, (userData.eventName || resumo), local, etapasComId.map(e => ({ nome: e.nome, inicio: e.inicio, fim: e.fim })))
+          .catch(mailErr => console.error("❌ Erro no envio de e-mail em background:", mailErr.message));
+      }, 100);
 
     } catch (err) {
       console.error("❌ Erro ao processar inscrição:", err.message);

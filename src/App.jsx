@@ -24,7 +24,6 @@ const AppVertical = () => {
   const [currentStep, setCurrentStep] = useState("select_local");
   const [firstStepDone, setFirstStepDone] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false); // NOVO: Estado de carregamento
   const [pendingRemovals, setPendingRemovals] = useState([]);
   const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -468,11 +467,11 @@ const newEnd = toMinutes(newEntry.end);
   };
 // SUBSTITUA TODA A SUA FUNÇÃO 'handleSendEmail' POR ESTA:
 const handleSendEmail = async () => {
-  setIsSubmitting(true);
   try {
     const etapas = [];
     stageOrder.forEach(etapa => {
       if (etapa === 'evento') {
+        // Para eventos, processa o array
         if (resumo.evento && Array.isArray(resumo.evento)) {
           resumo.evento.forEach(evt => {
             if (evt.date && evt.start && evt.end) {
@@ -481,6 +480,7 @@ const handleSendEmail = async () => {
           });
         }
       } else {
+        // Para outras etapas, processa normalmente
         if (resumo[etapa] && resumo[etapa].date && resumo[etapa].start && resumo[etapa].end) {
           etapas.push({ nome: etapa, inicio: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].start}:00`, fim: `${resumo[etapa].date.split("T")[0]}T${resumo[etapa].end}:00` });
         }
@@ -489,47 +489,57 @@ const handleSendEmail = async () => {
 
     if (etapas.length === 0) {
       setAlertMessage({type: 'warning', text: "Nenhuma etapa selecionada."});
+      setTimeout(() => setAlertMessage(null), 4000);
       return;
     }
 
     const response = await fetch("/api/create-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData })
+      body: JSON.stringify({ local: localSelecionado, resumo: userData.eventName, etapas, userData }   )
     });
 
     const result = await response.json();
 
-    if (response.ok && result?.success) {
+    if (result?.success && result.eventos) {
+      setAlertMessage({type: 'success', text: "Agendamento confirmado!"});
+
+      // Lógica corrigida para associar os eventIds
       const novoResumoComIds = { ...resumo };
+      
+      // Contador para eventos múltiplos
       let eventoIndex = 0;
 
-      if (result.eventos) {
-        result.eventos.forEach(eventoCriado => {
-          if (eventoCriado.etapa === 'evento') {
-            if (novoResumoComIds.evento && novoResumoComIds.evento[eventoIndex]) {
-              novoResumoComIds.evento[eventoIndex].eventId = eventoCriado.id;
-              eventoIndex++;
-            }
-          } else if (novoResumoComIds[eventoCriado.etapa]) {
+      result.eventos.forEach(eventoCriado => {
+        if (eventoCriado.etapa === 'evento') {
+          // Para eventos, adiciona o eventId ao item correspondente no array
+          if (novoResumoComIds.evento && novoResumoComIds.evento[eventoIndex]) {
+            novoResumoComIds.evento[eventoIndex].eventId = eventoCriado.id;
+            eventoIndex++;
+          }
+        } else {
+          // Para outras etapas, funciona como antes
+          if (novoResumoComIds[eventoCriado.etapa]) {
             novoResumoComIds[eventoCriado.etapa].eventId = eventoCriado.id;
           }
-        });
-      }
+        }
+      });
 
       setResumo(novoResumoComIds);
+
+      // E-mail de confirmação desabilitado temporariamente
+
       fetchOccupiedSlots(localSelecionado, currentMonth);
       setFirstStepDone(true);
-      setAlertMessage({type: 'success', text: "Inscrição salva com sucesso no banco de dados!"});
+      setAlertMessage({type: 'success', text: "Primeira etapa concluída com sucesso!"});
 
     } else {
-      setAlertMessage({type: 'error', text: result.error || "Erro ao salvar no banco de dados. Tente novamente."});
+      setAlertMessage({type: 'error', text: result.error || "Erro ao salvar eventos."});
     }
   } catch (err) {
     console.error("Falha na comunicação:", err);
-    setAlertMessage({type: 'error', text: "Falha de conexão com o servidor. Verifique o banco de dados."});
+    setAlertMessage({type: 'error', text: "Falha na comunicação com o servidor."});
   } finally {
-    setIsSubmitting(false);
     setTimeout(() => setAlertMessage(null), 5000);
   }
 };
@@ -643,7 +653,7 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
       if (data?.formsLink) {
         window.open(data.formsLink, "_blank");
         setShowCompletionMessage(true);
-        setTimeout(() => handleBackToLocalSelect(), 15000);
+        setTimeout(() => handleBackToLocalSelect(), 5000);
       } else {
         alert("Nenhum link de formulário configurado no painel de administração.");
       }
@@ -772,18 +782,7 @@ if (resumo.ensaio && resumo.ensaio.length > 0) {
                 <PartyPopper size={80} className="text-green-500 mx-auto" />
                 <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mt-6">Obrigado!</h1>
                 <p className="text-lg text-gray-600 mt-2">Sua solicitação de agendamento foi recebida. Continue preenchendo as informações na nova aba que foi aberta.</p>
-                
-                <div className="mt-8 space-y-4 w-full max-w-xs mx-auto">
-                  <button 
-                    onClick={handleDownloadPDF}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg"
-                  >
-                    <Download size={20} /> Baixar Comprovante PDF
-                  </button>
-                </div>
-
-                <p className="text-sm text-gray-500 mt-8">Caso precise baixar seu comprovante novamente, acesse a opção <strong>'Meus Comprovantes'</strong> na página inicial.</p>
-                <p className="text-xs text-gray-400 mt-2">Você será redirecionado para a página inicial em alguns segundos...</p>
+                <p className="text-sm text-gray-500 mt-8">Você será redirecionado para a página inicial em 5 segundos...</p>
               </motion.div>
             </motion.div>
           )}
@@ -976,17 +975,8 @@ if (etapa === 'evento' || etapa === 'ensaio') {
 
                 <div className="mt-6 border-t pt-6">
                   {!firstStepDone ? (
-                    <button 
-                      onClick={handleSendEmail} 
-                      disabled={!isFormValid() || isSubmitting} 
-                      className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100 flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Salvando no Banco de Dados...
-                        </>
-                      ) : "Confirmar 1ª Etapa e Agendar"}
+                    <button onClick={handleSendEmail} disabled={!isFormValid()} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all duration-200 hover:scale-[1.02] disabled:bg-gray-300 disabled:cursor-not-allowed disabled:scale-100">
+                      Confirmar 1ª Etapa e Agendar
                     </button>
                   ) : (
                     <div className="space-y-3">
