@@ -906,7 +906,12 @@ const Admin = ({ viewOnly = false }) => {
                                     </>
                                   )}
                                 </td>              {!viewOnly && <td className="px-6 py-4 space-y-2 align-top">                           {/* <button onClick={() => handleGeneratePDF(u)} className="flex items-center gap-2 text-blue-600 hover:underline font-semibold"><FileText size={16} /> Formulário (PDF)</button> */}
-                                  {u.formsData && <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha Detalhada</button>}
+                                  {u.formsData && (
+                                    <>
+                                      <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha Detalhada</button>
+                                      <button onClick={() => window.open(`/api/gerar-pdf/${u.id}`, "_blank")} className="flex items-center gap-2 text-red-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha (PDF)</button>
+                                    </>
+                                  )}
                                   {/* <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button> */}
                                 </td>}
                                 <td className="px-6 py-4 text-center align-top">
