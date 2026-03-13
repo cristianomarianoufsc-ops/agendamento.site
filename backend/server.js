@@ -1917,6 +1917,112 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   return false;
 }
 
+// --- 21.5 ROTA TEMPORÁRIA PARA DISPARO DE RETIFICAÇÃO ---
+app.get("/api/disparar-retificacao-fuso", async (req, res) => {
+  const { senha, testOnly } = req.query;
+  const SENHA_SEGURANCA = "ufsc_dac_2026_retificar"; // Senha simples para evitar disparos acidentais
+  
+  if (senha !== SENHA_SEGURANCA) {
+    return res.status(403).send("Acesso negado. Senha incorreta.");
+  }
+
+  try {
+    // Buscar inscrições afetadas (antes de 13/03/2026)
+    const result = await query("SELECT * FROM inscricoes WHERE criado_em < '2026-03-13' ORDER BY id ASC");
+    const inscricoes = result.rows;
+    
+    console.log(`🚀 Iniciando disparo de retificação para ${inscricoes.length} inscrições.`);
+    
+    let enviados = 0;
+    let erros = 0;
+
+    for (const ins of inscricoes) {
+      // Se testOnly estiver ativo, envia apenas para o admin (ou e-mail de teste)
+      const destinatario = testOnly === 'true' ? 'cristianomariano.ufsc@gmail.com' : ins.email;
+      
+      // Montar lista de etapas
+      const etapas = [];
+      if (ins.ensaio_inicio) etapas.push({ nome: 'Ensaio', inicio: ins.ensaio_inicio, fim: ins.ensaio_fim });
+      if (ins.montagem_inicio) etapas.push({ nome: 'Montagem', inicio: ins.montagem_inicio, fim: ins.montagem_fim });
+      if (ins.desmontagem_inicio) etapas.push({ nome: 'Desmontagem', inicio: ins.desmontagem_inicio, fim: ins.desmontagem_fim });
+      if (ins.eventos_json) {
+        try {
+          const evs = JSON.parse(ins.eventos_json);
+          evs.forEach((ev, i) => etapas.push({ nome: `Evento ${i+1}`, inicio: ev.inicio, fim: ev.fim }));
+        } catch(e) {}
+      }
+
+      // Formatar HTML das etapas (Consolidado)
+      const etapasHtml = etapas.map(etapa => {
+        const dInicio = new Date(etapa.inicio.includes('Z') ? etapa.inicio : etapa.inicio + '-03:00');
+        const dFim = new Date(etapa.fim.includes('Z') ? etapa.fim : etapa.fim + '-03:00');
+        const dataFormatada = dInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        const horaInicio = dInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+        const horaFim = dFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+        return `<li><strong>${etapa.nome}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
+      }).join('');
+
+      const subject = `RETIFICAÇÃO: Confirmação de Horários - Inscrição #${ins.id}`;
+      const htmlContent = `
+        <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #003366;">Olá, ${ins.nome}!</h2>
+          <p>Estamos entrando em contato para realizar uma <strong>retificação importante</strong> nos horários do seu agendamento para o evento "<strong>${ins.evento_nome}</strong>".</p>
+          <p>Devido a um ajuste técnico no fuso horário do nosso sistema, os horários enviados anteriormente apresentavam uma diferença de 3 horas. Os horários <strong>corretos e oficiais</strong> registrados são:</p>
+          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 5px solid #003366; margin: 20px 0;">
+            <ul style="list-style: none; padding: 0; margin: 0;">
+              ${etapasHtml}
+            </ul>
+          </div>
+          <p>Pedimos desculpas pelo transtorno. Seus horários já estão garantidos conforme a lista acima.</p>
+          <p>Atenciosamente,<br><strong>Equipe de Agendamento DAC/UFSC</strong></p>
+        </div>
+      `;
+
+      // Reutiliza a lógica de envio do sistema
+      // Mockamos userData para a função existente ou chamamos a lógica de envio diretamente
+      // Para garantir o envio consolidado, chamamos a lógica de e-mail aqui
+      const sucesso = await (async () => {
+        const brevoApiKey = process.env.BREVO_API_KEY;
+        const remetente = process.env.EMAIL_REMETENTE_VALIDADO || 'pautas.dac@contato.ufsc.br';
+        
+        if (brevoApiKey) {
+          try {
+            const payload = {
+              sender: { email: remetente, name: "Sistema de Agendamento DAC" },
+              to: [{ email: destinatario, name: ins.nome }],
+              subject: subject,
+              htmlContent: htmlContent
+            };
+            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'api-key': brevoApiKey },
+              body: JSON.stringify(payload)
+            });
+            return response.ok;
+          } catch (e) { return false; }
+        }
+        return false;
+      })();
+
+      if (sucesso) enviados++; else erros++;
+      
+      // Se for apenas teste, para no primeiro
+      if (testOnly === 'true') break;
+    }
+
+    res.json({ 
+      message: testOnly === 'true' ? "Teste enviado com sucesso!" : "Disparo concluído!",
+      total_processado: testOnly === 'true' ? 1 : inscricoes.length,
+      sucesso: enviados,
+      erros: erros
+    });
+
+  } catch (error) {
+    console.error("Erro no disparo de retificação:", error);
+    res.status(500).send("Erro interno ao processar disparo.");
+  }
+});
+
 // --- 22. ROTA PARA VISUALIZAR SLIDES ---
 app.get("/api/slides-viewer", async (req, res) => {
   try {
