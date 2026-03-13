@@ -1792,9 +1792,15 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
   };
 
   const etapasHtml = etapas.map(etapa => {
-    const dataFormatada = new Date(etapa.inicio).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-    const horaInicio = new Date(etapa.inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-    const horaFim = new Date(etapa.fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    // Forçamos a interpretação da string ISO sem o "Z" como horário local, adicionando o offset se necessário,
+    // ou simplesmente tratando a string de data que vem do frontend (YYYY-MM-DDTHH:mm:ss)
+    // Para garantir pt-BR e America/Sao_Paulo:
+    const dInicio = new Date(etapa.inicio.includes('Z') ? etapa.inicio : etapa.inicio + '-03:00');
+    const dFim = new Date(etapa.fim.includes('Z') ? etapa.fim : etapa.fim + '-03:00');
+    
+    const dataFormatada = dInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const horaInicio = dInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    const horaFim = dFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
     return `<li><strong>${etapa.nome.charAt(0).toUpperCase() + etapa.nome.slice(1)}:</strong> ${dataFormatada}, das ${horaInicio} às ${horaFim}</li>`;
   }).join('');
 
@@ -2208,9 +2214,13 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     doc.font('Helvetica-Bold').fontSize(14).text("2. AGENDAMENTOS REALIZADOS");
     const linhaEtapa = (rotulo, inicio, fim) => {
       if (!inicio || !fim) return;
-      const data = new Date(inicio).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const hIni = new Date(inicio).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-      const hFim = new Date(fim).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      // Garantir interpretação correta do fuso horário de Brasília (UTC-3)
+      const dInicio = new Date(inicio.includes('Z') ? inicio : inicio + '-03:00');
+      const dFim = new Date(fim.includes('Z') ? fim : fim + '-03:00');
+      
+      const data = dInicio.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+      const hIni = dInicio.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: 'America/Sao_Paulo' });
+      const hFim = dFim.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: 'America/Sao_Paulo' });
       doc.font('Helvetica').fontSize(10).text(`• ${rotulo}: ${data}, das ${hIni} às ${hFim}`);
     };
     linhaEtapa("Ensaio", inscricao.ensaio_inicio, inscricao.ensaio_fim);
