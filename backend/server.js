@@ -2291,10 +2291,25 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     doc.on("data", chunk => chunks.push(chunk));
     doc.on("end", () => {
       const pdfBuffer = Buffer.concat(chunks);
-      const filename = `inscricao-${id}-${(inscricao.evento_nome || 'evento').replace(/\s+/g, '_')}.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="${filename}"`); // inline = abre em nova aba
-      res.send(pdfBuffer);
+      // Limpar o nome do arquivo para evitar caracteres inválidos no cabeçalho HTTP
+      const safeEventName = (inscricao.evento_nome || 'evento')
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[^a-zA-Z0-9]/g, "_"); // Substitui qualquer caractere não alfanumérico por _
+      
+      const filename = `inscricao-${id}-${safeEventName}.pdf`;
+      
+      try {
+        res.setHeader("Content-Type", "application/pdf");
+        // Usar encodeURIComponent para o filename no Content-Disposition (padrão RFC 5987)
+        res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(filename)}"`); 
+        res.send(pdfBuffer);
+      } catch (headerError) {
+        console.error("❌ Erro ao definir cabeçalhos do PDF:", headerError);
+        if (!res.headersSent) {
+          res.status(500).send("Erro ao gerar o cabeçalho do PDF.");
+        }
+      }
 
       // NOVO: Enviar o PDF por e-mail
       const emailDestino = respostaForms ? (respostaForms[Object.keys(respostaForms).find(k => k.toLowerCase().includes("mail"))] || inscricao.email) : inscricao.email;
