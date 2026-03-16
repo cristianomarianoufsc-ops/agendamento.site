@@ -2221,11 +2221,24 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
       const configResult = await query('SELECT config_json FROM config WHERE id = 1');
       let sheetId = null;
+      const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
+      
       if (configResult.rows.length > 0) {
         const config = JSON.parse(configResult.rows[0].config_json);
         sheetId = config.sheetId;
+        
+        // Se a config diz para usar links fixos ou se o sheetId está vazio, tenta extrair do link fixo
+        if ((config.useFixedLinks || !sheetId)) {
+          const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
+          sheetId = match ? match[1] : sheetId;
+        }
+      } else {
+        // Fallback total se não houver config no banco
+        const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        sheetId = match ? match[1] : null;
       }
-      console.log(`[PDF] SheetId do banco:`, sheetId);
+      
+      console.log(`[PDF] SheetId final para busca:`, sheetId);
 
       if (sheetId) {
         // ✅ Usar Sheets API ao invés do Drive API
