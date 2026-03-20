@@ -649,29 +649,33 @@ app.get('/api/forms-data', async (req, res) => {
         return res.status(503).json({ error: 'Serviço do Google Sheets não disponível.' });
     }
 
-    // Acessa a API do Google Sheets
-    const response = await sheets.spreadsheets.values.get({ 
-      spreadsheetId: sheetId, 
-      range: "A:ZZ" 
-    });
+    // Acessa a API do Google Sheets para todas as abas
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
     
-    const rows = (response.data.values || []);
-    
-    if (rows.length <= 1) {
-      return res.json([]); // Retorna array vazio se só tiver cabeçalho ou estiver vazia
+    let allFormsData = [];
+    for (const title of sheetTitles) {
+      try {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `${title}!A:ZZ`
+        });
+        const rows = response.data.values;
+        if (rows && rows.length > 1) {
+          const headers = rows[0];
+          const sheetRecords = rows.slice(1).map(row => {
+            const rowData = {};
+            headers.forEach((header, index) => { rowData[header] = row[index] || ""; });
+            return rowData;
+          });
+          allFormsData = allFormsData.concat(sheetRecords);
+        }
+      } catch (sheetErr) {
+        console.warn(`⚠️ Erro ao ler aba "${title}":`, sheetErr.message);
+      }
     }
 
-    const headers = rows[0];
-    // Mapeia as linhas de dados para objetos com base nos cabeçalhos
-    const formsData = rows.slice(1).map(row => {
-      const rowData = {};
-      headers.forEach((header, index) => {
-        rowData[header] = row[index] || "";
-      });
-      return rowData;
-    });
-
-    res.json(formsData);
+    res.json(allFormsData);
 
   } catch (e) {
     console.error('❌ Erro ao buscar dados do Forms/Sheets:', e.message);
@@ -901,15 +905,28 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
-      // A rota é async, mas o bloco try/catch não é um escopo de função.
-      // O erro original não estava aqui, mas a lógica de await está correta.
       const config = await getConfigFromDB();
-      if (config.sheetId) {
-        const response = await sheets.spreadsheets.values.get({ spreadsheetId: config.sheetId, range: "A:ZZ" });
-        const rows = (response.data.values || []);
-        if (rows.length > 1) {
-          const headers = rows[0];
-          formsDataRows = rows.slice(1).map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
+      if (config.sheetId && sheets) {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: config.sheetId });
+        const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
+        
+        for (const title of sheetTitles) {
+          try {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: config.sheetId,
+              range: `${title}!A:ZZ`
+            });
+            const rows = response.data.values;
+            if (rows && rows.length > 1) {
+              const headers = rows[0];
+              const sheetRecords = rows.slice(1).map(row => 
+                headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {})
+              );
+              formsDataRows = formsDataRows.concat(sheetRecords);
+            }
+          } catch (sheetErr) {
+            console.warn(`⚠️ [UNIFY] Erro ao ler aba "${title}":`, sheetErr.message);
+          }
         }
       }
     } catch (e) {
@@ -920,6 +937,7 @@ app.get("/api/inscricoes", async (req, res) => {
       const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
       const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
       
+      console.log(`[UNIFY] Tentando unificar inscrição #${inscricao.id} (${inscricao.nome})`);
       const match = formsDataRows.find(rowData => {
         let emailForms = '', telForms = '';
         for (const key in rowData) {
@@ -936,14 +954,30 @@ app.get("/api/inscricoes", async (req, res) => {
               telForms = value.replace(/\D/g, "").replace(/^55/, "");
             }
         }
-        return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        if (isMatch) console.log(`[UNIFY] ✅ Sucesso! Encontrado match para #${inscricao.id} na planilha.`);
+        return isMatch;
       });
+
+      if (!match) {
+        console.log(`[UNIFY] ❌ Falha! Não foi encontrado match para #${inscricao.id} na planilha.`);
+        console.log(`[UNIFY]   - Email Etapa 1: "${emailEtapa1}"`);
+        console.log(`[UNIFY]   - Tel Etapa 1: "${telEtapa1}"`);
+        if (formsDataRows.length > 0) {
+           console.log(`[UNIFY]   - Verificando primeiros 2 registros da planilha para depuração:`);
+           formsDataRows.slice(0, 2).forEach((r, idx) => {
+             console.log(`[UNIFY]     Reg [${idx}]: Email="${(r['Endereço de e-mail'] || r['Email'] || 'N/A')}", Tel="${(r['Telefone'] || r['Fone'] || 'N/A')}"`);
+           });
+        }
+      }
 
       let proponenteTipo = 'Não identificado';
       if (match) {
         const tipoKey = Object.keys(match).find(key => {
           const normalized = normalizeKey(key);
-          return normalized.includes('inscreve') || normalized.includes('inscrevera');
+          // Busca por termos comuns em formulários (inscreve, tipo, proponente)
+          return normalized.includes('inscreve') || normalized.includes('inscrevera') || 
+                 (normalized.includes('proponente') && (normalized.includes('tipo') || normalized.includes('fisica') || normalized.includes('juridica')));
         });
         if (tipoKey && match[tipoKey]) {
           proponenteTipo = match[tipoKey];
@@ -2215,10 +2249,10 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
     
     const inscricao = result.rows[0];
     
-    // 2. Buscar dados do Google Sheets via CSV (como no backup)
+    // 2. Buscar dados do Google Sheets
     let respostaForms = null;
     try {
-      // ✅ LER CONFIG DO BANCO DE DADOS (não do arquivo)
+      // ✅ LER CONFIG DO BANCO DE DADOS
       const configResult = await query('SELECT config_json FROM config WHERE id = 1');
       let sheetId = null;
       const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
@@ -2226,76 +2260,72 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       if (configResult.rows.length > 0) {
         const config = JSON.parse(configResult.rows[0].config_json);
         sheetId = config.sheetId;
-        
-        // Se a config diz para usar links fixos ou se o sheetId está vazio, tenta extrair do link fixo
         if ((config.useFixedLinks || !sheetId)) {
           const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
           sheetId = match ? match[1] : sheetId;
         }
       } else {
-        // Fallback total se não houver config no banco
         const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
         sheetId = match ? match[1] : null;
       }
       
       console.log(`[PDF] SheetId final para busca:`, sheetId);
 
-      if (sheetId) {
-        // ✅ Usar Sheets API ao invés do Drive API
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: sheetId,
-          range: 'A:Z'
-        });
+      if (sheetId && sheets) {
+        // ✅ BUSCAR TODAS AS ABAS PARA GARANTIR QUE ENCONTRAMOS OS DADOS RECENTES
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+        const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
         
-        const rows = response.data.values;
-        if (!rows || rows.length === 0) {
-          console.log('[PDF] Sheet vazio');
-        } else {
-          // Primeira linha = cabeçalhos
-          const headers = rows[0];
-          // Converter para array de objetos
-          const records = rows.slice(1).map(row => {
-            const obj = {};
-            headers.forEach((header, i) => {
-              obj[header] = row[i] || '';
+        let allRecords = [];
+        for (const title of sheetTitles) {
+          try {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: sheetId,
+              range: `${title}!A:Z`
             });
-            return obj;
+            const rows = response.data.values;
+            if (rows && rows.length > 1) {
+              const headers = rows[0];
+              const sheetRecords = rows.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((header, i) => { obj[header] = row[i] || ''; });
+                return obj;
+              });
+              allRecords = allRecords.concat(sheetRecords);
+            }
+          } catch (sheetErr) {
+            console.warn(`[PDF] Erro ao ler aba "${title}":`, sheetErr.message);
+          }
+        }
+        
+        if (allRecords.length > 0) {
+          console.log(`[PDF] Total de registros encontrados em todas as abas: ${allRecords.length}`);
+          
+          // Encontrar linha correspondente
+          respostaForms = allRecords.find(f => {
+            let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+            if (!emailKey) {
+              emailKey = Object.keys(f).find(k => {
+                const value = (f[k] || "").trim();
+                return value.includes("@") && value.includes(".");
+              });
+            }
+            
+            const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+            const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
+            const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
+            const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
+            const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
+            
+            return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                   (telForms && telEtapa1 && telForms === telEtapa1);
           });
-          console.log(`[PDF] Records found: ${records.length}`);
-          if (records.length > 0) {
-            console.log(`[PDF] Columns:`, Object.keys(records[0]));
-          }
-
-        // Encontrar linha correspondente
-        respostaForms = records.find(f => {
-          // Buscar coluna de email: primeiro tenta por nome, depois por conteúdo com @
-          let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
-          if (!emailKey) {
-            // Se não encontrou por nome, procura qualquer coluna que tenha @ (email válido)
-            emailKey = Object.keys(f).find(k => {
-              const value = (f[k] || "").trim();
-              return value.includes("@") && value.includes(".");
-            });
-          }
           
-          const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
-          const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-          const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
-          const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-          const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
-          
-          return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                 (telForms && telEtapa1 && telForms === telEtapa1);
-        });
-          console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'N\u00c3O');
-          if (respostaForms) {
-            console.log(`[PDF] Campos:`, Object.keys(respostaForms));
-          }
+          console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'NÃO');
         }
       }
     } catch (e) {
       console.error("[PDF] ERRO ao buscar dados do Forms:", e.message);
-      console.error(e.stack);
     }
     
     // 3. Gerar PDF
@@ -2394,15 +2424,36 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
       // --------------------------------------------
 
       // Restante dos dados
+      // Determinar se é Pessoa Física ou Jurídica para ocultar campos irrelevantes
+      const proponenteTipoKey = Object.keys(respostaForms).find(k => {
+        const norm = normalizeKey(k);
+        return norm.includes('proponente') && (norm.includes('fisica') || norm.includes('juridica') || norm.includes('tipo'));
+      });
+      const isPJ = proponenteTipoKey && String(respostaForms[proponenteTipoKey]).toLowerCase().includes('juridica');
+      const isPF = proponenteTipoKey && String(respostaForms[proponenteTipoKey]).toLowerCase().includes('fisica');
+
       for (const [key, value] of Object.entries(respostaForms)) {
-        // Ignorar carimbo de data/hora e links (que já foram mostrados acima)
-        if (key.toLowerCase().includes('carimbo de data/hora')) continue;
-        if (typeof value === 'string' && value.includes('drive.google.com')) continue;
+        const normKey = normalizeKey(key);
+        const valStr = String(value || "").trim();
+
+        // 1. Ignorar campos administrativos ou já exibidos
+        if (normKey.includes('carimbodedatahora')) continue;
+        if (valStr.includes('drive.google.com')) continue;
         
-        const displayValue = String(value).trim() === "" ? "NÃO INFORMADO" : value;
-        
-        doc.font('Helvetica-Bold').text(`${key}: `, { continued: true })
-           .font('Helvetica').text(displayValue, { continued: false });
+        // 2. Ocultar campos de PJ se for PF (e vice-versa) para um PDF mais limpo
+        if (isPF) {
+          if (normKey.includes('razaosocial') || normKey.includes('cnpj') || normKey.includes('contratosocial')) continue;
+        }
+        if (isPJ) {
+          if (normKey.includes('cpf')) continue;
+        }
+
+        // 3. Só exibir o campo se ele tiver valor informado
+        // Isso remove o "NÃO INFORMADO" de campos que o usuário simplesmente pulou
+        if (valStr !== "" && valStr.toLowerCase() !== "não informado") {
+          doc.font('Helvetica-Bold').text(`${key}: `, { continued: true })
+             .font('Helvetica').text(valStr, { continued: false });
+        }
       }
     } else {
       doc.font('Helvetica-Oblique').fontSize(10).text("O proponente ainda não preencheu o formulário da Etapa 2.");
@@ -2590,4 +2641,5 @@ async function startServer() {
 }
 
 // Chama a função de inicialização
+startServer();
 startServer();
