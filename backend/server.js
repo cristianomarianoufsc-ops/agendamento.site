@@ -847,60 +847,6 @@ app.get("/api/inscricoes", async (req, res) => {
 
     const requiredAssessmentsForScore = await getRequiredAssessments();
 
-    // --- BUSCA DADOS DA PLANILHA (ETAPA 2) ---
-    let formsDataRows = [];
-    try {
-      const config = await getConfigFromDB();
-      if (config.sheetId && sheets) {
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: config.sheetId });
-        const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
-        
-        for (const title of sheetTitles) {
-          try {
-            const response = await sheets.spreadsheets.values.get({
-              spreadsheetId: config.sheetId,
-              range: `${title}!A:ZZ`
-            });
-            const rows = response.data.values;
-            if (rows && rows.length > 0) {
-              // ✅ LÓGICA ROBUSTA: Localiza a linha de cabeçalho real
-              let headerRowIndex = -1;
-              for (let i = 0; i < rows.length; i++) {
-                const firstCell = rows[i][0];
-                if (firstCell && typeof firstCell === 'string') {
-                  const normalizedFirstCell = normalizeKey(firstCell);
-                  if (normalizedFirstCell.includes('carimbodedatahora') || normalizedFirstCell.includes('timestamp')) {
-                    headerRowIndex = i;
-                    break;
-                  }
-                }
-              }
-
-              if (headerRowIndex !== -1) {
-                const headers = rows[headerRowIndex];
-                const sheetRecords = rows.slice(headerRowIndex + 1)
-                  .filter(row => row.length > 0 && row.some(cell => cell && String(cell).trim() !== ''))
-                  .map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
-                formsDataRows = formsDataRows.concat(sheetRecords);
-                console.log(`✅ [UNIFY] Aba "${title}": Cabeçalho na linha ${headerRowIndex + 1}. ${sheetRecords.length} registros.`);
-              } else if (rows.length > 1) {
-                // Fallback para a primeira linha se não achar o carimbo
-                const headers = rows[0];
-                const sheetRecords = rows.slice(1).map(row => 
-                  headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {})
-                );
-                formsDataRows = formsDataRows.concat(sheetRecords);
-              }
-            }
-          } catch (sheetErr) {
-            console.warn(`⚠️ [UNIFY] Erro ao ler aba "${title}":`, sheetErr.message);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("⚠️ [UNIFY] Aviso: Não foi possível buscar dados da planilha.", e.message);
-    }
-
     const inscriptionsWithScores = inscriptions.map(inscription => {
       let finalScore = null;
       const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
@@ -945,10 +891,53 @@ app.get("/api/inscricoes", async (req, res) => {
         if (hasConflict) break;
       }
 
-      // --- UNIFICAÇÃO COM ETAPA 2 ---
-      const emailEtapa1 = (inscription.email || "").trim().toLowerCase();
-      const telEtapa1 = (inscription.telefone || "").replace(/\D/g, "").replace(/^55/, "");
+      return { 
+        ...inscription, 
+        finalScore, 
+        allAssessments: relatedAssessments, 
+        assessmentsCount: relatedAssessments.length, 
+        evaluatorsWhoAssessed: relatedAssessments.map(a => a.evaluator_email), 
+        totalEvaluators,
+        hasConflict
+      };
+    });
+
+    // O resto da rota para unificar com o Google Forms...
+    let formsDataRows = [];
+    try {
+      const config = await getConfigFromDB();
+      if (config.sheetId && sheets) {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: config.sheetId });
+        const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
+        
+        for (const title of sheetTitles) {
+          try {
+            const response = await sheets.spreadsheets.values.get({
+              spreadsheetId: config.sheetId,
+              range: `${title}!A:ZZ`
+            });
+            const rows = response.data.values;
+            if (rows && rows.length > 1) {
+              const headers = rows[0];
+              const sheetRecords = rows.slice(1).map(row => 
+                headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {})
+              );
+              formsDataRows = formsDataRows.concat(sheetRecords);
+            }
+          } catch (sheetErr) {
+            console.warn(`⚠️ [UNIFY] Erro ao ler aba "${title}":`, sheetErr.message);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ [UNIFY] Aviso: Não foi possível buscar dados da planilha.", e.message);
+    }
+
+    const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
+      const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
+      const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
       
+      console.log(`[UNIFY] Tentando unificar inscrição #${inscricao.id} (${inscricao.nome})`);
       const match = formsDataRows.find(rowData => {
         let emailForms = '', telForms = '';
         for (const key in rowData) {
@@ -965,13 +954,28 @@ app.get("/api/inscricoes", async (req, res) => {
               telForms = value.replace(/\D/g, "").replace(/^55/, "");
             }
         }
-        return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        if (isMatch) console.log(`[UNIFY] ✅ Sucesso! Encontrado match para #${inscricao.id} na planilha.`);
+        return isMatch;
       });
+
+      if (!match) {
+        console.log(`[UNIFY] ❌ Falha! Não foi encontrado match para #${inscricao.id} na planilha.`);
+        console.log(`[UNIFY]   - Email Etapa 1: "${emailEtapa1}"`);
+        console.log(`[UNIFY]   - Tel Etapa 1: "${telEtapa1}"`);
+        if (formsDataRows.length > 0) {
+           console.log(`[UNIFY]   - Verificando primeiros 2 registros da planilha para depuração:`);
+           formsDataRows.slice(0, 2).forEach((r, idx) => {
+             console.log(`[UNIFY]     Reg [${idx}]: Email="${(r['Endereço de e-mail'] || r['Email'] || 'N/A')}", Tel="${(r['Telefone'] || r['Fone'] || 'N/A')}"`);
+           });
+        }
+      }
 
       let proponenteTipo = 'Não identificado';
       if (match) {
         const tipoKey = Object.keys(match).find(key => {
           const normalized = normalizeKey(key);
+          // Busca por termos comuns em formulários (inscreve, tipo, proponente)
           return normalized.includes('inscreve') || normalized.includes('inscrevera') || 
                  (normalized.includes('proponente') && (normalized.includes('tipo') || normalized.includes('fisica') || normalized.includes('juridica')));
         });
@@ -981,13 +985,7 @@ app.get("/api/inscricoes", async (req, res) => {
       }
 
       return { 
-        ...inscription, 
-        finalScore, 
-        allAssessments: relatedAssessments, 
-        assessmentsCount: relatedAssessments.length, 
-        evaluatorsWhoAssessed: relatedAssessments.map(a => a.evaluator_email), 
-        totalEvaluators,
-        hasConflict,
+        ...inscricao, 
         etapa2_ok: !!match, 
         formsData: match || null,
         proponenteTipo: proponenteTipo 
