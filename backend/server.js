@@ -925,43 +925,17 @@ app.get("/api/inscricoes", async (req, res) => {
           try {
             const response = await sheets.spreadsheets.values.get({
               spreadsheetId: sheetId,
-              range: `${title}!A:ZZ`
+              range: `${title}!A:Z`
             });
             const rows = response.data.values;
-            if (rows && rows.length > 0) {
-              // ✅ LÓGICA ROBUSTA: Localiza a linha de cabeçalho real
-              let headerRowIndex = -1;
-              for (let i = 0; i < Math.min(rows.length, 10); i++) { // Verifica apenas as primeiras 10 linhas
-                const firstCell = rows[i][0];
-                if (firstCell && typeof firstCell === 'string') {
-                  const normalizedFirstCell = normalizeKey(firstCell);
-                  if (normalizedFirstCell.includes('carimbodedatahora') || normalizedFirstCell.includes('timestamp')) {
-                    headerRowIndex = i;
-                    break;
-                  }
-                }
-              }
-
-              if (headerRowIndex !== -1) {
-                const headers = rows[headerRowIndex];
-                const sheetRecords = rows.slice(headerRowIndex + 1)
-                  .filter(row => row.length > 0 && row.some(cell => cell && String(cell).trim() !== ''))
-                  .map(row => {
-                    const obj = {};
-                    headers.forEach((header, i) => { obj[header] = row[i] || ""; });
-                    return obj;
-                  });
-                formsDataRows = formsDataRows.concat(sheetRecords);
-              } else if (rows.length > 1) {
-                // Fallback para a primeira linha se não achar o carimbo
-                const headers = rows[0];
-                const sheetRecords = rows.slice(1).map(row => {
-                  const obj = {};
-                  headers.forEach((header, i) => { obj[header] = row[i] || ""; });
-                  return obj;
-                });
-                formsDataRows = formsDataRows.concat(sheetRecords);
-              }
+            if (rows && rows.length > 1) {
+              const headers = rows[0];
+              const sheetRecords = rows.slice(1).map(row => {
+                const obj = {};
+                headers.forEach((header, i) => { obj[header] = row[i] || ''; });
+                return obj;
+              });
+              formsDataRows = formsDataRows.concat(sheetRecords);
             }
           } catch (sheetErr) {
             console.warn(`⚠️ [UNIFY] Erro ao ler aba "${title}":`, sheetErr.message);
