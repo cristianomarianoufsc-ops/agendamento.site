@@ -985,8 +985,18 @@ app.get("/api/inscricoes", async (req, res) => {
         const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
         const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^(55)/, "") : null;
         
+        // Lógica de telefone flexível (aceita com ou sem o 9 extra)
+        const checkTelMatch = (t1, t2) => {
+          if (!t1 || !t2) return false;
+          if (t1 === t2) return true;
+          // Se um tem 11 dígitos e outro 10, e os últimos 8 são iguais e o DDD bate
+          const clean1 = t1.length > 10 ? t1.slice(0, 2) + t1.slice(3) : t1;
+          const clean2 = t2.length > 10 ? t2.slice(0, 2) + t2.slice(3) : t2;
+          return clean1 === clean2;
+        };
+
         const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                       (telForms && telEtapa1 && telForms === telEtapa1);
+                       checkTelMatch(telEtapa1, telForms);
         
         // Log detalhado de cada tentativa para depuração no Render
         if (inscricao.id === 3 || inscricao.id === "3") {
