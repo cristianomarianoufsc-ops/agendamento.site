@@ -906,14 +906,25 @@ app.get("/api/inscricoes", async (req, res) => {
     let formsDataRows = [];
     try {
       const config = await getConfigFromDB();
-      if (config.sheetId && sheets) {
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: config.sheetId });
+      let sheetId = config.sheetId;
+      const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
+      
+      // ✅ Lógica idêntica ao PDF: Prioriza o link fixo se configurado ou se sheetId estiver vazio
+      if (config.useFixedLinks || !sheetId) {
+        const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        if (match) sheetId = match[1];
+      }
+
+      console.log(`[UNIFY] Usando SheetId: ${sheetId}`);
+
+      if (sheetId && sheets) {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
         const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
         
         for (const title of sheetTitles) {
           try {
             const response = await sheets.spreadsheets.values.get({
-              spreadsheetId: config.sheetId,
+              spreadsheetId: sheetId,
               range: `${title}!A:ZZ`
             });
             const rows = response.data.values;
