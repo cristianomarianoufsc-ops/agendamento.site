@@ -935,14 +935,20 @@ app.get("/api/inscricoes", async (req, res) => {
                 const headers = rows[headerRowIndex];
                 const sheetRecords = rows.slice(headerRowIndex + 1)
                   .filter(row => row.length > 0 && row.some(cell => cell && String(cell).trim() !== ''))
-                  .map(row => headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {}));
+                  .map(row => {
+                    const obj = {};
+                    headers.forEach((header, i) => { obj[header] = row[i] || ""; });
+                    return obj;
+                  });
                 formsDataRows = formsDataRows.concat(sheetRecords);
               } else if (rows.length > 1) {
                 // Fallback para a primeira linha se não achar o carimbo
                 const headers = rows[0];
-                const sheetRecords = rows.slice(1).map(row => 
-                  headers.reduce((acc, header, index) => ({ ...acc, [header]: row[index] || "" }), {})
-                );
+                const sheetRecords = rows.slice(1).map(row => {
+                  const obj = {};
+                  headers.forEach((header, i) => { obj[header] = row[i] || ""; });
+                  return obj;
+                });
                 formsDataRows = formsDataRows.concat(sheetRecords);
               }
             }
@@ -971,10 +977,7 @@ app.get("/api/inscricoes", async (req, res) => {
         }
         
         // ✅ Lógica robusta do PDF para encontrar a coluna de telefone
-        const telKey = Object.keys(f).find(k => {
-          const normK = normalizeKey(k);
-          return normK.includes("fone") || normK.includes("telefone") || normK.includes("contato") || normK.includes("whatsapp");
-        });
+        const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
 
         const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
         const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
