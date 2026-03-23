@@ -2349,12 +2349,21 @@ app.get("/api/gerar-pdf/:id", async (req, res) => {
             
             const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
             const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-            const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
+            const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^(55)/, "") : null;
             const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-            const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
+            const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^(55)/, "");
             
+            // Lógica de telefone flexível (aceita com ou sem o 9 extra)
+            const checkTelMatch = (t1, t2) => {
+              if (!t1 || !t2) return false;
+              if (t1 === t2) return true;
+              const clean1 = t1.length > 10 ? t1.slice(0, 2) + t1.slice(3) : t1;
+              const clean2 = t2.length > 10 ? t2.slice(0, 2) + t2.slice(3) : t2;
+              return clean1 === clean2;
+            };
+
             return (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
-                   (telForms && telEtapa1 && telForms === telEtapa1);
+                   checkTelMatch(telEtapa1, telForms);
           });
           
           console.log(`[PDF] Resposta encontrada:`, respostaForms ? 'SIM' : 'NÃO');
