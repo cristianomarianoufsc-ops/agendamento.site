@@ -977,7 +977,10 @@ app.get("/api/inscricoes", async (req, res) => {
         }
         
         // ✅ Lógica robusta do PDF para encontrar a coluna de telefone
-        const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+        const telKey = Object.keys(f).find(k => {
+           const nk = normalizeKey(k);
+           return nk.includes("fone") || nk.includes("telefone") || nk.includes("contato") || nk.includes("whatsapp");
+        });
 
         const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
         const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
@@ -985,6 +988,14 @@ app.get("/api/inscricoes", async (req, res) => {
         const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                        (telForms && telEtapa1 && telForms === telEtapa1);
         
+        // Log detalhado de cada tentativa para depuração no Render
+        if (inscricao.id === 3 || inscricao.id === "3") {
+           console.log(`[UNIFY-DEBUG] Testando #${inscricao.id} contra linha da planilha:`);
+           console.log(`  - Email Etapa 1: "${emailEtapa1}" | Email Planilha: "${emailForms}" (Chave: ${emailKey})`);
+           console.log(`  - Tel Etapa 1: "${telEtapa1}" | Tel Planilha: "${telForms}" (Chave: ${telKey})`);
+           console.log(`  - Resultado: ${isMatch ? "✅ MATCH" : "❌ NO MATCH"}`);
+        }
+
         if (isMatch) console.log(`[UNIFY] ✅ Sucesso! Encontrado match para #${inscricao.id} na planilha.`);
         return isMatch;
       });
