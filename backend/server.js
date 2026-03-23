@@ -905,15 +905,9 @@ app.get("/api/inscricoes", async (req, res) => {
     // O resto da rota para unificar com o Google Forms...
     let formsDataRows = [];
     try {
-      const config = await getConfigFromDB();
-      let sheetId = config.sheetId;
       const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
-      
-      // ✅ Lógica idêntica ao PDF: Prioriza o link fixo se configurado ou se sheetId estiver vazio
-      if (config.useFixedLinks || !sheetId) {
-        const match = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        if (match) sheetId = match[1];
-      }
+      const matchId = FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/);
+      let sheetId = matchId ? matchId[1] : null;
 
       console.log(`[UNIFY] Usando SheetId: ${sheetId}`);
 
