@@ -1021,12 +1021,14 @@ app.get("/api/inscricoes", async (req, res) => {
         }
       }
 
-      return { 
+      const finalInsc = { 
         ...inscricao, 
         etapa2_ok: !!match, 
         formsData: match || null,
         proponenteTipo: proponenteTipo 
       };
+      if (match) console.log(`[UNIFY] Objeto final para #${inscricao.id} marcado como etapa2_ok: true`);
+      return finalInsc;
     });
 
     let requiredAssessments = 3;
