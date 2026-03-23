@@ -960,23 +960,22 @@ app.get("/api/inscricoes", async (req, res) => {
       const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
       
       console.log(`[UNIFY] Tentando unificar inscrição #${inscricao.id} (${inscricao.nome})`);
-      const match = formsDataRows.find(rowData => {
-        let emailForms = '', telForms = '';
-        for (const key in rowData) {
-            const normalizedKey = normalizeKey(key);
-            const value = (rowData[key] || "").trim();
-            
-            if (normalizedKey.includes('mail')) {
-              emailForms = value.toLowerCase();
-            } else if (!emailForms && value.includes('@') && value.includes('.')) {
-              emailForms = value.toLowerCase();
-            }
-            
-            if (normalizedKey.includes('fone') || normalizedKey.includes('telefone')) {
-              telForms = value.replace(/\D/g, "").replace(/^55/, "");
-            }
+      const match = formsDataRows.find(f => {
+        let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+        if (!emailKey) {
+          emailKey = Object.keys(f).find(k => {
+            const value = (f[k] || "").trim();
+            return value.includes("@") && value.includes(".");
+          });
         }
-        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || (telForms && telEtapa1 && telForms === telEtapa1);
+        
+        const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+        const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
+        const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
+        
+        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+                       (telForms && telEtapa1 && telForms === telEtapa1);
+        
         if (isMatch) console.log(`[UNIFY] ✅ Sucesso! Encontrado match para #${inscricao.id} na planilha.`);
         return isMatch;
       });
