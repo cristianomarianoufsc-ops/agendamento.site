@@ -963,7 +963,7 @@ app.get("/api/inscricoes", async (req, res) => {
 
     const inscricoesCompletas = inscriptionsWithScores.map(inscricao => {
       const emailEtapa1 = (inscricao.email || "").trim().toLowerCase();
-      const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^55/, "");
+      const telEtapa1 = (inscricao.telefone || "").replace(/\D/g, "").replace(/^(55)/, "");
       
       console.log(`[UNIFY] Tentando unificar inscrição #${inscricao.id} (${inscricao.nome})`);
       const match = formsDataRows.find(f => {
@@ -983,7 +983,7 @@ app.get("/api/inscricoes", async (req, res) => {
         });
 
         const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
-        const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
+        const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^(55)/, "") : null;
         
         const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
                        (telForms && telEtapa1 && telForms === telEtapa1);
