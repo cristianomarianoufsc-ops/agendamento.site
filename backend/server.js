@@ -980,7 +980,8 @@ app.get("/api/inscricoes", async (req, res) => {
           return clean1 === clean2;
         };
 
-        const isMatch = (emailForms && emailEtapa1 && emailForms === emailEtapa1) || 
+        const isMatch = (emailForms && emailEtapa1 && emailForms.includes(emailEtapa1)) || 
+                       (emailEtapa1 && emailForms && emailEtapa1.includes(emailForms)) ||
                        checkTelMatch(telEtapa1, telForms);
         
         // Log detalhado de cada tentativa para depuração no Render
