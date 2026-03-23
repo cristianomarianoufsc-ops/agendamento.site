@@ -974,9 +974,18 @@ app.get("/api/inscricoes", async (req, res) => {
           return clean1 === clean2;
         };
 
+        // ✅ Lógica robusta do PDF para encontrar a coluna de nome
+        const nomeKey = Object.keys(f).find(k => {
+           const nk = normalizeKey(k);
+           return nk.includes("nome") || nk.includes("responsavel") || nk.includes("proponente");
+        });
+        const nomeForms = nomeKey ? normalizeKey(f[nomeKey] || "") : "";
+        const nomeEtapa1 = normalizeKey(inscricao.nome || "");
+
         const isMatch = (emailForms && emailEtapa1 && emailForms.includes(emailEtapa1)) || 
                        (emailEtapa1 && emailForms && emailEtapa1.includes(emailForms)) ||
-                       checkTelMatch(telEtapa1, telForms);
+                       checkTelMatch(telEtapa1, telForms) ||
+                       (nomeForms && nomeEtapa1 && (nomeForms.includes(nomeEtapa1) || nomeEtapa1.includes(nomeForms)));
         
         // Log detalhado de cada tentativa para depuração no Render
         if (inscricao.id === 3 || inscricao.id === "3") {
