@@ -961,15 +961,21 @@ app.get("/api/inscricoes", async (req, res) => {
       
       console.log(`[UNIFY] Tentando unificar inscrição #${inscricao.id} (${inscricao.nome})`);
       const match = formsDataRows.find(f => {
+        // ✅ Lógica robusta do PDF para encontrar a coluna de e-mail
         let emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
         if (!emailKey) {
           emailKey = Object.keys(f).find(k => {
             const value = (f[k] || "").trim();
-            return value.includes("@") && value.includes(".");
+            return typeof value === 'string' && value.includes("@") && value.includes(".");
           });
         }
         
-        const telKey = Object.keys(f).find(k => k.toLowerCase().includes("fone") || k.toLowerCase().includes("telefone"));
+        // ✅ Lógica robusta do PDF para encontrar a coluna de telefone
+        const telKey = Object.keys(f).find(k => {
+          const normK = normalizeKey(k);
+          return normK.includes("fone") || normK.includes("telefone") || normK.includes("contato") || normK.includes("whatsapp");
+        });
+
         const emailForms = emailKey ? (f[emailKey] || "").trim().toLowerCase() : null;
         const telForms = telKey ? (f[telKey] || "").replace(/\D/g, "").replace(/^55/, "") : null;
         

@@ -115,7 +115,28 @@ const EvaluationDrawer = ({ user, criteria, evaluatorEmail, onSaveSuccess, onClo
 
   // --- LÓGICA DE RENDERIZAÇÃO ---
 
-  const renderAllFormsData = () => { if (!user?.formsData) { return <InfoRow label="Status Etapa 2" value="Proponente ainda não preencheu o formulário." />; } const formKeys = Object.keys(user.formsData); const keysToIgnore = ["carimbo de data/hora", "timestamp"]; return formKeys.map(key => { if (keysToIgnore.some(ignored => key.toLowerCase().includes(ignored)) || !user.formsData[key]) { return null; } return <SmartInfoRow key={key} label={key} value={user.formsData[key]} />; }); };
+  const renderAllFormsData = () => { 
+    if (!user?.formsData) { 
+      return <InfoRow label="Status Etapa 2" value="Proponente ainda não preencheu o formulário." />; 
+    } 
+    const formKeys = Object.keys(user.formsData); 
+    const keysToIgnore = ["carimbo de data/hora", "timestamp", "carimbodedatahora"]; 
+    
+    // Filtra chaves que não devem ser exibidas
+    const validKeys = formKeys.filter(key => {
+      const lowerKey = key.toLowerCase();
+      const normalizedKey = lowerKey.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      return !keysToIgnore.some(ignored => normalizedKey.includes(ignored)) && user.formsData[key];
+    });
+
+    if (validKeys.length === 0) {
+      return <InfoRow label="Status Etapa 2" value="Dados da Etapa 2 vinculados, mas sem campos preenchidos." />;
+    }
+
+    return validKeys.map(key => (
+      <SmartInfoRow key={key} label={key} value={user.formsData[key]} />
+    )); 
+  };
   const renderScheduledSteps = () => { const steps = []; if (user.ensaio_inicio) steps.push({ label: 'Ensaio', start: user.ensaio_inicio, end: user.ensaio_fim }); if (user.montagem_inicio) steps.push({ label: 'Montagem', start: user.montagem_inicio, end: user.montagem_fim }); if (user.eventos_json) JSON.parse(user.eventos_json).forEach((ev, i) => steps.push({ label: `Evento ${i + 1}`, start: ev.inicio, end: ev.fim })); if (user.desmontagem_inicio) steps.push({ label: 'Desmontagem', start: user.desmontagem_inicio, end: user.desmontagem_fim }); if (steps.length === 0) return <SmartInfoRow label="Agendamentos" value="Nenhuma etapa encontrada." />; return steps.map(step => (<SmartInfoRow key={step.label} label={step.label} value={`${new Date(step.start).toLocaleDateString('pt-BR')} das ${new Date(step.start).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} às ${new Date(step.end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`} />)); };
 
   // Seção de Avaliação com critérios dinâmicos
