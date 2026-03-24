@@ -1475,6 +1475,60 @@ app.get("/api/admin/inscricoes/:id", async (req, res) => {
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
 app.get("/api/admin/data-for-analysis", async (req, res) => {
   try {
+    const criteria = await getEvaluationCriteria();
+    const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
+    const inscriptions = inscriptionsResult.rows;
+    
+    const assessmentsResult = await query("SELECT * FROM assessments");
+    const allAssessments = assessmentsResult.rows;
+    
+    const totalEvaluatorsResult = await query('SELECT COUNT(*) as count FROM evaluators');
+    const totalEvaluators = totalEvaluatorsResult.rows[0].count;
+
+    const requiredAssessmentsForScore = await getRequiredAssessments();
+
+    const inscriptionsWithScores = inscriptions.map(inscription => {
+      let finalScore = null;
+      const relatedAssessments = allAssessments.filter(a => a.inscription_id === inscription.id);
+      
+      if (relatedAssessments.length >= requiredAssessmentsForScore && requiredAssessmentsForScore > 0) {
+        let totalScoreSum = 0;
+        const assessmentsForScore = relatedAssessments.slice(0, requiredAssessmentsForScore);
+        assessmentsForScore.forEach(assessment => {
+          const scores = JSON.parse(assessment.scores_json);
+          let singleEvaluationScore = 0;
+          criteria.forEach(crit => {
+            const scoreValue = scores[crit.id] || 0;
+            const weightValue = crit.weight || 1;
+            singleEvaluationScore += scoreValue * weightValue;
+          });
+          totalScoreSum += singleEvaluationScore;
+        });
+        finalScore = totalScoreSum / assessmentsForScore.length;
+      }
+      
+      // Normalizar o campo hasConflict para booleano
+      const hasConflict = inscription.hasconflict === 1 || inscription.hasconflict === true || inscription.hasConflict === 1 || inscription.hasConflict === true;
+
+      return { 
+        ...inscription, 
+        finalScore: finalScore ? parseFloat(finalScore.toFixed(2)) : null, 
+        assessmentsCount: relatedAssessments.length, 
+        requiredAssessments: requiredAssessmentsForScore,
+        hasConflict,
+        isFullyAssessed: relatedAssessments.length >= requiredAssessmentsForScore,
+        allAssessments: relatedAssessments.map(a => ({
+            evaluator: a.evaluator_email,
+            scores: JSON.parse(a.scores_json)
+        }))
+      };
+    });
+
+    res.json({
+      inscriptions: inscriptionsWithScores,
+      criteria: criteria,
+      totalEvaluators: totalEvaluators,
+    });
   } catch (error) {
     console.error("❌ Erro ao obter dados para análise:", error);
     res.status(500).json({ error: "Erro interno ao obter dados para análise." });

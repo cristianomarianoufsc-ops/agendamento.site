@@ -11,8 +11,8 @@ const InsightsViewer = ({ analysisData, onClose }) => {
     (i) => i.finalScore !== null && i.finalScore !== undefined
   ).length;
   const emConflito = analysisData.inscriptions.filter((i) => i.hasConflict).length;
-  const teatroCount = analysisData.inscriptions.filter((i) => i.local === 'Teatro').length;
-  const igrejinhaCount = analysisData.inscriptions.filter((i) => i.local === 'Igrejinha').length;
+  const teatroCount = analysisData.inscriptions.filter((i) => (i.local || i.LOCAL) === 'Teatro').length;
+  const igrejinhaCount = analysisData.inscriptions.filter((i) => (i.local || i.LOCAL) === 'Igrejinha').length;
 
   const percentualAvaliadas = totalInscricoes > 0 ? ((avaliadasCount / totalInscricoes) * 100).toFixed(1) : 0;
   const emConflitoPct = totalInscricoes > 0 ? ((emConflito / totalInscricoes) * 100).toFixed(1) : 0;
@@ -178,9 +178,9 @@ const InsightsViewer = ({ analysisData, onClose }) => {
                       {idx + 1}
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800 text-sm">{p.nome}</p>
+                      <p className="font-bold text-gray-800 text-sm">{p.nome || p.NOME || p.evento_nome || p.EVENTO_NOME}</p>
                       <p className="text-xs text-gray-500 flex items-center gap-1">
-                        <MapPin size={10} /> {p.local}
+                        <MapPin size={10} /> {p.local || p.LOCAL}
                       </p>
                     </div>
                   </div>
