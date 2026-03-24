@@ -8,11 +8,30 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 const InsightsViewer = ({ analysisData, onClose }) => {
   const totalInscricoes = analysisData.inscriptions.length;
   const avaliadasCount = analysisData.inscriptions.filter(
-    (i) => i.finalScore !== null && i.finalScore !== undefined
+    (i) => (i.finalScore !== null && i.finalScore !== undefined) || (i.finalscore !== null && i.finalscore !== undefined)
   ).length;
-  const emConflito = analysisData.inscriptions.filter((i) => i.hasConflict).length;
-  const teatroCount = analysisData.inscriptions.filter((i) => (i.local || i.LOCAL) === 'Teatro').length;
-  const igrejinhaCount = analysisData.inscriptions.filter((i) => (i.local || i.LOCAL) === 'Igrejinha').length;
+  
+  // Função auxiliar para pegar valor de chave independente de case
+  const getVal = (obj, key) => {
+    const lowerKey = key.toLowerCase();
+    const foundKey = Object.keys(obj).find(k => k.toLowerCase() === lowerKey);
+    return foundKey ? obj[foundKey] : null;
+  };
+
+  const emConflito = analysisData.inscriptions.filter((i) => {
+    const val = getVal(i, 'hasConflict');
+    return val === 1 || val === true || val === '1' || val === 'true';
+  }).length;
+
+  const teatroCount = analysisData.inscriptions.filter((i) => {
+    const val = getVal(i, 'local');
+    return val === 'Teatro';
+  }).length;
+
+  const igrejinhaCount = analysisData.inscriptions.filter((i) => {
+    const val = getVal(i, 'local');
+    return val === 'Igrejinha';
+  }).length;
 
   const percentualAvaliadas = totalInscricoes > 0 ? ((avaliadasCount / totalInscricoes) * 100).toFixed(1) : 0;
   const emConflitoPct = totalInscricoes > 0 ? ((emConflito / totalInscricoes) * 100).toFixed(1) : 0;
@@ -178,14 +197,14 @@ const InsightsViewer = ({ analysisData, onClose }) => {
                       {idx + 1}
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800 text-sm">{p.nome || p.NOME || p.evento_nome || p.EVENTO_NOME}</p>
+                      <p className="font-bold text-gray-800 text-sm">{getVal(p, 'nome') || getVal(p, 'evento_nome') || 'Sem Nome'}</p>
                       <p className="text-xs text-gray-500 flex items-center gap-1">
-                        <MapPin size={10} /> {p.local || p.LOCAL}
+                        <MapPin size={10} /> {getVal(p, 'local') || 'Sem Local'}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-black text-indigo-600">{p.finalScore.toFixed(2)}</p>
+                    <p className="text-lg font-black text-indigo-600">{(getVal(p, 'finalScore') || 0).toFixed(2)}</p>
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Pontos</p>
                   </div>
                 </div>
