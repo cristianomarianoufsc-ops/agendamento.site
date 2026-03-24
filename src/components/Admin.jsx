@@ -4,11 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
-  PlusCircle, UserCheck, Presentation // ✅ Adicionado Presentation
+  PlusCircle, UserCheck, Presentation, TrendingUp // ✅ Adicionado TrendingUp
 } from "lucide-react";
 import EvaluationDrawer from './EvaluationDrawer';
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
-import SlidesViewer from './SlidesViewer';
+import InsightsViewer from './InsightsViewer';
 import ConsolidacaoModal from './ConsolidacaoModal'; // ✅ Importação do novo modal
 import { v4 as uuidv4 } from 'uuid';
 
@@ -35,8 +35,8 @@ const Admin = ({ viewOnly = false }) => {
   const [showModal, setShowModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false); // NOVO ESTADO
-  const [showSlidesViewer, setShowSlidesViewer] = useState(false); // NOVO ESTADO
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false); // RENOMEADO
+  const [showInsightsViewer, setShowInsightsViewer] = useState(false); // RENOMEADO
   const [showFormDataModal, setShowFormDataModal] = useState(false); // ✅ NOVO ESTADO
   const [showConsolidacaoModal, setShowConsolidacaoModal] = useState(false); // ✅ NOVO ESTADO
   const [consolidacaoData, setConsolidacaoData] = useState(null); // ✅ NOVO ESTADO
@@ -562,9 +562,9 @@ const Admin = ({ viewOnly = false }) => {
   // =================================================
   // ✅ FUNÇÃO PARA GERAR SLIDES
   // =================================================
-  const handleGenerateSlides = async () => {
-    if (isGeneratingSlides) return;
-    setIsGeneratingSlides(true);
+  const handleGenerateInsights = async () => {
+    if (isGeneratingInsights) return;
+    setIsGeneratingInsights(true);
     try {
       // 1. Chamar o novo endpoint para obter os dados brutos
       const response = await fetch("/api/admin/data-for-analysis");
@@ -575,13 +575,13 @@ const Admin = ({ viewOnly = false }) => {
       
       // 2. Armazenar os dados e abrir o visualizador
       setSlidesData(data);
-      setShowSlidesViewer(true);
+      setShowInsightsViewer(true);
 
     } catch (error) {
-      console.error("Erro ao gerar slides:", error);
-      alert(`❌ Erro ao gerar slides: ${error.message}`);
+      console.error("Erro ao gerar insights:", error);
+      alert(`❌ Erro ao gerar insights: ${error.message}`);
     } finally {
-      setIsGeneratingSlides(false);
+      setIsGeneratingInsights(false);
     }
   };
 
@@ -777,10 +777,10 @@ const Admin = ({ viewOnly = false }) => {
                         {/* ✅ BOTÃO BAIXAR TUDO */}
                         {isDownloading ? ( <div className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white font-semibold rounded-lg cursor-not-allowed text-sm"><Loader className="animate-spin" size={16} /><span>Processando...</span></div> ) : ( <button onClick={handleDownloadAllZip} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 text-sm"><Download size={16} /> Baixar Tudo (ZIP)</button> )}
                         
-                        {/* ✅ NOVO BOTÃO: GERAR SLIDES */}
-                        <button onClick={handleGenerateSlides} disabled={isGeneratingSlides} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 text-sm disabled:bg-purple-400">
-                          {isGeneratingSlides ? <Loader className="animate-spin" size={16} /> : <Presentation size={16} />}
-                          {isGeneratingSlides ? 'Gerando...' : 'Gerar Slides'}
+                        {/* ✅ NOVO BOTÃO: INSIGHTS DO EDITAL */}
+                        <button onClick={handleGenerateInsights} disabled={isGeneratingInsights} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm disabled:bg-indigo-400">
+                          {isGeneratingInsights ? <Loader className="animate-spin" size={16} /> : <TrendingUp size={16} />}
+                          {isGeneratingInsights ? 'Analisando...' : 'Insights do Edital'}
                         </button>
 
 
@@ -1315,10 +1315,10 @@ const Admin = ({ viewOnly = false }) => {
           />
         )}
       </AnimatePresence>
-      {showSlidesViewer && slidesData && (
-        <SlidesViewer
-          analysisData={slidesData}
-          onClose={() => setShowSlidesViewer(false)}
+      {showInsightsViewer && slidesData && (
+        <InsightsViewer 
+          analysisData={slidesData} 
+          onClose={() => setShowInsightsViewer(false)} 
         />
       )}
     </div>
