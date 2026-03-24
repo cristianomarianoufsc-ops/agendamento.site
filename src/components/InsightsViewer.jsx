@@ -25,12 +25,12 @@ const InsightsViewer = ({ analysisData, onClose }) => {
 
   const teatroCount = analysisData.inscriptions.filter((i) => {
     const val = getVal(i, 'local');
-    return val === 'Teatro';
+    return val === 'Teatro' || val === 'teatro' || val === 'TEATRO';
   }).length;
 
   const igrejinhaCount = analysisData.inscriptions.filter((i) => {
     const val = getVal(i, 'local');
-    return val === 'Igrejinha';
+    return val === 'Igrejinha' || val === 'igrejinha' || val === 'IGREJINHA';
   }).length;
 
   const percentualAvaliadas = totalInscricoes > 0 ? ((avaliadasCount / totalInscricoes) * 100).toFixed(1) : 0;
