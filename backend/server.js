@@ -2426,8 +2426,8 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
       const hF = dF.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: 'America/Sao_Paulo' });
       doc.text(`   • ${r}: ${data}, das ${hI} às ${hF}`);
     };
-    formatDT(inscricao.ensaio_inicio, inscricao.ensaio_fim, "Ensaio");
     formatDT(inscricao.montagem_inicio, inscricao.montagem_fim, "Montagem");
+    formatDT(inscricao.ensaio_inicio, inscricao.ensaio_fim, "Ensaio");
     if (inscricao.eventos_json) {
       try { JSON.parse(inscricao.eventos_json).forEach((ev, i) => formatDT(ev.inicio, ev.fim, `Evento ${i+1}`)); } catch(e){}
     }
