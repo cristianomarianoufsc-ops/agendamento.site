@@ -909,6 +909,7 @@ const Admin = ({ viewOnly = false }) => {
                                       <button onClick={() => handleShowFormDataModal(u)} className="flex items-center gap-2 text-indigo-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha Detalhada</button>
                                     )}
                                     <button onClick={() => window.open(`/api/gerar-pdf/${u.id}`, "_blank")} className="flex items-center gap-2 text-red-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha (PDF)</button>
+                                    <button onClick={() => window.open(`/api/gerar-termo/${u.id}`, "_blank")} className="flex items-center gap-2 text-green-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Termo de Autorização (PDF)</button>
                                   </div>
                                   {/* <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button> */}
                                 </td>}

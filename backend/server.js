@@ -2334,6 +2334,166 @@ app.use("/slides-content", express.static("slides-edital-ufsc"));
 
 // --- ROTAS DE CONFIGURAÇÃO REMOVIDAS (DUPLICADAS) ---
 // As rotas oficiais estão definidas anteriormente nas linhas 472 (GET) e 645 (POST).
+// --- 24. ROTA PARA GERAR TERMO DE AUTORIZAÇÃO (MALA DIRETA) ---
+app.get("/api/gerar-termo/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query('SELECT * FROM inscricoes WHERE id = $1', [id]);
+    if (result.rows.length === 0) return res.status(404).send('Inscrição não encontrada');
+    const inscricao = result.rows[0];
+
+    // Buscar dados do Forms (Etapa 2) para preencher o termo
+    let respostaForms = null;
+    try {
+      const configResult = await query('SELECT config_json FROM config WHERE id = 1');
+      let sheetId = null;
+      const FIXED_SHEET_LINK = "https://docs.google.com/spreadsheets/d/1DSMc1jGYJmK01wxKjAC83SWXQxcoxPUUjRyTdloxWt8/edit?resourcekey=&gid=913092206#gid=913092206";
+      if (configResult.rows.length > 0) {
+        const config = JSON.parse(configResult.rows[0].config_json);
+        sheetId = config.sheetId || FIXED_SHEET_LINK.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+      }
+      if (sheetId && sheets) {
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+        const sheetTitles = spreadsheet.data.sheets.map(s => s.properties.title);
+        let allRecords = [];
+        for (const title of sheetTitles) {
+          const response = await sheets.spreadsheets.values.get({ spreadsheetId: sheetId, range: `${title}!A:Z` });
+          const rows = response.data.values;
+          if (rows && rows.length > 1) {
+            const headers = rows[0];
+            allRecords = allRecords.concat(rows.slice(1).map(row => {
+              const obj = {};
+              headers.forEach((h, i) => { obj[h] = row[i] || ''; });
+              return obj;
+            }));
+          }
+        }
+        respostaForms = allRecords.find(f => {
+          const emailKey = Object.keys(f).find(k => k.toLowerCase().includes("mail"));
+          const emailForms = emailKey ? f[emailKey].trim().toLowerCase() : null;
+          return emailForms === inscricao.email.trim().toLowerCase();
+        });
+      }
+    } catch (e) { console.error("Erro ao buscar dados para o termo:", e.message); }
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const chunks = [];
+    doc.on("data", chunk => chunks.push(chunk));
+    doc.on("end", () => {
+      const pdfBuffer = Buffer.concat(chunks);
+      const safeName = (inscricao.evento_nome || 'evento').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "_");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="termo-${id}-${safeName}.pdf"`);
+      res.send(pdfBuffer);
+    });
+
+    // --- CONSTRUÇÃO DO DOCUMENTO (Baseado no modelo enviado) ---
+    const centerText = (t, s = 12, b = false) => {
+      doc.font(b ? 'Helvetica-Bold' : 'Helvetica').fontSize(s).text(t, { align: 'center' });
+    };
+
+    centerText("SERVIÇO PÚBLICO FEDERAL MINISTÉRIO DA EDUCAÇÃO", 11);
+    centerText("UNIVERSIDADE FEDERAL DE SANTA CATARINA SECRETARIA DE CULTURA, ARTE E ESPORTE Departamento Artístico Cultural", 11, true);
+    centerText("Praça Santos Dumont - Rua Desembargador Vitor Lima, 117 - Trindade CEP 88040-400 Florianópolis - SC - Brasil", 9);
+    doc.moveDown(2);
+
+    centerText("TERMO DE AUTORIZAÇÃO PARA OCUPAÇÃO DOS ESPAÇOS DO DEPARTAMENTO ARTÍSTICO CULTURAL", 12, true);
+    centerText(`*Este documento é parte integrante do Edital Mais Arte - Nº 002/2026/DAC/SeCArtE`, 10);
+    doc.moveDown(2);
+
+    doc.font('Helvetica-Bold').fontSize(12).text("I – PREÂMBULO");
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(11).text("1. Espaço físico objeto desta autorização:");
+    doc.moveDown(0.5);
+    const isTeatro = (inscricao.local || "").toLowerCase() === 'teatro';
+    const isIgrejinha = (inscricao.local || "").toLowerCase() === 'igrejinha';
+    doc.text(`${isTeatro ? '[X]' : '[  ]'} Teatro Carmen Fossari`);
+    doc.text(`${isIgrejinha ? '[X]' : '[  ]'} Igrejinha da UFSC`);
+    doc.moveDown(1);
+
+    doc.font('Helvetica').text("2. Evento a ser realizado no espaço físico objeto desta autorização:");
+    doc.font('Helvetica-Bold').fillColor('blue').text(`   ${inscricao.evento_nome || "N/A"}`).fillColor('black');
+    doc.moveDown(1);
+
+    doc.font('Helvetica').text("3. Data e horário de realização do evento, conforme informado na inscrição:");
+    doc.font('Helvetica-Bold').fillColor('blue');
+    const formatDT = (i, f, r) => {
+      if (!i || !f) return;
+      const dI = new Date(i.includes('Z') ? i : i + '-03:00');
+      const dF = new Date(f.includes('Z') ? f : f + '-03:00');
+      const data = dI.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+      const hI = dI.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: 'America/Sao_Paulo' });
+      const hF = dF.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: 'America/Sao_Paulo' });
+      doc.text(`   • ${r}: ${data}, das ${hI} às ${hF}`);
+    };
+    formatDT(inscricao.ensaio_inicio, inscricao.ensaio_fim, "Ensaio");
+    formatDT(inscricao.montagem_inicio, inscricao.montagem_fim, "Montagem");
+    if (inscricao.eventos_json) {
+      try { JSON.parse(inscricao.eventos_json).forEach((ev, i) => formatDT(ev.inicio, ev.fim, `Evento ${i+1}`)); } catch(e){}
+    }
+    formatDT(inscricao.desmontagem_inicio, inscricao.desmontagem_fim, "Desmontagem");
+    doc.fillColor('black').moveDown(2);
+
+    doc.font('Helvetica-Bold').text("II - PARTES ENVOLVIDAS:");
+    doc.moveDown(0.5);
+    
+    // Mapeamento de campos do Forms para o Termo
+    const findF = (q) => {
+      if (!respostaForms) return "____________________";
+      const key = Object.keys(respostaForms).find(k => normalizeKey(k).includes(normalizeKey(q)));
+      return key ? respostaForms[key] : "____________________";
+    };
+
+    const nomeProp = inscricao.nome || findF("nome");
+    const docProp = findF("cpf") || findF("cnpj") || "____________________";
+    const rgProp = findF("rg") || "____________________";
+    const orgProp = findF("expedida") || findF("orgao") || "____________________";
+    const ruaProp = findF("rua") || findF("endereco") || "____________________";
+    const numProp = findF("numero") || "____";
+    const bairroProp = findF("bairro") || "____________________";
+    const cidadeProp = findF("cidade") || "Florianópolis";
+    const telProp = inscricao.telefone || findF("telefone") || "____________________";
+
+    doc.font('Helvetica').fontSize(11).text(`Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada AUTORIZADORA, e de outro lado `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(nomeProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, portador(a) do CPF/CNPJ sob o nº `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(docProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, RG nº `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(rgProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, expedida pela `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(orgProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, residente à rua `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(ruaProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, nº `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(numProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, bairro `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(bairroProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, Telefone `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(telProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, na cidade `, { continued: true });
+    doc.font('Helvetica-Bold').fillColor('blue').text(cidadeProp, { continued: true });
+    doc.font('Helvetica').fillColor('black').text(`, doravante denominado(a) AUTORIZADO(A), mediante as cláusulas pactuadas.`);
+    
+    doc.moveDown(2);
+    doc.font('Helvetica-Bold').text("III - CLÁUSULAS PACTUADAS:");
+    doc.moveDown(0.5);
+    doc.font('Helvetica').fontSize(10).text("As partes declaram estar cientes de todas as normas contidas no Edital Mais Arte 002/2026 e se comprometem a cumprir integralmente as obrigações ali descritas.");
+    doc.moveDown(2);
+
+    const hoje = new Date().toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' });
+    doc.text(`Florianópolis, ${hoje}.`, { align: 'right' });
+    doc.moveDown(4);
+
+    doc.text("__________________________________________", { align: 'center' });
+    doc.text("Assinatura do Autorizado", { align: 'center' });
+
+    doc.end();
+  } catch (error) {
+    console.error("Erro ao gerar termo:", error);
+    res.status(500).send("Erro ao gerar termo");
+  }
+});
+
 app.get("/api/gerar-pdf/:id", async (req, res) => {
   try {
     const { id } = req.params;
