@@ -472,7 +472,7 @@ async function initializeGoogleAPIs() {
 
 // --- 7. CONFIGURAÇÃO DO EXPRESS ---
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -2955,5 +2955,4 @@ async function startServer() {
 }
 
 // Chama a função de inicialização
-startServer();
 startServer();
