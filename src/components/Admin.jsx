@@ -92,6 +92,7 @@ const Admin = ({ viewOnly = false }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('evaluatorEmail'));
   const [evaluatorPassword, setEvaluatorPassword] = useState('');
   const [conflictFilter, setConflictFilter] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // ✅ NOVO ESTADO PARA PESQUISA
    // ✅ NOVO: Senha única para todos os avaliadores
   
   // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
@@ -256,6 +257,15 @@ const Admin = ({ viewOnly = false }) => {
       const localCorreto = (localFilters.teatro && item.local === 'teatro') || (localFilters.igrejinha && item.local === 'igrejinha');
       if (!localCorreto) return false;
 
+      // ✅ NOVO: Filtro de Pesquisa (Nome, Email ou Evento)
+      const searchLower = searchTerm.toLowerCase();
+      const matchSearch = !searchTerm || 
+        (item.nome && item.nome.toLowerCase().includes(searchLower)) || 
+        (item.email && item.email.toLowerCase().includes(searchLower)) || 
+        (item.evento_nome && item.evento_nome.toLowerCase().includes(searchLower));
+      
+      if (!matchSearch) return false;
+
       // Filtro de conflito
       if (conflictFilter && !item.hasConflict) {
         return false;
@@ -323,7 +333,7 @@ const Admin = ({ viewOnly = false }) => {
         case 'id_asc': default: return a.id - b.id;
       }
     });
-  }, [unificados, inscricoesTab, localFilters, sortOrder, viewOnly, assessmentFilter, evaluatorEmail, conflictFilter]);
+  }, [unificados, inscricoesTab, localFilters, sortOrder, viewOnly, assessmentFilter, evaluatorEmail, conflictFilter, searchTerm]);
 
 
   const handleLocalFilterChange = (local) => { setLocalFilters(prev => ({ ...prev, [local]: !prev[local] })); };
@@ -799,17 +809,36 @@ const Admin = ({ viewOnly = false }) => {
                   ) : (
                     <div className="w-full border-b border-gray-200"></div>
                   )}
-<div className="flex items-center gap-4">
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="id_asc">Ordenar por Inscrição</option>
-	        <option value="nota_desc">Maior Nota</option>
-	        <option value="nota_asc">Menor Nota</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
+	<div className="flex items-center gap-4">
+		    {/* ✅ BARRA DE PESQUISA */}
+		    <div className="relative">
+		      <input
+		        type="text"
+		        placeholder="Buscar por nome, email ou evento..."
+		        value={searchTerm}
+		        onChange={(e) => setSearchTerm(e.target.value)}
+		        className="pl-10 pr-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+		      />
+		      <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
+		        <Search size={18} />
+		      </div>
+		      {searchTerm && (
+		        <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+		          <X size={16} />
+		        </button>
+		      )}
+		    </div>
+
+		  {inscricoesTab === 'eventos' && (
+		    <div className="relative">
+		      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+		        <option value="id_asc">Ordenar por Inscrição</option>
+		        <option value="nota_desc">Maior Nota</option>
+		        <option value="nota_asc">Menor Nota</option>
+		      </select>
+		      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
+		    </div>
+		  )}
 	  {inscricoesTab === 'eventos' && (
 	    <div className="relative">
 	      <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
