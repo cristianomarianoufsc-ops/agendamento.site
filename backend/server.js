@@ -2451,22 +2451,33 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
 
     const nomeProp = inscricao.nome || findF("nome");
     
-    // ✅ BUSCA ROBUSTA PARA CPF/CNPJ (Sincronizada com a Ficha PDF)
+    // ✅ BUSCA ROBUSTA PARA CPF/CNPJ (Validada com Teste Interno)
     let docProp = "____________________";
     if (respostaForms) {
-      // 1. Tenta encontrar qualquer chave que contenha 'cpf' ou 'cnpj'
+      // 1. Tenta encontrar por nome de chave (CPF ou CNPJ)
       const cpfKey = Object.keys(respostaForms).find(k => {
         const n = normalizeKey(k);
-        return n.includes('cpf') || n.includes('cnpj');
+        return (n.includes('cpf') || n.includes('cnpj')) && !n.includes('arquivo') && !n.includes('anexo');
       });
       
       if (cpfKey && respostaForms[cpfKey] && String(respostaForms[cpfKey]).trim() !== "") {
-        docProp = String(respostaForms[cpfKey]).trim();
-      } else {
-        // 2. Se não achou por nome, tenta por conteúdo (procura algo que pareça um CPF/CNPJ: 11 ou 14 dígitos)
+        const val = String(respostaForms[cpfKey]).trim();
+        // Evita pegar data/hora se o nome da chave for genérico
+        if (!val.includes(':') || val.replace(/\D/g, "").length >= 11) {
+           docProp = val;
+        }
+      }
+
+      // 2. Se não achou por nome, tenta por conteúdo (procura algo que pareça um CPF/CNPJ: 11 ou 14 dígitos)
+      // MAS ignora campos que claramente são data/hora ou telefone
+      if (docProp === "____________________") {
         const possibleDocKey = Object.keys(respostaForms).find(k => {
-          const val = String(respostaForms[k] || "").replace(/\D/g, "");
-          return val.length === 11 || val.length === 14;
+          const valRaw = String(respostaForms[k] || "");
+          const valClean = valRaw.replace(/\D/g, "");
+          const isDocLength = valClean.length === 11 || valClean.length === 14;
+          const isNotDateTime = !valRaw.includes(':');
+          const isNotPhone = !normalizeKey(k).includes('fone') && !normalizeKey(k).includes('tel');
+          return isDocLength && isNotDateTime && isNotPhone;
         });
         if (possibleDocKey) docProp = respostaForms[possibleDocKey];
       }
