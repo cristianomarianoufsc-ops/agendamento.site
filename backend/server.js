@@ -2445,7 +2445,16 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
     };
 
     const nomeProp = inscricao.nome || findF("nome");
-    const docProp = findF("cpf") || findF("cnpj") || "____________________";
+    // Busca aprimorada para CPF/CNPJ
+    let docProp = findF("cpf") || findF("cnpj");
+    if (!docProp || docProp.includes("___")) {
+      // Tenta buscar por qualquer campo que contenha 'cpf' ou 'cnpj' de forma mais agressiva
+      const key = Object.keys(respostaForms || {}).find(k => {
+        const n = normalizeKey(k);
+        return n.includes('cpf') || n.includes('cnpj');
+      });
+      docProp = key ? respostaForms[key] : "____________________";
+    }
     const rgProp = findF("rg") || "____________________";
     const orgProp = findF("expedida") || findF("orgao") || "____________________";
     const ruaProp = findF("rua") || findF("endereco") || "____________________";
@@ -2475,17 +2484,56 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
     doc.font('Helvetica').fillColor('black').text(`, doravante denominado(a) AUTORIZADO(A), mediante as cláusulas pactuadas.`);
     
     doc.moveDown(2);
-    doc.font('Helvetica-Bold').text("III - CLÁUSULAS PACTUADAS:");
-    doc.moveDown(0.5);
-    doc.font('Helvetica').fontSize(10).text("As partes declaram estar cientes de todas as normas contidas no Edital Mais Arte 002/2026 e se comprometem a cumprir integralmente as obrigações ali descritas.");
+    doc.font('Helvetica-Bold').text("III - CLÁUSULAS PACTUADAS ENTRE AS PARTES ENVOLVIDAS:");
+    doc.moveDown(1);
+
+    const addClausula = (titulo, texto, paragrafo = null) => {
+      doc.font('Helvetica-Bold').fontSize(11).text(titulo);
+      doc.font('Helvetica').fontSize(10).text(texto, { align: 'justify' });
+      if (paragrafo) {
+        doc.moveDown(0.5);
+        doc.font('Helvetica-Bold').text(paragrafo.split('.')[0] + '.', { continued: true });
+        doc.font('Helvetica').text(paragrafo.substring(paragrafo.indexOf('.') + 1), { align: 'justify' });
+      }
+      doc.moveDown(1);
+    };
+
+    addClausula("CLÁUSULA PRIMEIRA – DO OBJETO E DO PRAZO DA AUTORIZAÇÃO", 
+      "O objeto deste termo é a autorização de uso de dependências específicas de espaço cultural da AUTORIZADORA pelo(a) AUTORIZADO(A) para fim exclusivo de realização de evento, na forma especificada no preâmbulo acima, observado o calendário prioritário previamente estipulado pela Universidade Federal de Santa Catarina, por meio de Edital Público.",
+      "Parágrafo único. Excluem-se, expressamente, da autorização ora ajustada, quaisquer outras áreas e/ou dependências que não a referida no preâmbulo desta autorização.");
+
+    addClausula("CLÁUSULA SEGUNDA – DA TAXA DE UTILIZAÇÃO", 
+      "Nos casos de locação do espaço para eventos particulares e/ou não gratuitos, a AUTORIZADORA cobrará as taxas referentes à utilização do espaço cultural objeto desta autorização, conforme valores definidos em Portaria editada pela Secretaria de Cultura, nos termos da legislação vigente à época da autorização.",
+      "Parágrafo primeiro. Havendo cancelamento de apresentação do evento objeto deste termo, por qualquer motivo que seja, a taxa de locação paga pelo(a) AUTORIZADO(A) à AUTORIZADORA não será devolvida, podendo o (a) AUTORIZADO(A) reagendar a data para outra disponível no calendário anexo ao Edital vigente.");
+
+    addClausula("CLÁUSULA TERCEIRA – DOS INGRESSOS E DOS VALORES FIXADOS", 
+      "A comercialização dos ingressos do espetáculo é de total responsabilidade do AUTORIZADO(A), inclusive no que tange às regras de comercialização total ou meia entrada.");
+
+    addClausula("CLÁUSULA QUARTA – DAS OBRIGAÇÕES E DOS DIREITOS DA AUTORIZADORA", 
+      "A AUTORIZADORA, além de outras condições previstas em normas específicas, compromete-se a autorizar o uso das dependências e equipamentos do espaço cultural objeto deste termo o(à) AUTORIZADO(A), o qual será liberado para montagem no(s) dia(s) do(s) evento(s), a partir das (8) oito horas.");
+
+    // Adicionar quebra de página se necessário para as assinaturas
+    if (doc.y > 600) doc.addPage();
+
+    addClausula("CLÁUSULA NONA, DO FORO", 
+      "Fica eleito o foro da Comarca de Florianópolis, Capital do Estado de Santa Catarina, para dirimir eventuais dúvidas oriundas da aplicação deste Termo, com renúncia de qualquer outro, por mais privilegiado que seja.");
+
+    doc.moveDown(1);
+    doc.font('Helvetica').fontSize(10).text("E, por estarem justos e concordados, assinam o presente instrumento em 02 (duas) vias de igual teor e forma, para um só efeito.");
     doc.moveDown(2);
 
     const hoje = new Date().toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' });
-    doc.text(`Florianópolis, ${hoje}.`, { align: 'right' });
+    doc.text(`Florianópolis (SC), ${hoje}.`, { align: 'center' });
     doc.moveDown(4);
 
-    doc.text("__________________________________________", { align: 'center' });
-    doc.text("Assinatura do Autorizado", { align: 'center' });
+    const startY = doc.y;
+    doc.text("__________________________________________", 50, startY, { width: 230, align: 'center' });
+    doc.text("__________________________________________", 310, startY, { width: 230, align: 'center' });
+    
+    doc.font('Helvetica-Bold').text("AUTORIZADORA", 50, startY + 15, { width: 230, align: 'center' });
+    doc.text("AUTORIZADO (A)", 310, startY + 15, { width: 230, align: 'center' });
+    
+    doc.font('Helvetica').fontSize(9).text(`CPF/CNPJ: ${docProp}`, 310, startY + 30, { width: 230, align: 'center' });
 
     doc.end();
   } catch (error) {
