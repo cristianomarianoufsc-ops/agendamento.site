@@ -2440,20 +2440,32 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
     // Mapeamento de campos do Forms para o Termo
     const findF = (q) => {
       if (!respostaForms) return "____________________";
-      const key = Object.keys(respostaForms).find(k => normalizeKey(k).includes(normalizeKey(q)));
+      // Normaliza a busca para ser mais flexível
+      const search = normalizeKey(q);
+      const key = Object.keys(respostaForms).find(k => {
+        const n = normalizeKey(k);
+        return n.includes(search);
+      });
       return key ? respostaForms[key] : "____________________";
     };
 
     const nomeProp = inscricao.nome || findF("nome");
-    // Busca aprimorada para CPF/CNPJ
-    let docProp = findF("cpf") || findF("cnpj");
-    if (!docProp || docProp.includes("___")) {
-      // Tenta buscar por qualquer campo que contenha 'cpf' ou 'cnpj' de forma mais agressiva
-      const key = Object.keys(respostaForms || {}).find(k => {
+    
+    // ✅ BUSCA ROBUSTA PARA CPF/CNPJ
+    let docProp = "____________________";
+    if (respostaForms) {
+      const cpfKey = Object.keys(respostaForms).find(k => {
         const n = normalizeKey(k);
         return n.includes('cpf') || n.includes('cnpj');
       });
-      docProp = key ? respostaForms[key] : "____________________";
+      if (cpfKey && respostaForms[cpfKey]) {
+        docProp = respostaForms[cpfKey];
+      }
+    }
+    // Se ainda não encontrou, tenta o findF padrão
+    if (docProp === "____________________") {
+      const fallback = findF("cpf");
+      if (fallback !== "____________________") docProp = fallback;
     }
     const rgProp = findF("rg") || "____________________";
     const orgProp = findF("expedida") || findF("orgao") || "____________________";
