@@ -2451,21 +2451,31 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
 
     const nomeProp = inscricao.nome || findF("nome");
     
-    // ✅ BUSCA ROBUSTA PARA CPF/CNPJ
+    // ✅ BUSCA ROBUSTA PARA CPF/CNPJ (Sincronizada com a Ficha PDF)
     let docProp = "____________________";
     if (respostaForms) {
+      // 1. Tenta encontrar qualquer chave que contenha 'cpf' ou 'cnpj'
       const cpfKey = Object.keys(respostaForms).find(k => {
         const n = normalizeKey(k);
         return n.includes('cpf') || n.includes('cnpj');
       });
-      if (cpfKey && respostaForms[cpfKey]) {
-        docProp = respostaForms[cpfKey];
+      
+      if (cpfKey && respostaForms[cpfKey] && String(respostaForms[cpfKey]).trim() !== "") {
+        docProp = String(respostaForms[cpfKey]).trim();
+      } else {
+        // 2. Se não achou por nome, tenta por conteúdo (procura algo que pareça um CPF/CNPJ: 11 ou 14 dígitos)
+        const possibleDocKey = Object.keys(respostaForms).find(k => {
+          const val = String(respostaForms[k] || "").replace(/\D/g, "");
+          return val.length === 11 || val.length === 14;
+        });
+        if (possibleDocKey) docProp = respostaForms[possibleDocKey];
       }
     }
-    // Se ainda não encontrou, tenta o findF padrão
-    if (docProp === "____________________") {
-      const fallback = findF("cpf");
-      if (fallback !== "____________________") docProp = fallback;
+    
+    // 3. Fallback final se ainda estiver vazio
+    if (!docProp || docProp === "____________________") {
+      const fallback = findF("cpf") || findF("cnpj") || findF("documento");
+      if (fallback && fallback !== "____________________") docProp = fallback;
     }
     const rgProp = findF("rg") || "____________________";
     const orgProp = findF("expedida") || findF("orgao") || "____________________";
