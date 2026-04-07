@@ -939,6 +939,48 @@ const Admin = ({ viewOnly = false }) => {
                                     )}
                                     <button onClick={() => window.open(`/api/gerar-pdf/${u.id}`, "_blank")} className="flex items-center gap-2 text-red-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Ficha (PDF)</button>
                                     <button onClick={() => window.open(`/api/gerar-termo/${u.id}`, "_blank")} className="flex items-center gap-2 text-green-600 hover:underline font-semibold whitespace-nowrap"><FileText size={16} /> Termo de Autorização (PDF)</button>
+                                    <button 
+                                      onClick={() => {
+                                        const params = new URLSearchParams();
+                                        params.append('nome', u.nome || '');
+                                        params.append('evento', u.evento_nome || '');
+                                        params.append('local', u.local || '');
+                                        
+                                        // Formata a data para o campo de texto livre do formulário digital
+                                        let dataStr = '';
+                                        if (u.eventos_json) {
+                                          try {
+                                            const evs = JSON.parse(u.eventos_json);
+                                            if (evs.length > 0) {
+                                              const first = new Date(evs[0].inicio.includes('Z') ? evs[0].inicio : evs[0].inicio + '-03:00');
+                                              dataStr = first.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+                                            }
+                                          } catch(e) {}
+                                        }
+                                        params.append('data', dataStr);
+                                        
+                                        // Tenta pegar dados extras se existirem no formsData
+                                        if (u.formsData) {
+                                          const findF = (q) => {
+                                            const search = q.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                            const key = Object.keys(u.formsData).find(k => k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(search));
+                                            return key ? u.formsData[key] : '';
+                                          };
+                                          params.append('cpfCnpj', findF('cpf') || findF('cnpj') || '');
+                                          params.append('rg', findF('rg') || '');
+                                          params.append('telefone', findF('fone') || findF('celular') || u.telefone || '');
+                                          params.append('endereco', findF('endereco') || findF('logradouro') || '');
+                                          params.append('numero', findF('numero') || '');
+                                          params.append('bairro', findF('bairro') || '');
+                                          params.append('cidade', findF('cidade') || '');
+                                        }
+
+                                        window.open(`/termo-digital/?${params.toString()}`, "_blank");
+                                      }} 
+                                      className="flex items-center gap-2 text-blue-600 hover:underline font-semibold whitespace-nowrap"
+                                    >
+                                      <FileText size={16} /> Termo Digital (Formulário)
+                                    </button>
                                   </div>
                                   {/* <button onClick={(    ) => window.open(`/api/download-zip/${u.id}`, "_blank"   )} className="flex items-center gap-2 text-green-700 hover:underline font-semibold"><Archive size={16} /> Anexos (ZIP)</button> */}
                                 </td>}

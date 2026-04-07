@@ -2974,6 +2974,9 @@ app.get("/api/download-zip/:id", async (req, res) => {
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
+// Servir o formulário digital DAC
+app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
+
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);
 
