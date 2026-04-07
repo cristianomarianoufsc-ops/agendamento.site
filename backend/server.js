@@ -2570,7 +2570,7 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
 
     doc.moveDown(2);
     doc.text("Florianópolis (SC), ____ de ____________ de 2026.", { align: 'center' });
-    doc.moveDown(4);
+    doc.moveDown(8); // Aumentado de 4 para 8 para dar mais espaço para assinaturas eletrônicas
 
     const startY = doc.y;
     
