@@ -2568,18 +2568,24 @@ app.get("/api/gerar-termo/:id", async (req, res) => {
     doc.font('Helvetica').fontSize(10).text("E, por estarem justos e concordados, assinam o presente instrumento em 02 (duas) vias de igual teor e forma, para um só efeito.");
     doc.moveDown(2);
 
-    const hoje = new Date().toLocaleDateString("pt-BR", { day: '2-digit', month: 'long', year: 'numeric' });
-    doc.text(`Florianópolis (SC), ${hoje}.`, { align: 'center' });
+    doc.moveDown(2);
+    doc.text("Florianópolis (SC), ____ de ____________ de 2026.", { align: 'center' });
     doc.moveDown(4);
 
     const startY = doc.y;
+    
+    // Linha da Esquerda (AUTORIZADORA)
     doc.text("__________________________________________", 50, startY, { width: 230, align: 'center' });
-    doc.text("__________________________________________", 310, startY, { width: 230, align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(10).text("AUTORIZADORA", 50, startY + 15, { width: 230, align: 'center' });
     
-    doc.font('Helvetica-Bold').text("AUTORIZADORA", 50, startY + 15, { width: 230, align: 'center' });
-    doc.text("AUTORIZADO (A)", 310, startY + 15, { width: 230, align: 'center' });
+    // Linha da Direita (AUTORIZADO (A))
+    doc.font('Helvetica').fontSize(10).text("__________________________________________", 310, startY, { width: 230, align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(10).text("AUTORIZADO (A)", 310, startY + 15, { width: 230, align: 'center' });
     
-    doc.font('Helvetica').fontSize(9).text(`CPF/CNPJ: ${docProp}`, 310, startY + 30, { width: 230, align: 'center' });
+    // CPF/CNPJ abaixo do AUTORIZADO (A)
+    if (docProp && docProp !== "_______________________") {
+      doc.font('Helvetica').fontSize(9).text(`CPF/CNPJ: ${docProp}`, 310, startY + 30, { width: 230, align: 'center' });
+    }
 
     doc.end();
   } catch (error) {
