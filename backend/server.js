@@ -2977,6 +2977,11 @@ app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 // Servir o formulário digital DAC
 app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
 
+// Rota específica para o termo-digital para garantir que o index.html seja servido em sub-rotas
+app.get('/termo-digital/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
+});
+
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);
 
