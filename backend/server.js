@@ -2979,8 +2979,8 @@ app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
 
 // Rota para o index.html do termo-digital
-// Usamos uma rota que captura /termo-digital e /termo-digital/
-app.get(['/termo-digital', '/termo-digital/'], (req, res) => {
+// Usamos regex para capturar /termo-digital e qualquer sub-rota/parâmetro
+app.get(/^\/termo-digital/, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
 });
 
