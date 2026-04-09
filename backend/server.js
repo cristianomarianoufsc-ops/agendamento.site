@@ -2970,19 +2970,18 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
-// Servir arquivos estáticos (CSS, JS, Imagens)
-app.use(express.static(path.join(__dirname, '..', 'dist')));
-app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
-
-// Servir o formulário digital DAC
-// Primeiro servimos os arquivos estáticos (JS, CSS, etc)
+// 1. Rota específica para o termo-digital (DEVE VIR ANTES DO DIST)
+// Primeiro servimos os arquivos estáticos (JS, CSS, etc) da pasta termo-digital
 app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
 
-// Rota para o index.html do termo-digital
-// Usamos regex para capturar /termo-digital e qualquer sub-rota/parâmetro
+// Rota para o index.html do termo-digital para capturar /termo-digital e qualquer sub-rota/parâmetro
 app.get(/^\/termo-digital/, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
 });
+
+// 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
+app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);
