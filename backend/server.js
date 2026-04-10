@@ -2968,16 +2968,9 @@ app.get("/api/download-zip/:id", async (req, res) => {
   }
 });
 
-// --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
-
-// 1. Rota específica para o termo-digital (Servido como estático do dist)
-// Primeiro, servimos os arquivos estáticos (assets)
-app.use('/termo-digital/assets', express.static(path.join(__dirname, 'public', 'termo-digital', 'assets')));
-app.use('/termo-digital/__manus__', express.static(path.join(__dirname, 'public', 'termo-digital', '__manus__')));
-
-// Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
-// Isso resolve o erro 404 do roteador React (mala direta)
+// --- 23. ROTA PRIORITÁRIA PARA O TERMO-DIGITAL ---
 app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
+  // Se for um arquivo de asset (contém ponto e não é index.html), deixa o express.static tratar
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
     return next();
   }
@@ -2990,13 +2983,10 @@ app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
   ];
 
   console.log(`🔍 DEBUG TERMO-DIGITAL: Request URL: ${req.url}`);
-  console.log(`🔍 DEBUG TERMO-DIGITAL: __dirname: ${__dirname}`);
 
   for (const p of paths) {
-    const exists = fs.existsSync(p);
-    console.log(`🔍 DEBUG TERMO-DIGITAL: Checking ${p} -> ${exists ? 'EXISTS' : 'NOT FOUND'}`);
-    if (exists) {
-      console.log(`✅ DEBUG TERMO-DIGITAL: Serving ${p}`);
+    if (fs.existsSync(p)) {
+      console.log(`✅ DEBUG TERMO-DIGITAL: Servindo ${p}`);
       return res.sendFile(p);
     }
   }
@@ -3004,7 +2994,9 @@ app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
   res.status(404).send('Termo Digital não encontrado no servidor.');
 });
 
-// 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
+// --- 24. SERVIR ARQUIVOS ESTÁTICOS ---
+app.use('/termo-digital/assets', express.static(path.join(__dirname, 'public', 'termo-digital', 'assets')));
+app.use('/termo-digital/__manus__', express.static(path.join(__dirname, 'public', 'termo-digital', '__manus__')));
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
