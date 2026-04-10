@@ -2970,18 +2970,8 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
-// 1. Rota específica para o termo-digital (DEVE VIR ANTES DO DIST)
-// Primeiro servimos os arquivos estáticos (JS, CSS, etc) da pasta termo-digital
-app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
-
-// Rota para o index.html do termo-digital
-// Usamos uma função de middleware simples para evitar qualquer erro de path-to-regexp
-app.use((req, res, next) => {
-  if (req.path.startsWith('/termo-digital')) {
-    return res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
-  }
-  next();
-});
+// 1. Rota específica para o termo-digital (Servido como estático do dist)
+app.use('/termo-digital', express.static(path.join(__dirname, '..', 'dist', 'termo-digital')));
 
 // 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
 app.use(express.static(path.join(__dirname, '..', 'dist')));

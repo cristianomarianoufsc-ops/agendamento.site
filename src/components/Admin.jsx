@@ -975,7 +975,7 @@ const Admin = ({ viewOnly = false }) => {
                                           params.append('cidade', findF('cidade') || '');
                                         }
 
-                                        window.open(`/termo-digital/?${params.toString()}`, "_blank");
+                                        window.open(`/termo-digital/index.html?${params.toString()}`, "_blank");
                                       }} 
                                       className="flex items-center gap-2 text-blue-600 hover:underline font-semibold whitespace-nowrap"
                                     >
