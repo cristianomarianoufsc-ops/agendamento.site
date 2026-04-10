@@ -2971,7 +2971,19 @@ app.get("/api/download-zip/:id", async (req, res) => {
 // --- 23. SERVIR ARQUIVOS ESTÁTICOS E FALLBACK PARA O REACT ROUTER ---
 
 // 1. Rota específica para o termo-digital (Servido como estático do dist)
-app.use('/termo-digital', express.static(path.join(__dirname, '..', 'dist', 'termo-digital')));
+// Primeiro, servimos os arquivos estáticos (assets)
+app.use('/termo-digital/assets', express.static(path.join(__dirname, '..', 'dist', 'termo-digital', 'assets')));
+app.use('/termo-digital/__manus__', express.static(path.join(__dirname, '..', 'dist', 'termo-digital', '__manus__')));
+
+// Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
+// Isso resolve o erro 404 do roteador React (mala direta)
+app.get(/^\/termo-digital(\/.*)?$/, (req, res, next) => {
+  // Se for um arquivo específico (tem ponto no final do path), deixa o static tratar
+  if (req.path.includes('.') && !req.path.endsWith('index.html')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '..', 'dist', 'termo-digital', 'index.html'));
+});
 
 // 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
 app.use(express.static(path.join(__dirname, '..', 'dist')));
