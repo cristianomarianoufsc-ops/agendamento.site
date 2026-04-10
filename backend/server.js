@@ -2969,8 +2969,7 @@ app.get("/api/download-zip/:id", async (req, res) => {
 });
 
 // --- 23. ROTA PRIORITÁRIA PARA O TERMO-DIGITAL ---
-app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
-  // Se for um arquivo de asset (contém ponto e não é index.html), deixa o express.static tratar
+app.get(['/termo-digital', '/termo-digital/*'], (req, res, next) => {
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
     return next();
   }
@@ -2982,7 +2981,7 @@ app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
     path.join(__dirname, '..', 'backend', 'public', 'termo-digital', 'index.html')
   ];
 
-  console.log(`🔍 DEBUG TERMO-DIGITAL: Request URL: ${req.url}`);
+  console.log(`🔍 DEBUG TERMO-DIGITAL: URL=${req.url} PATH=${req.path}`);
 
   for (const p of paths) {
     if (fs.existsSync(p)) {
