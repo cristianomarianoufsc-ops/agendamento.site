@@ -2978,26 +2978,29 @@ app.use('/termo-digital/__manus__', express.static(path.join(__dirname, 'public'
 // Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
 // Isso resolve o erro 404 do roteador React (mala direta)
 app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
-  // Se for um arquivo específico (tem ponto no final do path), deixa o static tratar
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
     return next();
   }
 
-  // Tenta primeiro no backend/public/termo-digital (onde o script de build costuma colocar)
   const paths = [
     path.join(__dirname, 'public', 'termo-digital', 'index.html'),
     path.join(__dirname, '..', 'dist', 'termo-digital', 'index.html'),
-    path.join(__dirname, '..', 'public', 'termo-digital', 'index.html')
+    path.join(__dirname, '..', 'public', 'termo-digital', 'index.html'),
+    path.join(__dirname, '..', 'backend', 'public', 'termo-digital', 'index.html')
   ];
 
+  console.log(`🔍 DEBUG TERMO-DIGITAL: Request URL: ${req.url}`);
+  console.log(`🔍 DEBUG TERMO-DIGITAL: __dirname: ${__dirname}`);
+
   for (const p of paths) {
-    if (fs.existsSync(p)) {
-      console.log(`✅ DEBUG TERMO-DIGITAL: Servindo ${p}`);
+    const exists = fs.existsSync(p);
+    console.log(`🔍 DEBUG TERMO-DIGITAL: Checking ${p} -> ${exists ? 'EXISTS' : 'NOT FOUND'}`);
+    if (exists) {
+      console.log(`✅ DEBUG TERMO-DIGITAL: Serving ${p}`);
       return res.sendFile(p);
     }
   }
 
-  console.log(`❌ DEBUG TERMO-DIGITAL: Arquivo não encontrado em nenhuma das opções.`);
   res.status(404).send('Termo Digital não encontrado no servidor.');
 });
 
