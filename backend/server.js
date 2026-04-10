@@ -2977,7 +2977,7 @@ app.use('/termo-digital/__manus__', express.static(path.join(__dirname, '..', 'd
 
 // Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
 // Isso resolve o erro 404 do roteador React (mala direta)
-app.get(/^\/termo-digital(\/.*)?$/, (req, res, next) => {
+app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
   // Se for um arquivo específico (tem ponto no final do path), deixa o static tratar
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
     return next();
