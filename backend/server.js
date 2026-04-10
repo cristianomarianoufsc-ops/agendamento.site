@@ -157,8 +157,8 @@ async function initializeTables() {
   }
 }
 
-// Chamar inicialização de tabelas
-await initializeTables();
+// Chamar inicialização de tabelas (sem await no topo para compatibilidade)
+initializeTables().catch(err => console.error("Erro ao inicializar tabelas:", err));
 
 // ===================================================================
 // ✅ FUNÇÃO AUXILIAR PARA LER CONFIGURAÇÃO DO BANCO DE DADOS
@@ -2969,7 +2969,7 @@ app.get("/api/download-zip/:id", async (req, res) => {
 });
 
 // --- 23. ROTA PRIORITÁRIA PARA O TERMO-DIGITAL ---
-app.get(['/termo-digital', '/termo-digital/*'], (req, res, next) => {
+app.get(/^\/termo-digital(\/.*)?$/, (req, res, next) => {
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
     return next();
   }
