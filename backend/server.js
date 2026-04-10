@@ -2972,19 +2972,15 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // 1. Rota específica para o termo-digital (DEVE VIR ANTES DO DIST)
 // Primeiro servimos os arquivos estáticos (JS, CSS, etc) da pasta termo-digital
-app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital'), {
-  index: false
-}));
+app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
 
 // Rota para o index.html do termo-digital
-// Usamos uma string simples para evitar erros de path-to-regexp no Node v25
-app.get('/termo-digital', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
-});
-
-// Fallback para sub-rotas do termo-digital
-app.get('/termo-digital/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
+// Usamos uma função de middleware simples para evitar qualquer erro de path-to-regexp
+app.use((req, res, next) => {
+  if (req.path.startsWith('/termo-digital')) {
+    return res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
+  }
+  next();
 });
 
 // 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
