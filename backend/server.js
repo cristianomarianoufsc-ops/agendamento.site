@@ -2972,8 +2972,8 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // 1. Rota específica para o termo-digital (Servido como estático do dist)
 // Primeiro, servimos os arquivos estáticos (assets)
-app.use('/termo-digital/assets', express.static(path.join(__dirname, '..', 'dist', 'termo-digital', 'assets')));
-app.use('/termo-digital/__manus__', express.static(path.join(__dirname, '..', 'dist', 'termo-digital', '__manus__')));
+app.use('/termo-digital/assets', express.static(path.join(__dirname, 'public', 'termo-digital', 'assets')));
+app.use('/termo-digital/__manus__', express.static(path.join(__dirname, 'public', 'termo-digital', '__manus__')));
 
 // Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
 // Isso resolve o erro 404 do roteador React (mala direta)
@@ -3003,6 +3003,7 @@ app.get(/^\/termo-digital(\/?.*)?$/, (req, res, next) => {
 
 // 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
 app.use(express.static(path.join(__dirname, '..', 'dist')));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 
 // --- Rota para geração de PDF ---
