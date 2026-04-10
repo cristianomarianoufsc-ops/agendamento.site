@@ -2972,10 +2972,13 @@ app.get("/api/download-zip/:id", async (req, res) => {
 
 // 1. Rota específica para o termo-digital (DEVE VIR ANTES DO DIST)
 // Primeiro servimos os arquivos estáticos (JS, CSS, etc) da pasta termo-digital
-app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital')));
+app.use('/termo-digital', express.static(path.join(__dirname, 'public', 'termo-digital'), {
+  index: false // Não serve o index.html automaticamente para podermos tratar a rota abaixo
+}));
 
 // Rota para o index.html do termo-digital para capturar /termo-digital e qualquer sub-rota/parâmetro
-app.get(/^\/termo-digital/, (req, res) => {
+// Usamos uma rota que captura explicitamente o termo-digital e o que vier depois
+app.get(['/termo-digital', '/termo-digital/*'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'termo-digital', 'index.html'));
 });
 
