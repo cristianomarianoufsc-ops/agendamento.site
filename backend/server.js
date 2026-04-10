@@ -2978,31 +2978,27 @@ app.use('/termo-digital/__manus__', express.static(path.join(__dirname, '..', 'd
 // Depois, forçamos o index.html para qualquer rota que comece com /termo-digital
 // Isso resolve o erro 404 do roteador React (mala direta)
 app.get(/^\/termo-digital(\/.*)?$/, (req, res, next) => {
-  const fullPath = path.join(__dirname, '..', 'dist', 'termo-digital', 'index.html');
-  console.log(`🔍 DEBUG TERMO-DIGITAL: Requisição para: ${req.url}`);
-  console.log(`🔍 DEBUG TERMO-DIGITAL: Tentando servir: ${fullPath}`);
-  
   // Se for um arquivo específico (tem ponto no final do path), deixa o static tratar
   if (req.path.includes('.') && !req.path.endsWith('index.html')) {
-    console.log(`🔍 DEBUG TERMO-DIGITAL: Passando para static (arquivo detectado)`);
     return next();
   }
-  
-  if (fs.existsSync(fullPath)) {
-    console.log(`✅ DEBUG TERMO-DIGITAL: Arquivo encontrado! Enviando...`);
-    res.sendFile(fullPath);
-  } else {
-    console.log(`❌ DEBUG TERMO-DIGITAL: Arquivo NÃO encontrado em: ${fullPath}`);
-    // Tenta no caminho alternativo (public) se o dist falhar
-    const altPath = path.join(__dirname, 'public', 'termo-digital', 'index.html');
-    if (fs.existsSync(altPath)) {
-      console.log(`✅ DEBUG TERMO-DIGITAL: Arquivo encontrado no caminho alternativo (public)!`);
-      res.sendFile(altPath);
-    } else {
-      console.log(`❌ DEBUG TERMO-DIGITAL: Arquivo também não encontrado no caminho alternativo.`);
-      res.status(404).send('Termo Digital não encontrado no servidor.');
+
+  // Tenta primeiro no backend/public/termo-digital (onde o script de build costuma colocar)
+  const paths = [
+    path.join(__dirname, 'public', 'termo-digital', 'index.html'),
+    path.join(__dirname, '..', 'dist', 'termo-digital', 'index.html'),
+    path.join(__dirname, '..', 'public', 'termo-digital', 'index.html')
+  ];
+
+  for (const p of paths) {
+    if (fs.existsSync(p)) {
+      console.log(`✅ DEBUG TERMO-DIGITAL: Servindo ${p}`);
+      return res.sendFile(p);
     }
   }
+
+  console.log(`❌ DEBUG TERMO-DIGITAL: Arquivo não encontrado em nenhuma das opções.`);
+  res.status(404).send('Termo Digital não encontrado no servidor.');
 });
 
 // 2. Servir arquivos estáticos do sistema principal (CSS, JS, Imagens)
@@ -3014,11 +3010,17 @@ app.use('/api', pdfGeneratorRouter);
 
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
 app.use((req, res) => {
-  // Ignora rotas de API para não interferir
   if (req.path.startsWith('/api')) {
     return res.status(404).send('API endpoint not found');
   }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  
+  const mainIndexPath = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(mainIndexPath)) {
+    res.sendFile(mainIndexPath);
+  } else {
+    // Fallback para o dist raiz se o backend/public falhar
+    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  }
 });
 
 
