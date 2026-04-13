@@ -380,14 +380,26 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
       if (line[line.length - 1].text === ' ') line.pop();
       lines.push(line);
     }
-    // Renderizar
-    lines.forEach(ln => {
+    // Renderizar com justificação
+    lines.forEach((ln, lineIdx) => {
+      const isLast = lineIdx === lines.length - 1;
       let x = margin;
-      ln.forEach(tok => {
-        doc.setFont("helvetica", tok.bold ? "bold" : "normal");
-        doc.text(tok.text, x, y);
-        x += tok.w;
-      });
+      if (!isLast) {
+        const spaces = ln.filter(tok => tok.text === ' ');
+        const wordWidth = ln.filter(tok => tok.text !== ' ').reduce((sum, tok) => sum + tok.w, 0);
+        const spaceW = spaces.length > 0 ? (usable - wordWidth) / spaces.length : 0;
+        ln.forEach(tok => {
+          doc.setFont("helvetica", tok.bold ? "bold" : "normal");
+          if (tok.text !== ' ') { doc.text(tok.text, x, y); }
+          x += tok.text === ' ' ? spaceW : tok.w;
+        });
+      } else {
+        ln.forEach(tok => {
+          doc.setFont("helvetica", tok.bold ? "bold" : "normal");
+          doc.text(tok.text, x, y);
+          x += tok.w;
+        });
+      }
       y += lineH;
     });
   };
