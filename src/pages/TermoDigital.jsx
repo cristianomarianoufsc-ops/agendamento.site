@@ -432,13 +432,16 @@ export default function TermoDigital() {
     if (ini) etapas.push({ etapa: "Desmontagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
   }
 
+  // Campos somente leitura (pré-preenchidos)
+  const nome = searchParams.get("nome") || "";
+  const cpfCnpj = searchParams.get("cpfCnpj") || "";
+  const telefone = searchParams.get("telefone") || "";
+  const email = searchParams.get("email") || "";
+
   // Campos editáveis
-  const [nome, setNome] = useState(searchParams.get("nome") || "");
-  const [cpfCnpj, setCpfCnpj] = useState(searchParams.get("cpfCnpj") || "");
   const [rg, setRg] = useState(searchParams.get("rg") || "");
-  const [telefone, setTelefone] = useState(searchParams.get("telefone") || "");
   const [endereco, setEndereco] = useState(searchParams.get("endereco") || "");
-  const [numero, setNumero] = useState(searchParams.get("numero") || "");
+  const [numero, setNumero] = useState("");
   const [complemento, setComplemento] = useState("");
   const [bairro, setBairro] = useState(searchParams.get("bairro") || "");
   const [cidade, setCidade] = useState(searchParams.get("cidade") || "");
@@ -457,7 +460,7 @@ export default function TermoDigital() {
   };
 
   const limparFormulario = () => {
-    setNome(""); setCpfCnpj(""); setRg(""); setTelefone("");
+    setRg("");
     setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
     setOutrasInfo(""); setClausulasAceitas(Array(CLAUSULAS.length).fill(false));
   };
@@ -564,20 +567,21 @@ export default function TermoDigital() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
             <div className="md:col-span-2">
-              <Field label="Nome Completo" value={nome} onChange={setNome} required />
+              <ReadOnly label="Nome Completo" value={nome} />
             </div>
-            <Field label="CPF/CNPJ" value={cpfCnpj} onChange={setCpfCnpj} required />
+            <ReadOnly label="CPF/CNPJ" value={cpfCnpj} />
             <Field label="RG" value={rg} onChange={setRg} required />
-            <Field label="Telefone" value={telefone} onChange={setTelefone} required />
+            <ReadOnly label="Telefone" value={telefone} />
+            <ReadOnly label="E-mail" value={email} />
           </div>
           <div className="grid grid-cols-3 gap-x-4">
             <div className="col-span-2">
               <Field label="Endereço" value={endereco} onChange={setEndereco} required />
             </div>
-            <Field label="Nº" value={numero} onChange={setNumero} required />
+            <Field label="Nº" value={numero} onChange={setNumero} placeholder="Ex: 123" />
           </div>
           <div className="grid grid-cols-3 gap-x-4">
-            <Field label="Apto" value={apto} onChange={setApto} />
+            <Field label="Complemento" value={complemento} onChange={setComplemento} />
             <Field label="Bairro" value={bairro} onChange={setBairro} required />
             <Field label="Cidade" value={cidade} onChange={setCidade} required />
           </div>
