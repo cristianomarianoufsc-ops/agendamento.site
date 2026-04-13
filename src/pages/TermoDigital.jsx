@@ -344,28 +344,75 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
     endereco, numero ? `n.${numero}` : "", complemento || "", bairro ? `bairro ${bairro}` : ""
   ].filter(Boolean).join(" ");
 
-  const partesTextoIntro =
-    `Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado:`;
+  // Helper para texto misto (normal + negrito inline)
+  const addMixedText = (segments, fontSize, lineH) => {
+    doc.setFontSize(fontSize);
+    // Tokenizar preservando espaços e estilo
+    const tokens = [];
+    segments.forEach(({ text, bold }) => {
+      const parts = text.split(' ');
+      parts.forEach((part, i) => {
+        if (i > 0) tokens.push({ text: ' ', bold: false });
+        if (part) tokens.push({ text: part, bold });
+      });
+    });
+    // Medir cada token
+    tokens.forEach(tok => {
+      doc.setFont("helvetica", tok.bold ? "bold" : "normal");
+      tok.w = doc.getTextWidth(tok.text);
+    });
+    // Quebrar em linhas
+    const lines = [];
+    let line = [], lw = 0;
+    tokens.forEach(tok => {
+      if (tok.text === ' ' && line.length === 0) return;
+      if (lw + tok.w > usable && line.length > 0) {
+        if (line[line.length - 1].text === ' ') line.pop();
+        lines.push(line);
+        line = [];
+        lw = 0;
+        if (tok.text === ' ') return;
+      }
+      line.push(tok);
+      lw += tok.w;
+    });
+    if (line.length > 0) {
+      if (line[line.length - 1].text === ' ') line.pop();
+      lines.push(line);
+    }
+    // Renderizar
+    lines.forEach(ln => {
+      let x = margin;
+      ln.forEach(tok => {
+        doc.setFont("helvetica", tok.bold ? "bold" : "normal");
+        doc.text(tok.text, x, y);
+        x += tok.w;
+      });
+      y += lineH;
+    });
+  };
 
-  const partesTextoProponente =
-    `${nome || "_______________"}, portador(a) do CPF/CNPJ sob o nº ${cpfCnpj || "_______________"}, RG nº ${rg || "_______________"} expedida pela SSP/SC, residente à ${enderecoCompleto || "_______________"}, Telefone ${telefone || "_______________"}, na cidade ${cidade || "_______________"}, doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:`;
+  const introSegments = [
+    { text: "Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado:", bold: false },
+  ];
 
-  // Texto introdutório — normal
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.splitTextToSize(partesTextoIntro, usable).forEach((line, i, arr) => {
-    doc.text(line, margin, y, i < arr.length - 1 ? { maxWidth: usable, align: "justify" } : {});
-    y += 5;
-  });
+  const proponenteSegments = [
+    { text: nome || "_______________", bold: true },
+    { text: ", portador(a) do CPF/CNPJ sob o nº ", bold: false },
+    { text: cpfCnpj || "_______________", bold: true },
+    { text: ", RG nº ", bold: false },
+    { text: rg || "_______________", bold: true },
+    { text: " expedida pela SSP/SC, residente à ", bold: false },
+    { text: enderecoCompleto || "_______________", bold: true },
+    { text: ", Telefone ", bold: false },
+    { text: telefone || "_______________", bold: true },
+    { text: ", na cidade ", bold: false },
+    { text: cidade || "_______________", bold: true },
+    { text: ", doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:", bold: false },
+  ];
 
-  // Dados do proponente — negrito
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.splitTextToSize(partesTextoProponente, usable).forEach((line, i, arr) => {
-    doc.text(line, margin, y, i < arr.length - 1 ? { maxWidth: usable, align: "justify" } : {});
-    y += 5;
-  });
-  doc.setFont("helvetica", "normal");
+  addMixedText(introSegments, 10, 5);
+  addMixedText(proponenteSegments, 10, 5);
   y += 4;
 
   // Linha divisória antes das cláusulas
