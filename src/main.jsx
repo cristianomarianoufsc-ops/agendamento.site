@@ -7,6 +7,7 @@ import AppVertical from "./App.jsx"; // Renomeado para clareza (Agendamento Comp
 import AdminPanel from "./components/Admin.jsx"; // Importando o painel administrativo correto (DEIXADO POR COMPATIBILIDADE)
 import EnsaioPage from "./EnsaioPage.jsx"; // A NOVA PÁGINA DE ENSAIOS
 import Pagina from "./pages/Pagina.jsx"; // A NOVA PÁGINA COM DADOS DO CSV
+import TermoDigital from "./pages/TermoDigital.jsx";
 import Admin from "./components/Admin.jsx"; // Este é o AppVertical com props de admin, mas o nome é confuso. Deixando para trás.
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
@@ -147,6 +148,9 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         
         {/* Rota para a página de visualização do CSV */}
         <Route path="/csv-data" element={<Pagina />} />
+
+        {/* Rota para o formulário digital do Termo de Autorização */}
+        <Route path="/termo-digital" element={<TermoDigital />} />
         
       </Routes>
     </BrowserRouter>

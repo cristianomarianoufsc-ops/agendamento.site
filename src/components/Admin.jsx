@@ -809,46 +809,46 @@ const Admin = ({ viewOnly = false }) => {
                   ) : (
                     <div className="w-full border-b border-gray-200"></div>
                   )}
-	<div className="flex items-center gap-4">
-		    {/* ✅ BARRA DE PESQUISA */}
-		    <div className="relative">
-		      <input
-		        type="text"
-		        placeholder="Buscar por nome, email ou evento..."
-		        value={searchTerm}
-		        onChange={(e) => setSearchTerm(e.target.value)}
-		        className="pl-10 pr-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-		      />
-		      <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
-		        <Search size={18} />
-		      </div>
-		      {searchTerm && (
-		        <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-		          <X size={16} />
-		        </button>
-		      )}
-		    </div>
+        <div className="flex items-center gap-4">
+                    {/* ✅ BARRA DE PESQUISA */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Buscar por nome, email ou evento..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                      />
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">
+                        <Search size={18} />
+                      </div>
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
 
-		  {inscricoesTab === 'eventos' && (
-		    <div className="relative">
-		      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-		        <option value="id_asc">Ordenar por Inscrição</option>
-		        <option value="nota_desc">Maior Nota</option>
-		        <option value="nota_asc">Menor Nota</option>
-		      </select>
-		      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-		    </div>
-		  )}
-	  {inscricoesTab === 'eventos' && (
-	    <div className="relative">
-	      <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
-	        <option value="todos">Mostrar Todos</option>
-	        <option value="avaliados">{viewOnly ? 'Apenas Avaliados por Mim' : 'Apenas Avaliados (100%)'}</option>
-	        <option value="nao_avaliados">{viewOnly ? 'Não Avaliados por Mim' : 'Não Avaliados (Pendente)'}</option>
-	      </select>
-	      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
-	    </div>
-	  )}
+                  {inscricoesTab === 'eventos' && (
+                    <div className="relative">
+                      <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="id_asc">Ordenar por Inscrição</option>
+                        <option value="nota_desc">Maior Nota</option>
+                        <option value="nota_asc">Menor Nota</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
+                    </div>
+                  )}
+          {inscricoesTab === 'eventos' && (
+            <div className="relative">
+              <select value={assessmentFilter} onChange={(e) => setAssessmentFilter(e.target.value)} className="pl-8 pr-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="todos">Mostrar Todos</option>
+                <option value="avaliados">{viewOnly ? 'Apenas Avaliados por Mim' : 'Apenas Avaliados (100%)'}</option>
+                <option value="nao_avaliados">{viewOnly ? 'Não Avaliados por Mim' : 'Não Avaliados (Pendente)'}</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500"><ChevronsUpDown size={16} /></div>
+            </div>
+          )}
   <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.teatro} onChange={() => handleLocalFilterChange('teatro')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Theater size={16} /> Teatro</label>
   <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700"><input type="checkbox" checked={localFilters.igrejinha} onChange={() => handleLocalFilterChange('igrejinha')} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><Church size={16} /> Igrejinha</label>
   
@@ -945,21 +945,22 @@ const Admin = ({ viewOnly = false }) => {
                                         params.append('nome', u.nome || '');
                                         params.append('evento', u.evento_nome || '');
                                         params.append('local', u.local || '');
-                                        
-                                        // Formata a data para o campo de texto livre do formulário digital
-                                        let dataStr = '';
+                                        params.append('telefone', u.telefone || '');
+
+                                        // Etapas com datas/horas
+                                        params.append('ensaioInicio', u.ensaio_inicio || '');
+                                        params.append('ensaioFim', u.ensaio_fim || '');
+                                        params.append('montagemInicio', u.montagem_inicio || '');
+                                        params.append('montagemFim', u.montagem_fim || '');
+                                        params.append('desmontagemInicio', u.desmontagem_inicio || '');
+                                        params.append('desmontagemFim', u.desmontagem_fim || '');
+
+                                        // Eventos principais (apresentações)
                                         if (u.eventos_json) {
-                                          try {
-                                            const evs = JSON.parse(u.eventos_json);
-                                            if (evs.length > 0) {
-                                              const first = new Date(evs[0].inicio.includes('Z') ? evs[0].inicio : evs[0].inicio + '-03:00');
-                                              dataStr = first.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
-                                            }
-                                          } catch(e) {}
+                                          params.append('eventosJson', u.eventos_json);
                                         }
-                                        params.append('data', dataStr);
-                                        
-                                        // Tenta pegar dados extras se existirem no formsData
+
+                                        // Dados extras do formsData
                                         if (u.formsData) {
                                           const findF = (q) => {
                                             const search = q.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -968,14 +969,14 @@ const Admin = ({ viewOnly = false }) => {
                                           };
                                           params.append('cpfCnpj', findF('cpf') || findF('cnpj') || '');
                                           params.append('rg', findF('rg') || '');
-                                          params.append('telefone', findF('fone') || findF('celular') || u.telefone || '');
+                                          if (!u.telefone) params.append('telefone', findF('fone') || findF('celular') || '');
                                           params.append('endereco', findF('endereco') || findF('logradouro') || '');
                                           params.append('numero', findF('numero') || '');
                                           params.append('bairro', findF('bairro') || '');
                                           params.append('cidade', findF('cidade') || '');
                                         }
 
-                                        window.open(`/termo-digital/?${params.toString()}`, "_blank");
+                                        window.open(`/termo-digital?${params.toString()}`, "_blank");
                                       }} 
                                       className="flex items-center gap-2 text-blue-600 hover:underline font-semibold whitespace-nowrap"
                                     >
