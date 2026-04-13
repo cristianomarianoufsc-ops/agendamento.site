@@ -226,7 +226,7 @@ function ClausulaItem({ clausula, index, aceita, onAceitar }) {
 // ─────────────────────────────────────────────
 // Geração do PDF
 // ─────────────────────────────────────────────
-function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, apto, bairro, cidade, outrasInfo }) {
+function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const margin = 20;
@@ -234,7 +234,7 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   let y = 18;
 
   const addText = (text, options = {}) => {
-    const { fontSize = 10, align = "left", bold = false, indent = 0, lineHeight = 5 } = options;
+    const { fontSize = 10, align = "left", bold = false, indent = 0, lineHeight = 5, justify = false } = options;
     doc.setFontSize(fontSize);
     doc.setFont("helvetica", bold ? "bold" : "normal");
     const lines = doc.splitTextToSize(text, usable - indent);
@@ -243,11 +243,29 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
         doc.text(line, W / 2, y, { align: "center" });
         y += lineHeight;
       });
+    } else if (justify) {
+      lines.forEach((line, i) => {
+        const isLast = i === lines.length - 1;
+        doc.text(line, margin + indent, y, isLast ? {} : { maxWidth: usable - indent, align: "justify" });
+        y += lineHeight;
+      });
     } else {
       lines.forEach(line => {
         doc.text(line, margin + indent, y);
         y += lineHeight;
       });
+    }
+  };
+
+  // Draws a checkbox at (cx, cy) with size s. If checked, draws an X inside.
+  const drawCheckbox = (cx, cy, s, checked) => {
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.3);
+    doc.rect(cx, cy - s + 0.5, s, s);
+    if (checked) {
+      doc.setLineWidth(0.5);
+      doc.line(cx + 0.8, cy - s + 1.2, cx + s - 0.8, cy - 0.3);
+      doc.line(cx + s - 0.8, cy - s + 1.2, cx + 0.8, cy - 0.3);
     }
   };
 
@@ -282,9 +300,17 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   y += 1;
   const isTeatro = (local || "").toLowerCase().includes("teatro");
   const isIgreja = (local || "").toLowerCase().includes("igrej");
-  addText(`${isTeatro ? "X" : "☐"} Teatro Carmen Fossari`, { fontSize: 10, indent: 4, lineHeight: 5 });
-  addText(`${isIgreja ? "X" : "☐"} Igrejinha da UFSC`, { fontSize: 10, indent: 4, lineHeight: 6 });
-  y += 2;
+
+  // Teatro Carmen Fossari — checkbox drawn manually to avoid spaced-letter rendering
+  const cbSize = 3.5;
+  drawCheckbox(margin + 4, y, cbSize, isTeatro);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("Teatro Carmen Fossari", margin + 4 + cbSize + 2, y);
+  y += 5;
+  drawCheckbox(margin + 4, y, cbSize, isIgreja);
+  doc.text("Igrejinha da UFSC", margin + 4 + cbSize + 2, y);
+  y += 7;
 
   addText("2. Evento a ser realizado no espaço físico objeto desta autorização:", { fontSize: 10, lineHeight: 6 });
   addText(evento || "—", { fontSize: 10, indent: 4, lineHeight: 6 });
@@ -315,14 +341,20 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   y += 2;
 
   const enderecoCompleto = [
-    endereco, numero ? `n.${numero}` : "", apto ? `Ap ${apto}` : "", bairro ? `bairro ${bairro}` : ""
+    endereco, numero ? `n.${numero}` : "", complemento || "", bairro ? `bairro ${bairro}` : ""
   ].filter(Boolean).join(" ");
 
   const partesTexto =
     `Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado ${nome || "_______________"}, portador(a) do CPF/CNPJ sob o nº ${cpfCnpj || "_______________"}, RG nº ${rg || "_______________"} expedida pela SSP/SC residente à ${enderecoCompleto || "_______________"}, Telefone ${telefone || "_______________"}, na cidade ${cidade || "_______________"}, doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:`;
 
-  addText(partesTexto, { fontSize: 10, lineHeight: 5 });
+  addText(partesTexto, { fontSize: 10, lineHeight: 5, justify: true });
   y += 4;
+
+  // Linha divisória antes das cláusulas
+  doc.setDrawColor(180);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, W - margin, y);
+  y += 5;
 
   // Seção III – Cláusulas
   checkPage(10);
@@ -333,7 +365,7 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
     checkPage(15);
     addText(`CLÁUSULA ${cl.numero} – ${cl.titulo}`, { fontSize: 10, bold: true, lineHeight: 6 });
     y += 1;
-    addText(cl.texto, { fontSize: 9.5, lineHeight: 5 });
+    addText(cl.texto, { fontSize: 9.5, lineHeight: 5, justify: true });
     y += 3;
   });
 
@@ -407,7 +439,7 @@ export default function TermoDigital() {
   const [telefone, setTelefone] = useState(searchParams.get("telefone") || "");
   const [endereco, setEndereco] = useState(searchParams.get("endereco") || "");
   const [numero, setNumero] = useState(searchParams.get("numero") || "");
-  const [apto, setApto] = useState("");
+  const [complemento, setComplemento] = useState("");
   const [bairro, setBairro] = useState(searchParams.get("bairro") || "");
   const [cidade, setCidade] = useState(searchParams.get("cidade") || "");
   const [outrasInfo, setOutrasInfo] = useState("");
@@ -426,14 +458,14 @@ export default function TermoDigital() {
 
   const limparFormulario = () => {
     setNome(""); setCpfCnpj(""); setRg(""); setTelefone("");
-    setEndereco(""); setNumero(""); setApto(""); setBairro(""); setCidade("");
+    setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
     setOutrasInfo(""); setClausulasAceitas(Array(CLAUSULAS.length).fill(false));
   };
 
   const handleGerarPDF = () => {
     if (!nome || !cpfCnpj) { alert("Preencha pelo menos Nome e CPF/CNPJ antes de gerar o PDF."); return; }
     if (!todasAceitas) { alert("Você precisa aceitar todas as cláusulas antes de gerar o PDF."); return; }
-    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, apto, bairro, cidade, outrasInfo });
+    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo });
   };
 
   const totalAceitas = clausulasAceitas.filter(Boolean).length;
