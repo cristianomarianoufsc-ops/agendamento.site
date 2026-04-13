@@ -4,7 +4,7 @@
   "description": "Sistema de Agendamento de Espaços Culturais - UFSC",
   "main": "backend/server.js",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 & node backend/server.js",
+    "dev": "node backend/server.js & npx vite --host 0.0.0.0 --port 5000",
     "start": "node backend/server.js",
     "build": "VITE_API_URL=$VITE_API_URL npx vite build",
     "test": "vitest",
