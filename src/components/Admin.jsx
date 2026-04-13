@@ -970,7 +970,9 @@ const Admin = ({ viewOnly = false }) => {
                                           params.append('cpfCnpj', findF('cpf') || findF('cnpj') || '');
                                           params.append('rg', findF('rg') || '');
                                           if (!u.telefone) params.append('telefone', findF('fone') || findF('celular') || '');
-                                          params.append('endereco', findF('endereco') || findF('logradouro') || '');
+                                          params.append('email', findF('e-mail') || findF('email') || u.email || '');
+                                          const enderecoVal = findF('logradouro') || findF('endereco') || '';
+                                          params.append('endereco', enderecoVal.includes('@') ? '' : enderecoVal);
                                           params.append('numero', findF('numero') || '');
                                           params.append('bairro', findF('bairro') || '');
                                           params.append('cidade', findF('cidade') || '');
