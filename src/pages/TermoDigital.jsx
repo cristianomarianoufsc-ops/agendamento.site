@@ -350,8 +350,22 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   const partesTextoProponente =
     `${nome || "_______________"}, portador(a) do CPF/CNPJ sob o nº ${cpfCnpj || "_______________"}, RG nº ${rg || "_______________"} expedida pela SSP/SC, residente à ${enderecoCompleto || "_______________"}, Telefone ${telefone || "_______________"}, na cidade ${cidade || "_______________"}, doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:`;
 
-  addText(partesTextoIntro, { fontSize: 10, lineHeight: 5, justify: true });
-  addText(partesTextoProponente, { fontSize: 10, bold: true, lineHeight: 5, justify: true });
+  // Texto introdutório — normal
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.splitTextToSize(partesTextoIntro, usable).forEach((line, i, arr) => {
+    doc.text(line, margin, y, i < arr.length - 1 ? { maxWidth: usable, align: "justify" } : {});
+    y += 5;
+  });
+
+  // Dados do proponente — negrito
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.splitTextToSize(partesTextoProponente, usable).forEach((line, i, arr) => {
+    doc.text(line, margin, y, i < arr.length - 1 ? { maxWidth: usable, align: "justify" } : {});
+    y += 5;
+  });
+  doc.setFont("helvetica", "normal");
   y += 4;
 
   // Linha divisória antes das cláusulas
@@ -374,14 +388,16 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   });
 
   // Assinaturas
-  checkPage(60);
-  y += 10;
+  checkPage(80);
+  y += 14;
   const hoje = new Date();
-  addText(
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(
     `Florianópolis (SC), ${hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}`,
-    { fontSize: 10, align: "center", lineHeight: 8 }
+    W / 2, y, { align: "center" }
   );
-  y += 24;
+  y += 40;
 
   doc.line(margin, y, margin + 70, y);
   doc.line(W - margin - 70, y, W - margin, y);
