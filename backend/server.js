@@ -352,7 +352,7 @@ async function sendEvaluatorCredentials(email, password) {
   } catch (error) {
     console.error('Erro ao enviar email para', email, ':', error);
     return false;
-	}
+        }
 }
 
 // --- 4. FUNCOES UTILITARIAS ---`}
@@ -1937,24 +1937,24 @@ async function sendStep1ConfirmationEmail(userData, evento_nome, local, etapas) 
 
   // O HTML do e-mail é o mesmo para todos os métodos
   const htmlContent = `
-		      <div style="font-family: sans-serif; line-height: 1.6;">
-		        <h2>Olá, ${nome}!</h2>
-		        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
-		        
-		        <h3>Detalhes da Inscrição (Etapa 1):</h3>
-		        <ul>
-		          <li><strong>Nome do Proponente:</strong> ${nome}</li>
-		          <li><strong>E-mail:</strong> ${email}</li>
-		          ${telefone ? `<li><strong>Telefone:</strong> ${telefone}</li>` : ''}
-		          <li><strong>Local Solicitado:</strong> ${locaisNomes[local] || local}</li>
-		        </ul>
-		        <ul>
-		          ${etapasHtml}
-		        </ul>    <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
-	        <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
-	        <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
-		      </div>
-		    `;
+                      <div style="font-family: sans-serif; line-height: 1.6;">
+                        <h2>Olá, ${nome}!</h2>
+                        <p>A primeira etapa da sua solicitação de agendamento para o evento <strong>"${evento_nome}"</strong> foi recebida com sucesso.</p>
+                        
+                        <h3>Detalhes da Inscrição (Etapa 1):</h3>
+                        <ul>
+                          <li><strong>Nome do Proponente:</strong> ${nome}</li>
+                          <li><strong>E-mail:</strong> ${email}</li>
+                          ${telefone ? `<li><strong>Telefone:</strong> ${telefone}</li>` : ''}
+                          <li><strong>Local Solicitado:</strong> ${locaisNomes[local] || local}</li>
+                        </ul>
+                        <ul>
+                          ${etapasHtml}
+                        </ul>    <p><strong>Atenção:</strong> Este é um e-mail de confirmação da sua solicitação. Os horários ainda estão em análise e podem ser contestados por outras propostas. O agendamento só será definitivo após a consolidação da agenda do edital.</p>
+                <p>O próximo passo é preencher o formulário de inscrição detalhada. Se a aba não abriu automaticamente, acesse o link que foi disponibilizado na página de agendamento.</p>
+                <p>Atenciosamente,<br>Sistema de Agendamento DAC</p>
+                      </div>
+                    `;
   
   const subject = `✅ Confirmação da 1ª Etapa: ${evento_nome}`;
   const remetente = process.env.EMAIL_REMETENTE_VALIDADO || 'noreply@agendamento.site';
@@ -2968,34 +2968,7 @@ app.get("/api/download-zip/:id", async (req, res) => {
   }
 });
 
-// --- 23. ROTA PRIORITÁRIA PARA O TERMO-DIGITAL ---
-app.get(/^\/termo-digital(\/.*)?$/, (req, res, next) => {
-  if (req.path.includes('.') && !req.path.endsWith('index.html')) {
-    return next();
-  }
-
-  const paths = [
-    path.join(__dirname, 'public', 'termo-digital', 'index.html'),
-    path.join(__dirname, '..', 'dist', 'termo-digital', 'index.html'),
-    path.join(__dirname, '..', 'public', 'termo-digital', 'index.html'),
-    path.join(__dirname, '..', 'backend', 'public', 'termo-digital', 'index.html')
-  ];
-
-  console.log(`🔍 DEBUG TERMO-DIGITAL: URL=${req.url} PATH=${req.path}`);
-
-  for (const p of paths) {
-    if (fs.existsSync(p)) {
-      console.log(`✅ DEBUG TERMO-DIGITAL: Servindo ${p}`);
-      return res.sendFile(p);
-    }
-  }
-
-  res.status(404).send('Termo Digital não encontrado no servidor.');
-});
-
 // --- 24. SERVIR ARQUIVOS ESTÁTICOS ---
-app.use('/termo-digital/assets', express.static(path.join(__dirname, 'public', 'termo-digital', 'assets')));
-app.use('/termo-digital/__manus__', express.static(path.join(__dirname, 'public', 'termo-digital', '__manus__')));
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
