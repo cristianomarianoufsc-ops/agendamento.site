@@ -344,10 +344,14 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
     endereco, numero ? `n.${numero}` : "", complemento || "", bairro ? `bairro ${bairro}` : ""
   ].filter(Boolean).join(" ");
 
-  const partesTexto =
-    `Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado ${nome || "_______________"}, portador(a) do CPF/CNPJ sob o nº ${cpfCnpj || "_______________"}, RG nº ${rg || "_______________"} expedida pela SSP/SC residente à ${enderecoCompleto || "_______________"}, Telefone ${telefone || "_______________"}, na cidade ${cidade || "_______________"}, doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:`;
+  const partesTextoIntro =
+    `Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado:`;
 
-  addText(partesTexto, { fontSize: 10, lineHeight: 5, justify: true });
+  const partesTextoProponente =
+    `${nome || "_______________"}, portador(a) do CPF/CNPJ sob o nº ${cpfCnpj || "_______________"}, RG nº ${rg || "_______________"} expedida pela SSP/SC, residente à ${enderecoCompleto || "_______________"}, Telefone ${telefone || "_______________"}, na cidade ${cidade || "_______________"}, doravante denominado(a) AUTORIZADO(A), mediante as seguintes cláusulas:`;
+
+  addText(partesTextoIntro, { fontSize: 10, lineHeight: 5, justify: true });
+  addText(partesTextoProponente, { fontSize: 10, bold: true, lineHeight: 5, justify: true });
   y += 4;
 
   // Linha divisória antes das cláusulas
@@ -370,14 +374,14 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   });
 
   // Assinaturas
-  checkPage(40);
-  y += 6;
+  checkPage(60);
+  y += 10;
   const hoje = new Date();
   addText(
     `Florianópolis (SC), ${hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}`,
     { fontSize: 10, align: "center", lineHeight: 8 }
   );
-  y += 6;
+  y += 24;
 
   doc.line(margin, y, margin + 70, y);
   doc.line(W - margin - 70, y, W - margin, y);
