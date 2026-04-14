@@ -2976,6 +2976,90 @@ app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
 // --- Rota para geração de PDF ---
 app.use('/api', pdfGeneratorRouter);
 
+// --- ROTA: ENVIO EM MASSA DE LINKS DE TERMO DIGITAL ---
+app.post('/api/enviar-termos-digitais', async (req, res) => {
+  if (!transporter) {
+    return res.status(503).json({ error: 'Serviço de e-mail não configurado no servidor.' });
+  }
+
+  const { emails, siteUrl } = req.body;
+
+  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    return res.status(400).json({ error: 'Lista de e-mails inválida.' });
+  }
+
+  const baseUrl = siteUrl || `${req.protocol}://${req.get('host')}`;
+  const resultados = [];
+
+  for (const email of emails) {
+    const emailLimpo = (email || '').trim().toLowerCase();
+    if (!emailLimpo) continue;
+
+    try {
+      const result = await query('SELECT * FROM inscricoes WHERE LOWER(email) = $1 ORDER BY criado_em DESC LIMIT 1', [emailLimpo]);
+
+      if (result.rows.length === 0) {
+        resultados.push({ email: emailLimpo, status: 'nao_encontrado' });
+        continue;
+      }
+
+      const u = result.rows[0];
+
+      const params = new URLSearchParams();
+      params.append('nome', u.nome || '');
+      params.append('evento', u.evento_nome || '');
+      params.append('local', u.local || '');
+      params.append('telefone', u.telefone || '');
+      params.append('email', u.email || '');
+      params.append('ensaioInicio', u.ensaio_inicio || '');
+      params.append('ensaioFim', u.ensaio_fim || '');
+      params.append('montagemInicio', u.montagem_inicio || '');
+      params.append('montagemFim', u.montagem_fim || '');
+      params.append('desmontagemInicio', u.desmontagem_inicio || '');
+      params.append('desmontagemFim', u.desmontagem_fim || '');
+      if (u.eventos_json) params.append('eventosJson', u.eventos_json);
+
+      const link = `${baseUrl}/termo-digital?${params.toString()}`;
+
+      const mailOptions = {
+        from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
+        to: emailLimpo,
+        subject: `Termo Digital - ${u.evento_nome || 'Seu Evento'} | Sistema DAC/UFSC`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso de Espaço</h2>
+            <p>Olá, <strong>${u.nome}</strong>!</p>
+            <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso de Espaço Cultural</strong> referente ao seu evento:</p>
+            <ul>
+              <li><strong>Evento:</strong> ${u.evento_nome || 'N/A'}</li>
+              <li><strong>Local:</strong> ${u.local || 'N/A'}</li>
+            </ul>
+            <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${link}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
+                Acessar Termo Digital
+              </a>
+            </p>
+            <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${link}" style="color: #1d4ed8;">${link}</a></p>
+            <hr style="margin: 30px 0; border-color: #e5e7eb;" />
+            <p style="font-size: 12px; color: #9ca3af;">Este e-mail foi enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
+          </div>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+      resultados.push({ email: emailLimpo, nome: u.nome, status: 'enviado' });
+      console.log(`✅ Termo digital enviado para: ${emailLimpo}`);
+
+    } catch (err) {
+      console.error(`❌ Erro ao enviar termo digital para ${emailLimpo}:`, err.message);
+      resultados.push({ email: emailLimpo, status: 'erro', detalhe: err.message });
+    }
+  }
+
+  res.json({ resultados });
+});
+
 // Fallback para o React Router: Envia o index.html para qualquer rota não tratada
 app.use((req, res) => {
   if (req.path.startsWith('/api')) {

@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings, Save, Download, Trash2, Contact, Loader, X, FileText, Archive, AlertTriangle, CheckCircle, Search, Theater, Church, Eye, EyeOff, // ✅ Adicionado EyeOff
   SlidersHorizontal, Scale, ChevronsUpDown, Edit, Type, FileClock, 
-  PlusCircle, UserCheck, Presentation, TrendingUp // ✅ Adicionado TrendingUp
+  PlusCircle, UserCheck, Presentation, TrendingUp, // ✅ Adicionado TrendingUp
+  Mail, Send, CheckCircle2, AlertCircle, HelpCircle
 } from "lucide-react";
 import EvaluationDrawer from './EvaluationDrawer';
 import FormDataModal from './FormDataModal'; // ✅ Importação adicionada
@@ -81,8 +82,13 @@ const Admin = ({ viewOnly = false }) => {
   // ✅ NOVO ESTADO PARA O NÚMERO DE AVALIAÇÕES
   const [requiredAssessments, setRequiredAssessments] = useState(3);
 
+  // Estados da aba de Envio de Termos Digitais
+  const [emailsEnvioTexto, setEmailsEnvioTexto] = useState('');
+  const [enviandoTermos, setEnviandoTermos] = useState(false);
+  const [resultadosEnvio, setResultadosEnvio] = useState(null);
+
   // Estados de Navegação e Filtro
-  const [mainTab, setMainTab] = useState('inscricoes'); // 'inscricoes', 'configuracoes_gerais', 'configuracoes_avaliacao'
+  const [mainTab, setMainTab] = useState('inscricoes'); // 'inscricoes', 'configuracoes_gerais', 'configuracoes_avaliacao', 'envio_termos'
   const [inscricoesTab, setInscricoesTab] = useState(viewOnly ? 'eventos' : 'eventos');
   const [localFilters, setLocalFilters] = useState({ teatro: true, igrejinha: true });
   const [sortOrder, setSortOrder] = useState('id_asc');
@@ -597,6 +603,38 @@ const Admin = ({ viewOnly = false }) => {
 
 
 
+  const handleEnviarTermos = async () => {
+    const emails = emailsEnvioTexto
+      .split(/[\n,;]+/)
+      .map(e => e.trim())
+      .filter(e => e.includes('@'));
+
+    if (emails.length === 0) {
+      alert('Por favor, insira ao menos um e-mail válido.');
+      return;
+    }
+
+    if (!window.confirm(`Enviar links de Termo Digital para ${emails.length} e-mail(s)?`)) return;
+
+    setEnviandoTermos(true);
+    setResultadosEnvio(null);
+
+    try {
+      const response = await fetch('/api/enviar-termos-digitais', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails, siteUrl: window.location.origin })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erro no servidor.');
+      setResultadosEnvio(data.resultados);
+    } catch (err) {
+      alert(`❌ Erro ao enviar: ${err.message}`);
+    } finally {
+      setEnviandoTermos(false);
+    }
+  };
+
   const handleDownloadAllZip = async () => { if (!window.confirm("Deseja baixar o ZIP de todos os anexos?")) return; setIsDownloading(true); try { const response = await fetch("/api/download-all-zips"   ); if (!response.ok) throw new Error(`Erro: ${response.statusText}`); const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "inscricoes-completas.zip"; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { alert(`❌ Falha ao baixar: ${err.message}`); } finally { setIsDownloading(false); } };
   const handleConsolidateAgenda = async () => {
     const inscricoes = unificados; // Usar a lista de inscrições já carregada
@@ -771,6 +809,9 @@ const Admin = ({ viewOnly = false }) => {
             </button>
             <button onClick={() => setMainTab('configuracoes_avaliacao')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold transition-colors ${mainTab === 'configuracoes_avaliacao' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
               <Scale size={20} /> Configurações de Avaliação
+            </button>
+            <button onClick={() => setMainTab('envio_termos')} className={`flex items-center gap-2 px-4 py-2 text-lg font-semibold transition-colors ${mainTab === 'envio_termos' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Mail size={20} /> Envio de Termos
             </button>
           </div>
         )}
@@ -1374,6 +1415,67 @@ const Admin = ({ viewOnly = false }) => {
                   </button>
                 </div>
               </div>            )}
+
+            {/* ✅ ABA: ENVIO DE TERMOS DIGITAIS EM MASSA */}
+            {mainTab === 'envio_termos' && !viewOnly && (
+              <div className="bg-white p-6 rounded-2xl shadow-md">
+                <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2">
+                  <Mail size={22} /> Envio em Massa de Termos Digitais
+                </h3>
+                <p className="text-gray-500 text-sm mb-6">
+                  Cole abaixo os e-mails dos proponentes (um por linha, ou separados por vírgula/ponto-e-vírgula). O sistema irá buscar a inscrição de cada e-mail e enviar o link individual do Termo Digital.
+                </p>
+
+                <div className="mb-4">
+                  <label className="block font-semibold text-gray-600 mb-2">E-mails dos proponentes</label>
+                  <textarea
+                    value={emailsEnvioTexto}
+                    onChange={(e) => { setEmailsEnvioTexto(e.target.value); setResultadosEnvio(null); }}
+                    rows={8}
+                    placeholder={"proponente1@email.com\nproponente2@email.com\nproponente3@email.com"}
+                    className="w-full p-3 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    {emailsEnvioTexto.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@')).length} e-mail(s) detectado(s)
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleEnviarTermos}
+                  disabled={enviandoTermos}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                >
+                  {enviandoTermos ? <><Loader size={18} className="animate-spin" /> Enviando...</> : <><Send size={18} /> Enviar Links em Massa</>}
+                </button>
+
+                {resultadosEnvio && (
+                  <div className="mt-6">
+                    <h4 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><CheckCircle size={18} className="text-green-600" /> Resultado do Envio</h4>
+                    <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                      {resultadosEnvio.map((r, i) => (
+                        <div key={i} className={`flex items-start gap-3 p-3 rounded-lg text-sm ${r.status === 'enviado' ? 'bg-green-50 border border-green-200' : r.status === 'nao_encontrado' ? 'bg-yellow-50 border border-yellow-200' : 'bg-red-50 border border-red-200'}`}>
+                          {r.status === 'enviado' && <CheckCircle2 size={16} className="text-green-600 mt-0.5 flex-shrink-0" />}
+                          {r.status === 'nao_encontrado' && <HelpCircle size={16} className="text-yellow-600 mt-0.5 flex-shrink-0" />}
+                          {r.status === 'erro' && <AlertCircle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />}
+                          <div>
+                            <span className="font-semibold">{r.email}</span>
+                            {r.nome && <span className="text-gray-500"> — {r.nome}</span>}
+                            <div className="text-xs mt-0.5">
+                              {r.status === 'enviado' && <span className="text-green-700">E-mail enviado com sucesso</span>}
+                              {r.status === 'nao_encontrado' && <span className="text-yellow-700">Inscrição não encontrada para este e-mail</span>}
+                              {r.status === 'erro' && <span className="text-red-700">Erro ao enviar: {r.detalhe}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3">
+                      {resultadosEnvio.filter(r => r.status === 'enviado').length} enviado(s) · {resultadosEnvio.filter(r => r.status === 'nao_encontrado').length} não encontrado(s) · {resultadosEnvio.filter(r => r.status === 'erro').length} erro(s)
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         </AnimatePresence>
       </div>
