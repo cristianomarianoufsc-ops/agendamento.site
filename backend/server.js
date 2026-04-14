@@ -2978,8 +2978,9 @@ app.use('/api', pdfGeneratorRouter);
 
 // --- ROTA: ENVIO EM MASSA DE LINKS DE TERMO DIGITAL ---
 app.post('/api/enviar-termos-digitais', async (req, res) => {
-  if (!transporter) {
-    return res.status(503).json({ error: 'Serviço de e-mail não configurado no servidor.' });
+  const emailDisponivel = brevoApiKey || resend || transporter;
+  if (!emailDisponivel) {
+    return res.status(503).json({ error: 'Serviço de e-mail não configurado no servidor. Configure BREVO_API_KEY, RESEND_API_KEY ou EMAIL_USER/EMAIL_PASS.' });
   }
 
   const { emails, siteUrl } = req.body;
@@ -2989,7 +2990,59 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
   }
 
   const baseUrl = siteUrl || `${req.protocol}://${req.get('host')}`;
+  const remetente = process.env.EMAIL_REMETENTE_VALIDADO || process.env.EMAIL_USER || 'noreply@agendamento.site';
   const resultados = [];
+
+  async function enviarEmailTermo(emailDest, subject, htmlContent) {
+    // 1. Tenta Brevo API
+    if (brevoApiKey) {
+      try {
+        const payload = {
+          sender: { email: remetente, name: "Sistema de Agendamento DAC" },
+          to: [{ email: emailDest }],
+          subject,
+          htmlContent
+        };
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': brevoApiKey },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(`Brevo HTTP ${resp.status}: ${JSON.stringify(err)}`);
+        }
+        return true;
+      } catch (err) {
+        console.error(`❌ Brevo falhou para ${emailDest}:`, err.message);
+      }
+    }
+    // 2. Tenta Resend
+    if (resend) {
+      try {
+        const { error } = await resend.emails.send({
+          from: `"Sistema de Agendamento DAC" <${remetente}>`,
+          to: emailDest,
+          subject,
+          html: htmlContent
+        });
+        if (error) throw new Error(JSON.stringify(error));
+        return true;
+      } catch (err) {
+        console.error(`❌ Resend falhou para ${emailDest}:`, err.message);
+      }
+    }
+    // 3. Tenta Nodemailer SMTP
+    if (transporter) {
+      try {
+        await transporter.sendMail({ from: `"Sistema de Agendamento DAC" <${remetente}>`, to: emailDest, subject, html: htmlContent });
+        return true;
+      } catch (err) {
+        console.error(`❌ SMTP falhou para ${emailDest}:`, err.message);
+      }
+    }
+    return false;
+  }
 
   for (const email of emails) {
     const emailLimpo = (email || '').trim().toLowerCase();
@@ -3020,36 +3073,35 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
       if (u.eventos_json) params.append('eventosJson', u.eventos_json);
 
       const link = `${baseUrl}/termo-digital?${params.toString()}`;
+      const subject = `Termo Digital - ${u.evento_nome || 'Seu Evento'} | DAC/UFSC`;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso de Espaço</h2>
+          <p>Olá, <strong>${u.nome}</strong>!</p>
+          <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso de Espaço Cultural</strong> referente ao seu evento:</p>
+          <ul>
+            <li><strong>Evento:</strong> ${u.evento_nome || 'N/A'}</li>
+            <li><strong>Local:</strong> ${u.local || 'N/A'}</li>
+          </ul>
+          <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${link}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
+              Acessar Termo Digital
+            </a>
+          </p>
+          <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${link}" style="color: #1d4ed8; word-break:break-all;">${link}</a></p>
+          <hr style="margin: 30px 0; border-color: #e5e7eb;" />
+          <p style="font-size: 12px; color: #9ca3af;">E-mail enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
+        </div>
+      `;
 
-      const mailOptions = {
-        from: `"Sistema de Agendamento DAC" <${process.env.EMAIL_USER || 'seu-email@gmail.com'}>`,
-        to: emailLimpo,
-        subject: `Termo Digital - ${u.evento_nome || 'Seu Evento'} | Sistema DAC/UFSC`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso de Espaço</h2>
-            <p>Olá, <strong>${u.nome}</strong>!</p>
-            <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso de Espaço Cultural</strong> referente ao seu evento:</p>
-            <ul>
-              <li><strong>Evento:</strong> ${u.evento_nome || 'N/A'}</li>
-              <li><strong>Local:</strong> ${u.local || 'N/A'}</li>
-            </ul>
-            <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
-            <p style="text-align: center; margin: 30px 0;">
-              <a href="${link}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
-                Acessar Termo Digital
-              </a>
-            </p>
-            <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${link}" style="color: #1d4ed8;">${link}</a></p>
-            <hr style="margin: 30px 0; border-color: #e5e7eb;" />
-            <p style="font-size: 12px; color: #9ca3af;">Este e-mail foi enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
-          </div>
-        `
-      };
-
-      await transporter.sendMail(mailOptions);
-      resultados.push({ email: emailLimpo, nome: u.nome, status: 'enviado' });
-      console.log(`✅ Termo digital enviado para: ${emailLimpo}`);
+      const enviado = await enviarEmailTermo(emailLimpo, subject, html);
+      if (enviado) {
+        resultados.push({ email: emailLimpo, nome: u.nome, status: 'enviado' });
+        console.log(`✅ Termo digital enviado para: ${emailLimpo}`);
+      } else {
+        resultados.push({ email: emailLimpo, nome: u.nome, status: 'erro', detalhe: 'Todos os provedores de e-mail falharam.' });
+      }
 
     } catch (err) {
       console.error(`❌ Erro ao enviar termo digital para ${emailLimpo}:`, err.message);
