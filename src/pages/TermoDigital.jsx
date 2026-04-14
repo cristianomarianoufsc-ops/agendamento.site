@@ -2,6 +2,20 @@ import React, { useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { Settings, X, Save } from "lucide-react";
+
+const CONFIG_KEY = "termoDigital_config";
+const DEFAULT_CONFIG = {
+  tituloEdital: "*Este documento é parte integrante do Edital Mais Arte - N° 002/2026/DAC/SeCArtE",
+  nomeResponsavel: "Andréa Búrigo Ventura",
+  cpfAutorizadora: "",
+};
+function loadConfig() {
+  try { return { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}") }; } catch { return DEFAULT_CONFIG; }
+}
+function saveConfig(cfg) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
 
 // ─────────────────────────────────────────────
 // Texto completo das cláusulas
@@ -226,7 +240,7 @@ function ClausulaItem({ clausula, index, aceita, onAceitar }) {
 // ─────────────────────────────────────────────
 // Geração do PDF
 // ─────────────────────────────────────────────
-function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo }) {
+function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo, tituloEdital, nomeResponsavel, cpfAutorizadora }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const margin = 20;
@@ -289,7 +303,7 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
 
   addText("TERMO DE AUTORIZAÇÃO PARA OCUPAÇÃO DOS ESPAÇOS DO DEPARTAMENTO ARTÍSTICO CULTURAL", { fontSize: 11, align: "center", bold: true, lineHeight: 6 });
   y += 2;
-  addText("*Este documento é parte integrante do Edital Mais Arte - N° 002/2026/DAC/SeCArtE", { fontSize: 8, align: "center", lineHeight: 6 });
+  addText(tituloEdital || DEFAULT_CONFIG.tituloEdital, { fontSize: 8, align: "center", lineHeight: 6 });
   y += 4;
 
   // Seção I
@@ -405,7 +419,7 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   };
 
   const introSegments = [
-    { text: "Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por Andréa Búrigo Ventura, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado:", bold: false },
+    { text: `Termo de autorização de uso do espaço cultural acima especificado, que entre si celebram, de um lado, a UNIVERSIDADE FEDERAL DE SANTA CATARINA, com sede no Campus Universitário Florianópolis, s/n Trindade Florianópolis (SC) - CEP.: 88040-900, inscrita no CNPJ sob o nº 83.899.526/0001-82, doravante denominada simplesmente de AUTORIZADORA, neste ato representada por ${nomeResponsavel || DEFAULT_CONFIG.nomeResponsavel}, Secretaria de Cultura, Arte e Esporte - DAC/SeCArte, e de outro lado:`, bold: false },
   ];
 
   const proponenteSegments = [
@@ -461,13 +475,17 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   doc.line(margin, y, margin + 70, y);
   doc.line(W - margin - 70, y, W - margin, y);
   y += 5;
-  addText("AUTORIZADORA", { fontSize: 9, indent: 10, lineHeight: 5 });
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(nomeResponsavel || DEFAULT_CONFIG.nomeResponsavel, margin + 10, y);
+  y += 4;
+  doc.text("AUTORIZADORA", margin + 10, y);
+  if (cpfAutorizadora) { y += 4; doc.text(`CPF – ${cpfAutorizadora}`, margin + 10, y); }
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("AUTORIZADO (A)", W - margin - 60, y - 5);
-  y += 3;
-  doc.text(`CPF – ${cpfCnpj || ""}`, W - margin - 60, y + 2);
+  doc.text("AUTORIZADO (A)", W - margin - 60, y - (cpfAutorizadora ? 8 : 4));
+  doc.text(`CPF – ${cpfCnpj || ""}`, W - margin - 60, y - (cpfAutorizadora ? 4 : 0));
 
   doc.save(`Termo_de_Autorizacao_DAC_${(nome || "proponente").replace(/\s+/g, "_")}.pdf`);
 }
@@ -477,6 +495,14 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
 // ─────────────────────────────────────────────
 export default function TermoDigital() {
   const [searchParams] = useSearchParams();
+
+  // Configurações administrativas (persistidas no localStorage)
+  const [config, setConfig] = useState(loadConfig);
+  const [showConfig, setShowConfig] = useState(false);
+  const [tempConfig, setTempConfig] = useState(config);
+
+  const abrirConfig = () => { setTempConfig(config); setShowConfig(true); };
+  const salvarConfig = () => { saveConfig(tempConfig); setConfig(tempConfig); setShowConfig(false); };
 
   // Campos pré-preenchidos (somente leitura)
   const local = searchParams.get("local") || "";
@@ -547,14 +573,77 @@ export default function TermoDigital() {
   const handleGerarPDF = () => {
     if (!nome || !cpfCnpj) { alert("Preencha pelo menos Nome e CPF/CNPJ antes de gerar o PDF."); return; }
     if (!todasAceitas) { alert("Você precisa aceitar todas as cláusulas antes de gerar o PDF."); return; }
-    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo });
+    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo, ...config });
   };
 
   const totalAceitas = clausulasAceitas.filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto relative">
+
+        {/* Botão engrenagem */}
+        <button
+          onClick={abrirConfig}
+          title="Configurações Administrativas"
+          className="absolute top-2 right-2 z-10 p-2 rounded-full bg-white border border-gray-200 shadow hover:bg-gray-50 text-gray-500 hover:text-blue-700 transition-colors"
+        >
+          <Settings size={18} />
+        </button>
+
+        {/* Modal de Configurações */}
+        {showConfig && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+              <button onClick={() => setShowConfig(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><X size={20} /></button>
+              <div className="flex items-center gap-2 mb-6">
+                <Settings size={20} className="text-blue-700" />
+                <h2 className="text-lg font-bold text-gray-800">Configurações Administrativas</h2>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Título do Edital</label>
+                <textarea
+                  rows={3}
+                  value={tempConfig.tituloEdital}
+                  onChange={e => setTempConfig(c => ({ ...c, tituloEdital: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Este texto aparecerá no topo do PDF. Pode ser alterado conforme o ano ou edital.</p>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nome da Responsável (Autorizadora)</label>
+                <input
+                  type="text"
+                  value={tempConfig.nomeResponsavel}
+                  onChange={e => setTempConfig(c => ({ ...c, nomeResponsavel: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Este nome aparecerá no texto das partes envolvidas e na seção de assinaturas.</p>
+              </div>
+
+              <div className="mb-7">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">CPF da Autorizadora <span className="font-normal text-gray-400">(Opcional)</span></label>
+                <input
+                  type="text"
+                  value={tempConfig.cpfAutorizadora}
+                  onChange={e => setTempConfig(c => ({ ...c, cpfAutorizadora: e.target.value }))}
+                  placeholder="Ex: 123.456.789-00"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">Deixe em branco para não exibir no PDF.</p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowConfig(false)} className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 font-semibold hover:bg-gray-50">Cancelar</button>
+                <button onClick={salvarConfig} className="flex items-center gap-2 px-6 py-2 bg-blue-700 text-white rounded-lg text-sm font-bold hover:bg-blue-800 transition-colors">
+                  <Save size={15} /> Salvar Alterações
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Cabeçalho oficial */}
         <div className="bg-white border border-gray-200 rounded-t-xl px-8 py-5 text-center shadow-sm">
@@ -565,7 +654,7 @@ export default function TermoDigital() {
             <h1 className="text-base font-bold text-gray-900 uppercase leading-snug">
               Termo de Autorização para Ocupação dos Espaços do<br />Departamento Artístico Cultural
             </h1>
-            <p className="text-xs text-gray-500 mt-1 italic">*Este documento é parte integrante do Edital Mais Arte - N° 002/2026/DAC/SeCArtE</p>
+            <p className="text-xs text-gray-500 mt-1 italic">{config.tituloEdital}</p>
           </div>
         </div>
 
