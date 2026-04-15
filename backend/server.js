@@ -3076,7 +3076,7 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
       const subject = `Termo Digital - ${u.evento_nome || 'Seu Evento'} | DAC/UFSC`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso de Espaço</h2>
+          <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso do DAC</h2>
           <p>Olá, <strong>${u.nome}</strong>!</p>
           <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso do DAC</strong> referente ao seu evento:</p>
           <ul>
