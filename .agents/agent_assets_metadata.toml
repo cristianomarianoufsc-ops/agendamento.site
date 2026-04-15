@@ -6,3 +6,9 @@ id = "QEHNqU1JA9DgXmJ2U_tap"
 uri = "file://agendamento-dac-backup.zip"
 type = "unspecified"
 title = "agendamento-dac-backup.zip"
+
+[[outputs]]
+id = "RPzG6F9iXb4HGWuxqW6gG"
+uri = "file://emails_proponentes_homologados.pdf"
+type = "pdf"
+title = "E-mails dos Proponentes Homologados — Edital 002/2026/DAC"
