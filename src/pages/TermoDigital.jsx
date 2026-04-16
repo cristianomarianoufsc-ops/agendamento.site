@@ -240,7 +240,7 @@ function ClausulaItem({ clausula, index, aceita, onAceitar }) {
 // ─────────────────────────────────────────────
 // Geração do PDF
 // ─────────────────────────────────────────────
-function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo, tituloEdital, nomeResponsavel, cpfAutorizadora }) {
+function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, tituloEdital, nomeResponsavel, cpfAutorizadora }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const margin = 20;
@@ -441,6 +441,38 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco
   addMixedText(proponenteSegments, 10, 5);
   y += 4;
 
+  const dadosFormulario = [
+    ["Nome completo", nome],
+    ["CPF/CNPJ", cpfCnpj],
+    ["RG", rg],
+    ["Telefone", telefone],
+    ["E-mail", email],
+    ["Endereço", endereco],
+    ["Número", numero],
+    ["Complemento", complemento],
+    ["Bairro", bairro],
+    ["Cidade", cidade],
+    ["Outras informações", outrasInfo],
+  ].filter(([, value]) => String(value || "").trim());
+
+  if (dadosFormulario.length > 0) {
+    checkPage(35);
+    addText("Dados preenchidos no formulário digital:", { fontSize: 10, bold: true, lineHeight: 6 });
+    autoTable(doc, {
+      startY: y,
+      body: dadosFormulario,
+      styles: { fontSize: 8.5, cellPadding: 2, overflow: "linebreak" },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 45 },
+        1: { cellWidth: usable - 45 },
+      },
+      margin: { left: margin, right: margin },
+      tableWidth: usable,
+      theme: "grid",
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
+
   // Linha divisória antes das cláusulas
   doc.setDrawColor(180);
   doc.setLineWidth(0.4);
@@ -546,8 +578,8 @@ export default function TermoDigital() {
   // Campos editáveis
   const [rg, setRg] = useState(searchParams.get("rg") || "");
   const [endereco, setEndereco] = useState(searchParams.get("endereco") || "");
-  const [numero, setNumero] = useState("");
-  const [complemento, setComplemento] = useState("");
+  const [numero, setNumero] = useState(searchParams.get("numero") || "");
+  const [complemento, setComplemento] = useState(searchParams.get("complemento") || "");
   const [bairro, setBairro] = useState(searchParams.get("bairro") || "");
   const [cidade, setCidade] = useState(searchParams.get("cidade") || "");
   const [outrasInfo, setOutrasInfo] = useState("");
@@ -573,7 +605,7 @@ export default function TermoDigital() {
   const handleGerarPDF = () => {
     if (!nome || !cpfCnpj) { alert("Preencha pelo menos Nome e CPF/CNPJ antes de gerar o PDF."); return; }
     if (!todasAceitas) { alert("Você precisa aceitar todas as cláusulas antes de gerar o PDF."); return; }
-    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, endereco, numero, complemento, bairro, cidade, outrasInfo, ...config });
+    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, ...config });
   };
 
   const totalAceitas = clausulasAceitas.filter(Boolean).length;

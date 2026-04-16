@@ -2977,6 +2977,43 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
   const baseUrl = siteUrl || `${req.protocol}://${req.get('host')}`;
   const remetente = process.env.EMAIL_REMETENTE_VALIDADO || process.env.EMAIL_USER || 'noreply@agendamento.site';
   const resultados = [];
+  const escapeHtml = (value = '') => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  const buildEmailTermoHtml = ({ observacao, nomeDestinatario, eventoNome, localNome, link }) => {
+    const observacaoSegura = escapeHtml(observacao || '').replace(/\n/g, '<br>');
+    const observacaoHtml = observacaoSegura
+      ? `<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; margin-bottom: 24px; border-radius: 4px;">
+           <p style="margin: 0 0 4px 0; font-weight: bold; color: #92400e; font-size: 13px;">AVISO IMPORTANTE</p>
+           <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.5;">${observacaoSegura}</p>
+         </div>`
+      : '';
+
+    return `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #111827;">
+        <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso do DAC</h2>
+        ${observacaoHtml}
+        <p>Olá, <strong>${escapeHtml(nomeDestinatario || 'proponente')}</strong>!</p>
+        <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso do DAC</strong> referente ao seu evento:</p>
+        <ul>
+          <li><strong>Evento:</strong> ${escapeHtml(eventoNome || 'N/A')}</li>
+          ${localNome ? `<li><strong>Local:</strong> ${escapeHtml(localNome)}</li>` : ''}
+        </ul>
+        <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${escapeHtml(link)}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; display: inline-block;">
+            Acessar Termo Digital
+          </a>
+        </p>
+        <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${escapeHtml(link)}" style="color: #1d4ed8; word-break:break-all;">${escapeHtml(link)}</a></p>
+        <hr style="margin: 30px 0; border-color: #e5e7eb;" />
+        <p style="font-size: 12px; color: #9ca3af;">E-mail enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
+      </div>
+    `;
+  };
 
   async function enviarEmailTermo(emailDest, subject, htmlContent) {
     // 1. Tenta Brevo API
@@ -3037,12 +3074,14 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
       let link;
       let nomeDestinatario;
       let eventoNome;
+      let localNome;
 
       if (dest.params) {
         // Novo formato: frontend já enviou os params completos (incluindo cpfCnpj, rg, etc.)
         link = `${baseUrl}/termo-digital?${dest.params}`;
         nomeDestinatario = dest.nome || '';
         eventoNome = dest.eventoNome || '';
+        localNome = new URLSearchParams(dest.params).get('local') || '';
       } else {
         // Formato legado: busca no banco e monta params sem formsData
         const result = await query('SELECT * FROM inscricoes WHERE LOWER(email) = $1 ORDER BY criado_em DESC LIMIT 1', [emailLimpo]);
@@ -3055,6 +3094,7 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
         const u = result.rows[0];
         nomeDestinatario = u.nome || '';
         eventoNome = u.evento_nome || '';
+        localNome = u.local || '';
 
         const params = new URLSearchParams();
         params.append('nome', u.nome || '');
@@ -3073,32 +3113,7 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
       }
 
       const subject = `Termo Digital - ${eventoNome || 'Seu Evento'} | DAC/UFSC`;
-      const observacaoHtml = observacao
-        ? `<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; margin-bottom: 24px; border-radius: 4px;">
-             <p style="margin: 0 0 4px 0; font-weight: bold; color: #92400e; font-size: 13px;">⚠️ AVISO IMPORTANTE</p>
-             <p style="margin: 0; color: #78350f; font-size: 14px; white-space: pre-line;">${observacao.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
-           </div>`
-        : '';
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso do DAC</h2>
-          ${observacaoHtml}
-          <p>Olá, <strong>${nomeDestinatario}</strong>!</p>
-          <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso do DAC</strong> referente ao seu evento:</p>
-          <ul>
-            <li><strong>Evento:</strong> ${eventoNome || 'N/A'}</li>
-          </ul>
-          <p>Por favor, acesse o link abaixo, preencha os dados solicitados e gere o PDF para assinar:</p>
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${link}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
-              Acessar Termo Digital
-            </a>
-          </p>
-          <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${link}" style="color: #1d4ed8; word-break:break-all;">${link}</a></p>
-          <hr style="margin: 30px 0; border-color: #e5e7eb;" />
-          <p style="font-size: 12px; color: #9ca3af;">E-mail enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
-        </div>
-      `;
+      const html = buildEmailTermoHtml({ observacao, nomeDestinatario, eventoNome, localNome, link });
 
       const enviado = await enviarEmailTermo(emailLimpo, subject, html);
       if (enviado) {

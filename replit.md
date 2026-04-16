@@ -44,6 +44,11 @@ A web-based scheduling and management system for cultural spaces at UFSC (Federa
 ## Google Integration Security
 For Replit compatibility and safer secret handling, Google APIs are disabled unless credentials are provided through environment variables/secrets. Local `backend/credentials.json` is ignored for Replit runtime and should not be used as the deployment credential source.
 
+## Termos Digitais
+- Admin mass email route: `/api/enviar-termos-digitais`.
+- The optional observation/notice is rendered as an highlighted block, but the standard automatic email text, event details, button, and fallback link must always remain in the message.
+- The digital term PDF generated in `src/pages/TermoDigital.jsx` includes a summary table with all filled form fields, including email, number, complement, address, city, CPF/CNPJ, RG, phone, and additional information.
+
 ## Database
 Tables are auto-created on startup via `initializeTables()`:
 - `inscricoes` — Event registrations
