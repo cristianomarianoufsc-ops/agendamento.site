@@ -2984,6 +2984,7 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
   const buildEmailTermoHtml = ({ observacao, nomeDestinatario, eventoNome, localNome, link }) => {
+    const linkSeguro = escapeHtml(link || '');
     const observacaoSegura = escapeHtml(observacao || '').replace(/\n/g, '<br>');
     const observacaoHtml = observacaoSegura
       ? `<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; margin-bottom: 24px; border-radius: 4px;">
@@ -3003,12 +3004,19 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
           ${localNome ? `<li><strong>Local:</strong> ${escapeHtml(localNome)}</li>` : ''}
         </ul>
         <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
-        <p style="text-align: center; margin: 30px 0;">
-          <a href="${escapeHtml(link)}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; display: inline-block;">
-            Acessar Termo Digital
-          </a>
+        <p style="font-size: 15px; margin: 18px 0;">
+          <a href="${linkSeguro}" style="color: #1d4ed8; font-weight: bold; text-decoration: underline;">Clique aqui para abrir o Termo Digital parcialmente preenchido</a>
         </p>
-        <p style="font-size: 13px; color: #6b7280;">Ou copie e cole este link no seu navegador:<br><a href="${escapeHtml(link)}" style="color: #1d4ed8; word-break:break-all;">${escapeHtml(link)}</a></p>
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 24px auto;">
+          <tr>
+            <td align="center" bgcolor="#1d4ed8" style="border-radius: 8px;">
+              <a href="${linkSeguro}" target="_blank" style="display: block; padding: 14px 28px; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; color: #ffffff; text-decoration: none; border-radius: 8px;">
+                Acessar Termo Digital
+              </a>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">Se o botão não aparecer ou não abrir, copie e cole este link no seu navegador:<br><a href="${linkSeguro}" target="_blank" style="color: #1d4ed8; word-break: break-all; overflow-wrap: anywhere;">${linkSeguro}</a></p>
         <hr style="margin: 30px 0; border-color: #e5e7eb;" />
         <p style="font-size: 12px; color: #9ca3af;">E-mail enviado automaticamente pelo Sistema de Agendamento de Espaços Culturais DAC/UFSC.</p>
       </div>

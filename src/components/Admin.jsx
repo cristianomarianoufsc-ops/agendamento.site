@@ -649,6 +649,7 @@ const Admin = ({ viewOnly = false }) => {
         const enderecoVal = findF('logradouro') || findF('endereco') || '';
         params.append('endereco', enderecoVal.includes('@') ? '' : enderecoVal);
         params.append('numero', findF('numero') || '');
+        params.append('complemento', findF('complemento') || '');
         params.append('bairro', findF('bairro') || '');
         params.append('cidade', findF('cidade') || '');
       }
@@ -1068,6 +1069,7 @@ const Admin = ({ viewOnly = false }) => {
                                           const enderecoVal = findF('logradouro') || findF('endereco') || '';
                                           params.append('endereco', enderecoVal.includes('@') ? '' : enderecoVal);
                                           params.append('numero', findF('numero') || '');
+                                          params.append('complemento', findF('complemento') || '');
                                           params.append('bairro', findF('bairro') || '');
                                           params.append('cidade', findF('cidade') || '');
                                         }
