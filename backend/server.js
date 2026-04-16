@@ -189,32 +189,9 @@ async function getRequiredAssessments() {
 
 // --- 2. CONFIGURAÇÃO DO GOOGLE CALENDAR E SHEETS ---
 
-// NOVO: Tenta ler as credenciais de uma variável de ambiente (para Render)
-let credentials = null;
-if (process.env.GOOGLE_CREDENTIALS_JSON) {
-  try {
-    // A chave privada (private_key) pode ter quebras de linha que precisam ser restauradas
-    const jsonString = process.env.GOOGLE_CREDENTIALS_JSON.replace(/\\n/g, '\n');
-    credentials = JSON.parse(jsonString);
-    console.log('✅ Credenciais do Google lidas da variável de ambiente.');
-  } catch (e) {
-    console.error('❌ Erro ao parsear GOOGLE_CREDENTIALS_JSON:', e.message);
-  }
-}
-
-// Se não houver variável de ambiente, tenta ler do arquivo local (para desenvolvimento)
-if (!credentials) {
-  try {
-    const credentialsPath = path.join(__dirname, 'credentials.json');
-    if (fs.existsSync(credentialsPath)) {
-      credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-      console.log('🔑 Usando credentials.json local (desenvolvimento)');
-    } else {
-      console.warn('⚠️ credentials.json não encontrado. Google APIs desabilitadas.');
-    }
-  } catch (e) {
-    console.error('❌ Erro ao ler credentials.json local:', e.message);
-  }
+const hasGoogleCredentialsEnv = Boolean(process.env.GOOGLE_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+if (!hasGoogleCredentialsEnv) {
+  console.warn('⚠️ Credenciais do Google não configuradas em variável de ambiente. Google APIs desabilitadas.');
 }
 
 // Declarações globais para as APIs do Google (serão inicializadas de forma assíncrona)
@@ -408,13 +385,14 @@ async function atualizarCache() {
 // Função assíncrona para inicializar as Google APIs
 async function initializeGoogleAPIs() {
   try {
-    // Variável 'auth' agora é global (declarada acima)
-    
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.log('🔑 Usando GOOGLE_APPLICATION_CREDENTIALS da variável de ambiente');
+    const envCredentials = process.env.GOOGLE_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const runningOnReplit = Boolean(process.env.REPLIT_DEV_DOMAIN || process.env.REPL_ID);
+
+    if (envCredentials) {
+      console.log('🔑 Usando credenciais do Google da variável de ambiente');
       // Se a variável de ambiente contém JSON, faz o parse
       try {
-        const envValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+        const envValue = envCredentials.trim();
         let credentials;
         
         // Tentar parsear direto primeiro
@@ -441,12 +419,12 @@ async function initializeGoogleAPIs() {
         console.log('⚠️ Erro ao parsear JSON:', e.message);
         // Se não for JSON, assume que é um caminho de arquivo
         const { auth: fileAuth } = await google.auth.getClient({
-          keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+          keyFile: envCredentials,
           scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
         });
         auth = fileAuth;
       }
-    } else {
+    } else if (!runningOnReplit && fs.existsSync(path.join(__dirname, 'credentials.json'))) {
       console.log('🔑 Usando credentials.json local (desenvolvimento)');
       // Desenvolvimento: usa o arquivo local
       const credData = JSON.parse(fs.readFileSync(path.join(__dirname, 'credentials.json'), 'utf8'));
@@ -457,6 +435,9 @@ async function initializeGoogleAPIs() {
         credentials: credData,
         scopes: ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.readonly'],
       });
+    } else {
+      console.warn('⚠️ Google APIs desabilitadas. Configure GOOGLE_CREDENTIALS_JSON nos Secrets do Replit para ativar.');
+      return false;
     }
 
     // Atualiza as variáveis globais
@@ -464,9 +445,10 @@ async function initializeGoogleAPIs() {
     sheets = google.sheets({ version: 'v4', auth });
     drive = google.drive({ version: 'v3', auth });
     console.log('✅ Google APIs autenticadas com sucesso!');
+    return true;
   } catch (error) {
-    console.error('❌ Erro ao inicializar Google APIs:', error.message);
-    process.exit(1);
+    console.warn('⚠️ Google APIs desabilitadas por erro de configuração:', error.message);
+    return false;
   }
 }
 
@@ -3156,13 +3138,17 @@ app.use((req, res) => {
 async function startServer() {
   try {
     // Inicializa as Google APIs
-    await initializeGoogleAPIs();
+    const googleApisReady = await initializeGoogleAPIs();
     
     // Inicia o servidor Express
     app.listen(port, () => {
       console.log(`🚀 Servidor rodando em http://localhost:${port}`);
-      cron.schedule("*/5 * * * *", atualizarCache);
-      atualizarCache();
+      if (googleApisReady && calendar) {
+        cron.schedule("*/5 * * * *", atualizarCache);
+        atualizarCache();
+      } else {
+        console.warn("⚠️ Cache do Google Calendar não iniciado porque as Google APIs estão desabilitadas.");
+      }
     });
   } catch (error) {
     console.error('❌ Erro ao iniciar o servidor:', error.message);
