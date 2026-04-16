@@ -2983,7 +2983,7 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
     return res.status(503).json({ error: 'Serviço de e-mail não configurado no servidor. Configure BREVO_API_KEY, RESEND_API_KEY ou EMAIL_USER/EMAIL_PASS.' });
   }
 
-  const { emails, destinatarios, siteUrl } = req.body;
+  const { emails, destinatarios, siteUrl, observacao } = req.body;
 
   // Aceita tanto o formato legado { emails } quanto o novo { destinatarios }
   const lista = destinatarios || (emails ? emails.map(e => ({ email: e, params: null })) : null);
@@ -3091,9 +3091,16 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
       }
 
       const subject = `Termo Digital - ${eventoNome || 'Seu Evento'} | DAC/UFSC`;
+      const observacaoHtml = observacao
+        ? `<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; margin-bottom: 24px; border-radius: 4px;">
+             <p style="margin: 0 0 4px 0; font-weight: bold; color: #92400e; font-size: 13px;">⚠️ AVISO IMPORTANTE</p>
+             <p style="margin: 0; color: #78350f; font-size: 14px; white-space: pre-line;">${observacao.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+           </div>`
+        : '';
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso do DAC</h2>
+          ${observacaoHtml}
           <p>Olá, <strong>${nomeDestinatario}</strong>!</p>
           <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso do DAC</strong> referente ao seu evento:</p>
           <ul>

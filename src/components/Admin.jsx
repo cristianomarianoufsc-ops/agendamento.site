@@ -84,6 +84,7 @@ const Admin = ({ viewOnly = false }) => {
 
   // Estados da aba de Envio de Termos Digitais
   const [emailsEnvioTexto, setEmailsEnvioTexto] = useState('');
+  const [observacaoEnvio, setObservacaoEnvio] = useState('');
   const [enviandoTermos, setEnviandoTermos] = useState(false);
   const [resultadosEnvio, setResultadosEnvio] = useState(null);
 
@@ -675,7 +676,7 @@ const Admin = ({ viewOnly = false }) => {
       const response = await fetch('/api/enviar-termos-digitais', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destinatarios, siteUrl: window.location.origin })
+        body: JSON.stringify({ destinatarios, siteUrl: window.location.origin, observacao: observacaoEnvio.trim() })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Erro no servidor.');
@@ -1490,6 +1491,20 @@ const Admin = ({ viewOnly = false }) => {
                   <p className="text-xs text-gray-400 mt-1">
                     {emailsEnvioTexto.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.includes('@')).length} e-mail(s) detectado(s)
                   </p>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block font-semibold text-gray-600 mb-1">
+                    Observação / Aviso adicional <span className="text-gray-400 font-normal">(opcional)</span>
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Esta mensagem será exibida em destaque no início do e-mail, antes do link do termo.</p>
+                  <textarea
+                    value={observacaoEnvio}
+                    onChange={(e) => setObservacaoEnvio(e.target.value)}
+                    rows={3}
+                    placeholder="Ex: Por favor, desconsidere o e-mail anterior enviado com erro. Utilize apenas este novo link para preencher o Termo Digital."
+                    className="w-full p-3 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y bg-amber-50"
+                  />
                 </div>
 
                 <button
