@@ -619,11 +619,63 @@ const Admin = ({ viewOnly = false }) => {
     setEnviandoTermos(true);
     setResultadosEnvio(null);
 
+    // Helper para buscar campo no formsData (igual ao botão individual)
+    const buildParams = (u) => {
+      const params = new URLSearchParams();
+      params.append('nome', u.nome || '');
+      params.append('evento', u.evento_nome || '');
+      params.append('local', u.local || '');
+      params.append('telefone', u.telefone || '');
+      params.append('ensaioInicio', u.ensaio_inicio || '');
+      params.append('ensaioFim', u.ensaio_fim || '');
+      params.append('montagemInicio', u.montagem_inicio || '');
+      params.append('montagemFim', u.montagem_fim || '');
+      params.append('desmontagemInicio', u.desmontagem_inicio || '');
+      params.append('desmontagemFim', u.desmontagem_fim || '');
+      if (u.eventos_json) params.append('eventosJson', u.eventos_json);
+      if (u.formsData) {
+        const findF = (q) => {
+          const search = q.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const key = Object.keys(u.formsData).find(k =>
+            k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(search)
+          );
+          return key ? u.formsData[key] : '';
+        };
+        params.append('cpfCnpj', findF('cpf') || findF('cnpj') || '');
+        params.append('rg', findF('rg') || '');
+        if (!u.telefone) params.append('telefone', findF('fone') || findF('celular') || '');
+        params.append('email', findF('e-mail') || findF('email') || u.email || '');
+        const enderecoVal = findF('logradouro') || findF('endereco') || '';
+        params.append('endereco', enderecoVal.includes('@') ? '' : enderecoVal);
+        params.append('numero', findF('numero') || '');
+        params.append('bairro', findF('bairro') || '');
+        params.append('cidade', findF('cidade') || '');
+      }
+      return params.toString();
+    };
+
+    // Monta destinatários com os params completos já construídos aqui no frontend
+    const destinatarios = emails.map(email => {
+      const emailNorm = email.toLowerCase();
+      const inscricao = unificados.find(u =>
+        (u.email || '').toLowerCase() === emailNorm ||
+        (u.formsData && Object.values(u.formsData).some(v =>
+          typeof v === 'string' && v.toLowerCase() === emailNorm
+        ))
+      );
+      return {
+        email,
+        nome: inscricao?.nome || '',
+        eventoNome: inscricao?.evento_nome || '',
+        params: inscricao ? buildParams(inscricao) : null,
+      };
+    });
+
     try {
       const response = await fetch('/api/enviar-termos-digitais', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails, siteUrl: window.location.origin })
+        body: JSON.stringify({ destinatarios, siteUrl: window.location.origin })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Erro no servidor.');

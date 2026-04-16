@@ -2983,9 +2983,12 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
     return res.status(503).json({ error: 'Serviço de e-mail não configurado no servidor. Configure BREVO_API_KEY, RESEND_API_KEY ou EMAIL_USER/EMAIL_PASS.' });
   }
 
-  const { emails, siteUrl } = req.body;
+  const { emails, destinatarios, siteUrl } = req.body;
 
-  if (!emails || !Array.isArray(emails) || emails.length === 0) {
+  // Aceita tanto o formato legado { emails } quanto o novo { destinatarios }
+  const lista = destinatarios || (emails ? emails.map(e => ({ email: e, params: null })) : null);
+
+  if (!lista || !Array.isArray(lista) || lista.length === 0) {
     return res.status(400).json({ error: 'Lista de e-mails inválida.' });
   }
 
@@ -3044,46 +3047,59 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
     return false;
   }
 
-  for (const email of emails) {
-    const emailLimpo = (email || '').trim().toLowerCase();
+  for (const dest of lista) {
+    const emailLimpo = (dest.email || '').trim().toLowerCase();
     if (!emailLimpo) continue;
 
     try {
-      const result = await query('SELECT * FROM inscricoes WHERE LOWER(email) = $1 ORDER BY criado_em DESC LIMIT 1', [emailLimpo]);
+      let link;
+      let nomeDestinatario;
+      let eventoNome;
 
-      if (result.rows.length === 0) {
-        resultados.push({ email: emailLimpo, status: 'nao_encontrado' });
-        continue;
+      if (dest.params) {
+        // Novo formato: frontend já enviou os params completos (incluindo cpfCnpj, rg, etc.)
+        link = `${baseUrl}/termo-digital?${dest.params}`;
+        nomeDestinatario = dest.nome || '';
+        eventoNome = dest.eventoNome || '';
+      } else {
+        // Formato legado: busca no banco e monta params sem formsData
+        const result = await query('SELECT * FROM inscricoes WHERE LOWER(email) = $1 ORDER BY criado_em DESC LIMIT 1', [emailLimpo]);
+
+        if (result.rows.length === 0) {
+          resultados.push({ email: emailLimpo, status: 'nao_encontrado' });
+          continue;
+        }
+
+        const u = result.rows[0];
+        nomeDestinatario = u.nome || '';
+        eventoNome = u.evento_nome || '';
+
+        const params = new URLSearchParams();
+        params.append('nome', u.nome || '');
+        params.append('evento', u.evento_nome || '');
+        params.append('local', u.local || '');
+        params.append('telefone', u.telefone || '');
+        params.append('email', u.email || '');
+        params.append('ensaioInicio', u.ensaio_inicio || '');
+        params.append('ensaioFim', u.ensaio_fim || '');
+        params.append('montagemInicio', u.montagem_inicio || '');
+        params.append('montagemFim', u.montagem_fim || '');
+        params.append('desmontagemInicio', u.desmontagem_inicio || '');
+        params.append('desmontagemFim', u.desmontagem_fim || '');
+        if (u.eventos_json) params.append('eventosJson', u.eventos_json);
+        link = `${baseUrl}/termo-digital?${params.toString()}`;
       }
 
-      const u = result.rows[0];
-
-      const params = new URLSearchParams();
-      params.append('nome', u.nome || '');
-      params.append('evento', u.evento_nome || '');
-      params.append('local', u.local || '');
-      params.append('telefone', u.telefone || '');
-      params.append('email', u.email || '');
-      params.append('ensaioInicio', u.ensaio_inicio || '');
-      params.append('ensaioFim', u.ensaio_fim || '');
-      params.append('montagemInicio', u.montagem_inicio || '');
-      params.append('montagemFim', u.montagem_fim || '');
-      params.append('desmontagemInicio', u.desmontagem_inicio || '');
-      params.append('desmontagemFim', u.desmontagem_fim || '');
-      if (u.eventos_json) params.append('eventosJson', u.eventos_json);
-
-      const link = `${baseUrl}/termo-digital?${params.toString()}`;
-      const subject = `Termo Digital - ${u.evento_nome || 'Seu Evento'} | DAC/UFSC`;
+      const subject = `Termo Digital - ${eventoNome || 'Seu Evento'} | DAC/UFSC`;
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #1d4ed8;">Formulário de Autorização de Uso do DAC</h2>
-          <p>Olá, <strong>${u.nome}</strong>!</p>
+          <p>Olá, <strong>${nomeDestinatario}</strong>!</p>
           <p>Você está recebendo o link individual para preencher o <strong>Termo Digital de Autorização de Uso do DAC</strong> referente ao seu evento:</p>
           <ul>
-            <li><strong>Evento:</strong> ${u.evento_nome || 'N/A'}</li>
-            <li><strong>Local:</strong> ${u.local || 'N/A'}</li>
+            <li><strong>Evento:</strong> ${eventoNome || 'N/A'}</li>
           </ul>
-          <p>Por favor, acesse o link abaixo, preencha os dados solicitados e assine digitalmente:</p>
+          <p>Por favor, acesse o link abaixo, preencha os dados solicitados e gere o PDF para assinar:</p>
           <p style="text-align: center; margin: 30px 0;">
             <a href="${link}" style="background-color: #1d4ed8; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
               Acessar Termo Digital
@@ -3097,10 +3113,10 @@ app.post('/api/enviar-termos-digitais', async (req, res) => {
 
       const enviado = await enviarEmailTermo(emailLimpo, subject, html);
       if (enviado) {
-        resultados.push({ email: emailLimpo, nome: u.nome, status: 'enviado' });
+        resultados.push({ email: emailLimpo, nome: nomeDestinatario, status: 'enviado' });
         console.log(`✅ Termo digital enviado para: ${emailLimpo}`);
       } else {
-        resultados.push({ email: emailLimpo, nome: u.nome, status: 'erro', detalhe: 'Todos os provedores de e-mail falharam.' });
+        resultados.push({ email: emailLimpo, nome: nomeDestinatario, status: 'erro', detalhe: 'Todos os provedores de e-mail falharam.' });
       }
 
     } catch (err) {
