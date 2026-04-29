@@ -1477,9 +1477,28 @@ const Admin = ({ viewOnly = false }) => {
                 <h3 className="font-bold text-xl mb-2 text-gray-700 flex items-center gap-2">
                   <Mail size={22} /> Envio em Massa de Termos Digitais
                 </h3>
-                <p className="text-gray-500 text-sm mb-6">
+                <p className="text-gray-500 text-sm mb-4">
                   Cole abaixo os e-mails dos proponentes (um por linha, ou separados por vírgula/ponto-e-vírgula). O sistema irá buscar a inscrição de cada e-mail e enviar o link individual do Termo Digital.
                 </p>
+
+                {/* Atalho: Termo Digital em Branco (sem nenhum dado pré-preenchido) */}
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-blue-900 text-sm flex items-center gap-2">
+                      <FileText size={16} /> Termo Digital em Branco
+                    </p>
+                    <p className="text-xs text-blue-800/80 mt-1">
+                      Abre uma versão totalmente em branco do termo, para o proponente preencher todos os dados manualmente. Ideal para enviar quando a inscrição não está cadastrada no sistema.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => window.open('/termo-digital', '_blank')}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-600 text-blue-700 font-semibold rounded-lg hover:bg-blue-600 hover:text-white transition-colors text-sm whitespace-nowrap"
+                  >
+                    <FileText size={16} /> Abrir Termo em Branco
+                  </button>
+                </div>
 
                 <div className="mb-4">
                   <label className="block font-semibold text-gray-600 mb-2">E-mails dos proponentes</label>

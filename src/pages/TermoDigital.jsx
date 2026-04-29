@@ -569,13 +569,16 @@ export default function TermoDigital() {
     if (ini) etapas.push({ etapa: "Desmontagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
   }
 
-  // Campos somente leitura (pré-preenchidos)
-  const nome = searchParams.get("nome") || "";
-  const cpfCnpj = searchParams.get("cpfCnpj") || "";
-  const telefone = searchParams.get("telefone") || "";
-  const email = searchParams.get("email") || "";
+  // Campos editáveis (pré-preenchidos quando vierem na URL).
+  // Antes eram somente leitura, mas isso travava proponentes cujo formulário de
+  // inscrição não tinha o CPF/CNPJ com a chave esperada (heurística no Admin),
+  // gerando o alerta "Preencha pelo menos Nome e CPF/CNPJ" sem como editar.
+  const [nome, setNome] = useState(searchParams.get("nome") || "");
+  const [cpfCnpj, setCpfCnpj] = useState(searchParams.get("cpfCnpj") || "");
+  const [telefone, setTelefone] = useState(searchParams.get("telefone") || "");
+  const [email, setEmail] = useState(searchParams.get("email") || "");
 
-  // Campos editáveis
+  // Campos editáveis adicionais
   const [rg, setRg] = useState(searchParams.get("rg") || "");
   const [endereco, setEndereco] = useState(searchParams.get("endereco") || "");
   const [numero, setNumero] = useState(searchParams.get("numero") || "");
@@ -597,6 +600,7 @@ export default function TermoDigital() {
   };
 
   const limparFormulario = () => {
+    setNome(""); setCpfCnpj(""); setTelefone(""); setEmail("");
     setRg("");
     setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
     setOutrasInfo(""); setClausulasAceitas(Array(CLAUSULAS.length).fill(false));
@@ -767,12 +771,12 @@ export default function TermoDigital() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
             <div className="md:col-span-2">
-              <ReadOnly label="Nome Completo" value={nome} />
+              <Field label="Nome Completo" value={nome} onChange={setNome} required />
             </div>
-            <ReadOnly label="CPF/CNPJ" value={cpfCnpj} />
+            <Field label="CPF/CNPJ" value={cpfCnpj} onChange={setCpfCnpj} required placeholder="Ex: 123.456.789-00" />
             <Field label="RG" value={rg} onChange={setRg} required />
-            <ReadOnly label="Telefone" value={telefone} />
-            <ReadOnly label="E-mail" value={email} />
+            <Field label="Telefone" value={telefone} onChange={setTelefone} placeholder="(00) 00000-0000" />
+            <Field label="E-mail" value={email} onChange={setEmail} type="email" placeholder="seu@email.com" />
           </div>
           <div className="grid grid-cols-3 gap-x-4">
             <div className="col-span-2">
