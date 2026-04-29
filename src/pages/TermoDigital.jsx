@@ -240,7 +240,7 @@ function ClausulaItem({ clausula, index, aceita, onAceitar }) {
 // ─────────────────────────────────────────────
 // Geração do PDF
 // ─────────────────────────────────────────────
-function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, tituloEdital, nomeResponsavel, cpfAutorizadora }) {
+function gerarPDF({ local, evento, etapas, etapasTexto, nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, tituloEdital, nomeResponsavel, cpfAutorizadora }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = 210;
   const margin = 20;
@@ -333,17 +333,23 @@ function gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, email, e
   addText("3. Data e horário de realização do evento, conforme informado na inscrição, incluindo os horários de ensaio e montagem, caso tenham sido previstos.", { fontSize: 10, lineHeight: 5 });
   y += 2;
 
-  checkPage(30);
-  autoTable(doc, {
-    startY: y,
-    head: [["Etapa", "Data", "Horário"]],
-    body: etapas.map(e => [e.etapa, e.data, e.horario]),
-    styles: { fontSize: 9, cellPadding: 2 },
-    headStyles: { fillColor: [30, 60, 120], textColor: 255, fontStyle: "bold" },
-    margin: { left: margin, right: margin },
-    tableWidth: usable,
-  });
-  y = doc.lastAutoTable.finalY + 6;
+  if (etapasTexto && etapasTexto.trim()) {
+    // Modo texto livre (formulário em branco) — escreve como parágrafo
+    addText(etapasTexto, { fontSize: 10, indent: 4, lineHeight: 5 });
+    y += 4;
+  } else {
+    checkPage(30);
+    autoTable(doc, {
+      startY: y,
+      head: [["Etapa", "Data", "Horário"]],
+      body: etapas.map(e => [e.etapa, e.data, e.horario]),
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [30, 60, 120], textColor: 255, fontStyle: "bold" },
+      margin: { left: margin, right: margin },
+      tableWidth: usable,
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  }
 
   addText("4. Outras informações:", { fontSize: 10, lineHeight: 6 });
   if (outrasInfo) addText(outrasInfo, { fontSize: 10, indent: 4, lineHeight: 5 });
@@ -574,6 +580,11 @@ export default function TermoDigital() {
     setLocal(prev => prev.toLowerCase() === valor.toLowerCase() ? "" : valor);
   };
 
+  // Modo "formulário em branco": link aberto sem nenhum parâmetro pré-preenchido.
+  // Nesse modo, o item 3 vira um campo de texto livre (correção manual).
+  const isBlankForm = !searchParams.get("nome") && !searchParams.get("cpfCnpj") && etapas.length === 0;
+  const [etapasTexto, setEtapasTexto] = useState("");
+
   // Campos editáveis (pré-preenchidos quando vierem na URL).
   // Antes eram somente leitura, mas isso travava proponentes cujo formulário de
   // inscrição não tinha o CPF/CNPJ com a chave esperada (heurística no Admin),
@@ -605,7 +616,7 @@ export default function TermoDigital() {
   };
 
   const limparFormulario = () => {
-    setLocal(""); setEvento("");
+    setLocal(""); setEvento(""); setEtapasTexto("");
     setNome(""); setCpfCnpj(""); setTelefone(""); setEmail("");
     setRg("");
     setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
@@ -615,7 +626,7 @@ export default function TermoDigital() {
   const handleGerarPDF = () => {
     if (!nome || !cpfCnpj) { alert("Preencha pelo menos Nome e CPF/CNPJ antes de gerar o PDF."); return; }
     if (!todasAceitas) { alert("Você precisa aceitar todas as cláusulas antes de gerar o PDF."); return; }
-    gerarPDF({ local, evento, etapas, nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, ...config });
+    gerarPDF({ local, evento, etapas, etapasTexto: isBlankForm ? etapasTexto : "", nome, cpfCnpj, rg, telefone, email, endereco, numero, complemento, bairro, cidade, outrasInfo, ...config });
   };
 
   const totalAceitas = clausulasAceitas.filter(Boolean).length;
@@ -745,33 +756,43 @@ export default function TermoDigital() {
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
               3. Data e horário de realização do evento
             </label>
-            <div className="overflow-hidden rounded-lg border border-gray-200">
-              <table className="w-full text-xs">
-                <thead className="bg-blue-800 text-white">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-semibold">Etapa</th>
-                    <th className="text-left px-3 py-2 font-semibold">Data</th>
-                    <th className="text-left px-3 py-2 font-semibold">Horário</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {etapas.length === 0 && (
+            {isBlankForm ? (
+              <textarea
+                rows={6}
+                value={etapasTexto}
+                onChange={e => setEtapasTexto(e.target.value)}
+                placeholder="Descreva as datas e horários do evento (ensaio, montagem, apresentações, desmontagem etc.)"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-blue-800 text-white">
                     <tr>
-                      <td colSpan={3} className="px-3 py-3 text-center text-gray-400 italic">
-                        Nenhuma etapa informada
-                      </td>
+                      <th className="text-left px-3 py-2 font-semibold">Etapa</th>
+                      <th className="text-left px-3 py-2 font-semibold">Data</th>
+                      <th className="text-left px-3 py-2 font-semibold">Horário</th>
                     </tr>
-                  )}
-                  {etapas.map((e, i) => (
-                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="px-3 py-2 font-medium text-gray-700">{e.etapa}</td>
-                      <td className="px-3 py-2 text-gray-600">{e.data}</td>
-                      <td className="px-3 py-2 text-gray-600">{e.horario}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {etapas.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-3 text-center text-gray-400 italic">
+                          Nenhuma etapa informada
+                        </td>
+                      </tr>
+                    )}
+                    {etapas.map((e, i) => (
+                      <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="px-3 py-2 font-medium text-gray-700">{e.etapa}</td>
+                        <td className="px-3 py-2 text-gray-600">{e.data}</td>
+                        <td className="px-3 py-2 text-gray-600">{e.horario}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="mb-2">
