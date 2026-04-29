@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Settings, X, Save } from "lucide-react";
+import { Settings, X, Save, Plus, Trash2 } from "lucide-react";
 
 const CONFIG_KEY = "termoDigital_config";
 const DEFAULT_CONFIG = {
@@ -536,38 +536,57 @@ export default function TermoDigital() {
   const abrirConfig = () => { setTempConfig(config); setShowConfig(true); };
   const salvarConfig = () => { saveConfig(tempConfig); setConfig(tempConfig); setShowConfig(false); };
 
-  // Campos pré-preenchidos (somente leitura)
-  const local = searchParams.get("local") || "";
-  const evento = searchParams.get("evento") || "";
-  const ensaioInicio = searchParams.get("ensaioInicio") || "";
-  const ensaioFim = searchParams.get("ensaioFim") || "";
-  const montagemInicio = searchParams.get("montagemInicio") || "";
-  const montagemFim = searchParams.get("montagemFim") || "";
-  const desmontagemInicio = searchParams.get("desmontagemInicio") || "";
-  const desmontagemFim = searchParams.get("desmontagemFim") || "";
-  const eventosJsonRaw = searchParams.get("eventosJson") || "";
+  // Campos da seção I — agora editáveis (pré-preenchidos pela URL quando existir)
+  const [local, setLocal] = useState(searchParams.get("local") || "");
+  const [evento, setEvento] = useState(searchParams.get("evento") || "");
 
-  let eventosPrincipais = [];
-  try { if (eventosJsonRaw) eventosPrincipais = JSON.parse(eventosJsonRaw); } catch {}
+  // Etapas iniciais derivadas dos parâmetros da URL
+  const buildInitialEtapas = () => {
+    const ensaioInicio = searchParams.get("ensaioInicio") || "";
+    const ensaioFim = searchParams.get("ensaioFim") || "";
+    const montagemInicio = searchParams.get("montagemInicio") || "";
+    const montagemFim = searchParams.get("montagemFim") || "";
+    const desmontagemInicio = searchParams.get("desmontagemInicio") || "";
+    const desmontagemFim = searchParams.get("desmontagemFim") || "";
+    const eventosJsonRaw = searchParams.get("eventosJson") || "";
 
-  // Monta tabela de etapas
-  const etapas = [];
-  if (ensaioInicio) {
-    const ini = formatDT(ensaioInicio), fim = formatDT(ensaioFim);
-    if (ini) etapas.push({ etapa: "Ensaio", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
-  }
-  if (montagemInicio) {
-    const ini = formatDT(montagemInicio), fim = formatDT(montagemFim);
-    if (ini) etapas.push({ etapa: "Montagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
-  }
-  eventosPrincipais.forEach((ev, i) => {
-    const ini = formatDT(ev.inicio), fim = formatDT(ev.fim);
-    if (ini) etapas.push({ etapa: `Evento${eventosPrincipais.length > 1 ? " " + (i + 1) : ""}`, data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
-  });
-  if (desmontagemInicio) {
-    const ini = formatDT(desmontagemInicio), fim = formatDT(desmontagemFim);
-    if (ini) etapas.push({ etapa: "Desmontagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
-  }
+    let eventosPrincipais = [];
+    try { if (eventosJsonRaw) eventosPrincipais = JSON.parse(eventosJsonRaw); } catch {}
+
+    const list = [];
+    if (ensaioInicio) {
+      const ini = formatDT(ensaioInicio), fim = formatDT(ensaioFim);
+      if (ini) list.push({ etapa: "Ensaio", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
+    }
+    if (montagemInicio) {
+      const ini = formatDT(montagemInicio), fim = formatDT(montagemFim);
+      if (ini) list.push({ etapa: "Montagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
+    }
+    eventosPrincipais.forEach((ev, i) => {
+      const ini = formatDT(ev.inicio), fim = formatDT(ev.fim);
+      if (ini) list.push({ etapa: `Evento${eventosPrincipais.length > 1 ? " " + (i + 1) : ""}`, data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
+    });
+    if (desmontagemInicio) {
+      const ini = formatDT(desmontagemInicio), fim = formatDT(desmontagemFim);
+      if (ini) list.push({ etapa: "Desmontagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
+    }
+    return list;
+  };
+
+  const [etapas, setEtapas] = useState(buildInitialEtapas);
+
+  const updateEtapa = (i, campo, valor) => {
+    setEtapas(prev => prev.map((e, idx) => idx === i ? { ...e, [campo]: valor } : e));
+  };
+  const addEtapa = () => {
+    setEtapas(prev => [...prev, { etapa: "", data: "", horario: "" }]);
+  };
+  const removeEtapa = (i) => {
+    setEtapas(prev => prev.filter((_, idx) => idx !== i));
+  };
+  const toggleLocal = (valor) => {
+    setLocal(prev => prev.toLowerCase() === valor.toLowerCase() ? "" : valor);
+  };
 
   // Campos editáveis (pré-preenchidos quando vierem na URL).
   // Antes eram somente leitura, mas isso travava proponentes cujo formulário de
@@ -600,6 +619,7 @@ export default function TermoDigital() {
   };
 
   const limparFormulario = () => {
+    setLocal(""); setEvento(""); setEtapas([]);
     setNome(""); setCpfCnpj(""); setTelefone(""); setEmail("");
     setRg("");
     setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
@@ -701,55 +721,113 @@ export default function TermoDigital() {
 
           <div className="mb-4">
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">1. Espaço físico objeto desta autorização</label>
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+            <div className="flex gap-6 flex-wrap">
+              <button
+                type="button"
+                onClick={() => toggleLocal("Teatro Carmen Fossari")}
+                className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-blue-700 transition-colors"
+              >
                 <span className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center text-xs font-bold ${local.toLowerCase().includes("teatro") ? "border-blue-700 bg-blue-700 text-white" : "border-gray-400"}`}>
                   {local.toLowerCase().includes("teatro") ? "✓" : ""}
                 </span>
                 Teatro Carmen Fossari
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleLocal("Igrejinha da UFSC")}
+                className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-blue-700 transition-colors"
+              >
                 <span className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center text-xs font-bold ${local.toLowerCase().includes("igrej") ? "border-blue-700 bg-blue-700 text-white" : "border-gray-400"}`}>
                   {local.toLowerCase().includes("igrej") ? "✓" : ""}
                 </span>
                 Igrejinha da UFSC
-              </label>
+              </button>
             </div>
             {local && !local.toLowerCase().includes("teatro") && !local.toLowerCase().includes("igrej") && (
-              <p className="text-xs text-gray-500 mt-1">{local}</p>
+              <p className="text-xs text-gray-500 mt-1">Outro: {local}</p>
             )}
           </div>
 
-          <ReadOnly label="2. Evento a ser realizado no espaço físico objeto desta autorização" value={evento} />
+          <Field
+            label="2. Evento a ser realizado no espaço físico objeto desta autorização"
+            value={evento}
+            onChange={setEvento}
+            placeholder="Nome do evento"
+          />
 
           <div className="mb-4">
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
               3. Data e horário de realização do evento
             </label>
-            {etapas.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-blue-800 text-white">
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-blue-800 text-white">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold w-1/3">Etapa</th>
+                    <th className="text-left px-3 py-2 font-semibold">Data</th>
+                    <th className="text-left px-3 py-2 font-semibold">Horário</th>
+                    <th className="px-2 py-2 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {etapas.length === 0 && (
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Etapa</th>
-                      <th className="text-left px-3 py-2 font-semibold">Data</th>
-                      <th className="text-left px-3 py-2 font-semibold">Horário</th>
+                      <td colSpan={4} className="px-3 py-3 text-center text-gray-400 italic">
+                        Nenhuma etapa informada — clique em "Adicionar etapa" abaixo
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {etapas.map((e, i) => (
-                      <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="px-3 py-2 font-medium text-gray-700">{e.etapa}</td>
-                        <td className="px-3 py-2 text-gray-600">{e.data}</td>
-                        <td className="px-3 py-2 text-gray-600">{e.horario}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 italic">Nenhuma etapa informada</p>
-            )}
+                  )}
+                  {etapas.map((e, i) => (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={e.etapa}
+                          onChange={ev => updateEtapa(i, "etapa", ev.target.value)}
+                          placeholder="Ex: Ensaio, Montagem, Evento"
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={e.data}
+                          onChange={ev => updateEtapa(i, "data", ev.target.value)}
+                          placeholder="dd/mm/aaaa"
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={e.horario}
+                          onChange={ev => updateEtapa(i, "horario", ev.target.value)}
+                          placeholder="hh:mm - hh:mm"
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                      <td className="px-2 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeEtapa(i)}
+                          title="Remover etapa"
+                          className="text-red-500 hover:bg-red-50 p-1 rounded"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              type="button"
+              onClick={addEtapa}
+              className="mt-2 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-blue-700 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors"
+            >
+              <Plus size={14} /> Adicionar etapa
+            </button>
           </div>
 
           <div className="mb-2">
