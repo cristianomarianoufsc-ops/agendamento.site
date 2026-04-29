@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Settings, X, Save, Plus, Trash2 } from "lucide-react";
+import { Settings, X, Save } from "lucide-react";
 
 const CONFIG_KEY = "termoDigital_config";
 const DEFAULT_CONFIG = {
@@ -540,48 +540,18 @@ export default function TermoDigital() {
   const [local, setLocal] = useState(searchParams.get("local") || "");
   const [evento, setEvento] = useState(searchParams.get("evento") || "");
 
-  // Converte ISO/string da URL para o formato exigido pelo input datetime-local (YYYY-MM-DDTHH:mm)
-  const toLocalInput = (iso) => {
-    if (!iso) return "";
-    try {
-      const d = new Date(iso.includes("Z") ? iso : iso + "-03:00");
-      if (isNaN(d.getTime())) return "";
-      const pad = (n) => String(n).padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    } catch { return ""; }
-  };
+  // Etapas derivadas dos parâmetros da URL (somente leitura — comportamento original)
+  const ensaioInicio = searchParams.get("ensaioInicio") || "";
+  const ensaioFim = searchParams.get("ensaioFim") || "";
+  const montagemInicio = searchParams.get("montagemInicio") || "";
+  const montagemFim = searchParams.get("montagemFim") || "";
+  const desmontagemInicio = searchParams.get("desmontagemInicio") || "";
+  const desmontagemFim = searchParams.get("desmontagemFim") || "";
+  const eventosJsonRaw = searchParams.get("eventosJson") || "";
 
-  // Eventos principais (apresentações) iniciais — vêm de eventosJson
-  const buildInitialEventos = () => {
-    const eventosJsonRaw = searchParams.get("eventosJson") || "";
-    let lista = [];
-    try { if (eventosJsonRaw) lista = JSON.parse(eventosJsonRaw); } catch {}
-    return lista.map(ev => ({ inicio: toLocalInput(ev.inicio), fim: toLocalInput(ev.fim) }));
-  };
+  let eventosPrincipais = [];
+  try { if (eventosJsonRaw) eventosPrincipais = JSON.parse(eventosJsonRaw); } catch {}
 
-  // Estados editáveis das etapas (mesmo modelo de dados de antes: início/fim por etapa)
-  const [ensaioInicio, setEnsaioInicio] = useState(toLocalInput(searchParams.get("ensaioInicio")));
-  const [ensaioFim, setEnsaioFim] = useState(toLocalInput(searchParams.get("ensaioFim")));
-  const [montagemInicio, setMontagemInicio] = useState(toLocalInput(searchParams.get("montagemInicio")));
-  const [montagemFim, setMontagemFim] = useState(toLocalInput(searchParams.get("montagemFim")));
-  const [desmontagemInicio, setDesmontagemInicio] = useState(toLocalInput(searchParams.get("desmontagemInicio")));
-  const [desmontagemFim, setDesmontagemFim] = useState(toLocalInput(searchParams.get("desmontagemFim")));
-  const [eventosPrincipais, setEventosPrincipais] = useState(buildInitialEventos);
-
-  const updateEvento = (i, campo, valor) => {
-    setEventosPrincipais(prev => prev.map((ev, idx) => idx === i ? { ...ev, [campo]: valor } : ev));
-  };
-  const addEvento = () => {
-    setEventosPrincipais(prev => [...prev, { inicio: "", fim: "" }]);
-  };
-  const removeEvento = (i) => {
-    setEventosPrincipais(prev => prev.filter((_, idx) => idx !== i));
-  };
-  const toggleLocal = (valor) => {
-    setLocal(prev => prev.toLowerCase() === valor.toLowerCase() ? "" : valor);
-  };
-
-  // Tabela de etapas derivada (mesmo formato da exibição original: Etapa | Data | Horário)
   const etapas = [];
   if (ensaioInicio) {
     const ini = formatDT(ensaioInicio), fim = formatDT(ensaioFim);
@@ -599,6 +569,10 @@ export default function TermoDigital() {
     const ini = formatDT(desmontagemInicio), fim = formatDT(desmontagemFim);
     if (ini) etapas.push({ etapa: "Desmontagem", data: ini.date, horario: `${ini.time}${fim ? " - " + fim.time : ""}` });
   }
+
+  const toggleLocal = (valor) => {
+    setLocal(prev => prev.toLowerCase() === valor.toLowerCase() ? "" : valor);
+  };
 
   // Campos editáveis (pré-preenchidos quando vierem na URL).
   // Antes eram somente leitura, mas isso travava proponentes cujo formulário de
@@ -632,10 +606,6 @@ export default function TermoDigital() {
 
   const limparFormulario = () => {
     setLocal(""); setEvento("");
-    setEnsaioInicio(""); setEnsaioFim("");
-    setMontagemInicio(""); setMontagemFim("");
-    setDesmontagemInicio(""); setDesmontagemFim("");
-    setEventosPrincipais([]);
     setNome(""); setCpfCnpj(""); setTelefone(""); setEmail("");
     setRg("");
     setEndereco(""); setNumero(""); setComplemento(""); setBairro(""); setCidade("");
@@ -775,114 +745,33 @@ export default function TermoDigital() {
             <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
               3. Data e horário de realização do evento
             </label>
-            <p className="text-xs text-gray-500 mb-3">Inclua apenas as etapas que se aplicam ao seu evento. Deixe os campos em branco para omitir uma etapa.</p>
-
-            {/* Editor de etapas (mesma estrutura do formulário original: início e fim por etapa) */}
-            <div className="space-y-3 mb-4">
-              {/* Ensaio */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Ensaio</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Início</label>
-                    <input type="datetime-local" value={ensaioInicio} onChange={e => setEnsaioInicio(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Fim</label>
-                    <input type="datetime-local" value={ensaioFim} onChange={e => setEnsaioFim(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Montagem */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Montagem</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Início</label>
-                    <input type="datetime-local" value={montagemInicio} onChange={e => setMontagemInicio(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Fim</label>
-                    <input type="datetime-local" value={montagemFim} onChange={e => setMontagemFim(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Evento(s) - apresentações */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Evento (apresentações)</p>
-                  <button type="button" onClick={addEvento} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-700 border border-blue-300 rounded hover:bg-blue-50 transition-colors">
-                    <Plus size={12} /> Adicionar apresentação
-                  </button>
-                </div>
-                {eventosPrincipais.length === 0 && (
-                  <p className="text-xs text-gray-400 italic">Nenhuma apresentação adicionada</p>
-                )}
-                <div className="space-y-2">
-                  {eventosPrincipais.map((ev, i) => (
-                    <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">
-                          {eventosPrincipais.length > 1 ? `Apresentação ${i + 1} - Início` : "Início"}
-                        </label>
-                        <input type="datetime-local" value={ev.inicio} onChange={e => updateEvento(i, "inicio", e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Fim</label>
-                        <input type="datetime-local" value={ev.fim} onChange={e => updateEvento(i, "fim", e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                      </div>
-                      <button type="button" onClick={() => removeEvento(i)} title="Remover apresentação" className="text-red-500 hover:bg-red-50 p-2 rounded self-end">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Desmontagem */}
-              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">Desmontagem</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Início</label>
-                    <input type="datetime-local" value={desmontagemInicio} onChange={e => setDesmontagemInicio(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-1">Fim</label>
-                    <input type="datetime-local" value={desmontagemFim} onChange={e => setDesmontagemFim(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tabela de prévia (mesmo formato exibido antes e que vai para o PDF) */}
-            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Prévia (como ficará no PDF)</p>
-            {etapas.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-blue-800 text-white">
+            <div className="overflow-hidden rounded-lg border border-gray-200">
+              <table className="w-full text-xs">
+                <thead className="bg-blue-800 text-white">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold">Etapa</th>
+                    <th className="text-left px-3 py-2 font-semibold">Data</th>
+                    <th className="text-left px-3 py-2 font-semibold">Horário</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {etapas.length === 0 && (
                     <tr>
-                      <th className="text-left px-3 py-2 font-semibold">Etapa</th>
-                      <th className="text-left px-3 py-2 font-semibold">Data</th>
-                      <th className="text-left px-3 py-2 font-semibold">Horário</th>
+                      <td colSpan={3} className="px-3 py-3 text-center text-gray-400 italic">
+                        Nenhuma etapa informada
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {etapas.map((e, i) => (
-                      <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="px-3 py-2 font-medium text-gray-700">{e.etapa}</td>
-                        <td className="px-3 py-2 text-gray-600">{e.data}</td>
-                        <td className="px-3 py-2 text-gray-600">{e.horario}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 italic">Nenhuma etapa informada</p>
-            )}
+                  )}
+                  {etapas.map((e, i) => (
+                    <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="px-3 py-2 font-medium text-gray-700">{e.etapa}</td>
+                      <td className="px-3 py-2 text-gray-600">{e.data}</td>
+                      <td className="px-3 py-2 text-gray-600">{e.horario}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="mb-2">
