@@ -20,12 +20,14 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         sync: false
-      - key: SHEET_ID
+      - key: ADMIN_PASSWORD
         sync: false
-      - key: SHEET_RANGE
+      - key: GOOGLE_CREDENTIALS_JSON
         sync: false
-      - key: GOOGLE_APPLICATION_CREDENTIALS
-        value: ./credentials.json
+      - key: RESEND_API_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
 
 databases:
   - name: agendamento-db
