@@ -576,7 +576,7 @@ app.post('/api/evaluators', requireAdminAuth, async (req, res) => {
       }
       
       console.log('Processando avaliador:', email);
-      const evaluatorPassword = 'avalia.dac.2026';
+      const evaluatorPassword = process.env.EVALUATOR_PASSWORD || 'avalia.dac.2026';
       await query(
         'INSERT INTO evaluators (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash',
         [email.trim().toLowerCase(), evaluatorPassword]
