@@ -3,6 +3,7 @@
 // ===================================================================
 
 import express from "express";
+import rateLimit from "express-rate-limit";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fs from "fs";
@@ -470,6 +471,16 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
+// --- RATE LIMITING NAS ROTAS DE LOGIN ---
+// Máximo de 10 tentativas a cada 15 minutos por IP
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // --- 9. ROTA PARA OBTER CONFIGURAÇÕES ---
 app.get("/api/config", async (req, res) => {
   try {
@@ -605,7 +616,7 @@ app.delete('/api/evaluators/:id', requireAdminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/auth/viewer', async (req, res) => {
+app.post('/api/auth/viewer', loginRateLimit, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
         return res.status(400).json({ error: 'Nome e senha sao obrigatorios.' });
@@ -682,7 +693,7 @@ app.get('/api/forms-data', async (req, res) => {
 });
 
 // --- ROTA PARA AUTENTICAÇÃO DO ADMINISTRADOR ---
-app.post('/api/auth/admin', async (req, res) => {
+app.post('/api/auth/admin', loginRateLimit, async (req, res) => {
     const { password } = req.body;
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin.dac.ufsc'; // Senha padrão se não estiver em ENV
 
