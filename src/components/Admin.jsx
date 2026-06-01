@@ -104,9 +104,21 @@ const Admin = ({ viewOnly = false }) => {
   
   // ✅ NOVOS ESTADOS PARA AUTENTICAÇÃO ADMIN
   const [adminPassword, setAdminPassword] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminAuth'));
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(!!sessionStorage.getItem('adminToken'));
   const [showAdminPassword, setShowAdminPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha
   const [showEvaluatorPassword, setShowEvaluatorPassword] = useState(false); // NOVO ESTADO: Visibilidade da senha do avaliador
+
+  // --- HELPER: fetch com token de admin ---
+  const adminFetch = (url, options = {}) => {
+    const token = sessionStorage.getItem('adminToken') || '';
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'X-Admin-Token': token,
+      },
+    });
+  };
 
   // --- LÓGICA DE DADOS E FILTRAGEM ---
 
@@ -364,7 +376,7 @@ const Admin = ({ viewOnly = false }) => {
   const fetchEvaluators = async () => {
     if (viewOnly) return;
     try {
-        const response = await fetch("/api/evaluators");
+        const response = await adminFetch("/api/evaluators");
         const data = await response.json();
         // Garante que evaluators seja sempre um array
         setEvaluators(Array.isArray(data) ? data : []);
@@ -406,9 +418,9 @@ const Admin = ({ viewOnly = false }) => {
   // --- FUNÇÕES DE MANIPULAÇÃO (HANDLERS) ---
   const handleSaveConfig = async (configData) => {
     try {
-      const response = await fetch("/api/config", {
+      const response = await adminFetch("/api/config", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configData   ),
+        body: JSON.stringify(configData),
       });
       if (response.ok) alert("✅ Configurações salvas com sucesso!");
       else throw new Error("Erro no servidor.");
@@ -467,7 +479,7 @@ const Admin = ({ viewOnly = false }) => {
       });
       const data = await response.json();
       if (data.success) {
-        sessionStorage.setItem('adminAuth', 'true');
+        sessionStorage.setItem('adminToken', adminPassword);
         setIsAdminAuthenticated(true);
         setAdminPassword(''); // Limpa o campo de senha
       } else {
@@ -481,7 +493,7 @@ const Admin = ({ viewOnly = false }) => {
   
   // ✅ FUNÇÃO DE LOGOUT DO ADMINISTRADOR
   const handleAdminLogout = () => {
-    sessionStorage.removeItem('adminAuth');
+    sessionStorage.removeItem('adminToken');
     setIsAdminAuthenticated(false);
     window.location.reload();
   };
@@ -541,7 +553,7 @@ const Admin = ({ viewOnly = false }) => {
     // Se já estiver no banco, confirma e remove via API
     if (window.confirm("Tem certeza que deseja remover este avaliador?")) {
       try {
-        const response = await fetch(`/api/evaluators/${id}`, { method: 'DELETE' });
+        const response = await adminFetch(`/api/evaluators/${id}`, { method: 'DELETE' });
         if (response.ok) {
           setEvaluators(prev => prev.filter(e => e.id !== id));
         } else {
@@ -557,7 +569,7 @@ const Admin = ({ viewOnly = false }) => {
   const handleSaveEvaluators = async () => {
      const evaluatorsToSave = evaluators.map(e => ({ email: e.email }));;
     try {
-      const response = await fetch("/api/evaluators", {
+      const response = await adminFetch("/api/evaluators", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ evaluators: evaluatorsToSave, sharedPassword: "avalia.dac.2026" }),
       });
@@ -584,7 +596,7 @@ const Admin = ({ viewOnly = false }) => {
     setIsGeneratingInsights(true);
     try {
       // 1. Chamar o novo endpoint para obter os dados brutos
-      const response = await fetch("/api/admin/data-for-analysis");
+      const response = await adminFetch("/api/admin/data-for-analysis");
       if (!response.ok) {
         throw new Error("Falha ao buscar dados para análise.");
       }

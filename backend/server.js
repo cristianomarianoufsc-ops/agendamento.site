@@ -460,6 +460,16 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
+// --- MIDDLEWARE DE AUTENTICAÇÃO ADMIN ---
+function requireAdminAuth(req, res, next) {
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin.dac.ufsc';
+  const token = req.headers['x-admin-token'];
+  if (!token || token !== adminPassword) {
+    return res.status(401).json({ error: 'Acesso não autorizado. Faça login como administrador.' });
+  }
+  next();
+}
+
 // --- 9. ROTA PARA OBTER CONFIGURAÇÕES ---
 app.get("/api/config", async (req, res) => {
   try {
@@ -538,7 +548,7 @@ app.get("/api/config", async (req, res) => {
 // --- 10. ENDPOINTS PARA GERENCIAR AVALIADORES E AUTENTICAÇÃO ---
 
 // Endpoint para buscar a lista de avaliadores
-app.get('/api/evaluators', async (req, res) => {
+app.get('/api/evaluators', requireAdminAuth, async (req, res) => {
   try {
     const result = await query('SELECT * FROM evaluators ORDER BY email ASC');
     res.json(result.rows);
@@ -548,7 +558,7 @@ app.get('/api/evaluators', async (req, res) => {
   }
 });
 
-app.post('/api/evaluators', async (req, res) => {
+app.post('/api/evaluators', requireAdminAuth, async (req, res) => {
   const { evaluators, sharedPassword } = req.body;
   
   if (!Array.isArray(evaluators) || !sharedPassword) {
@@ -584,7 +594,7 @@ app.post('/api/evaluators', async (req, res) => {
 });
 
 // Endpoint para remover um avaliador
-app.delete('/api/evaluators/:id', async (req, res) => {
+app.delete('/api/evaluators/:id', requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   try {
     await query('DELETE FROM evaluators WHERE id = $1', [id]);
@@ -689,7 +699,7 @@ app.post('/api/auth/admin', async (req, res) => {
 });
 
 // NOVO: Endpoint unificado para SALVAR a configuração
-app.post("/api/config", async (req, res) => {
+app.post("/api/config", requireAdminAuth, async (req, res) => {
   try {
     const newConfigData = req.body;
     let currentConfig = {};
@@ -1349,7 +1359,7 @@ async function consolidateSchedule() {
 }
 
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
-app.get("/api/admin/data-for-analysis", async (req, res) => {
+app.get("/api/admin/data-for-analysis", requireAdminAuth, async (req, res) => {
   try {
     const criteria = await getEvaluationCriteria();
     const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
@@ -1411,7 +1421,7 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
 });
 
 // --- 11.1. ROTA PARA OBTER APENAS OS IDs DAS INSCRIÇÕES (PARA O ADMIN PANEL) ---
-app.get("/api/admin/inscricoes", async (req, res) => {
+app.get("/api/admin/inscricoes", requireAdminAuth, async (req, res) => {
   try {
     const inscriptionsResult = await query("SELECT id FROM inscricoes ORDER BY criado_em DESC");
     const ids = inscriptionsResult.rows.map(row => row.id);
@@ -1423,7 +1433,7 @@ app.get("/api/admin/inscricoes", async (req, res) => {
 });
 
 // --- 12. ROTA PARA OBTER DETALHES DE UMA INSCRIÇÃO (PARA O ADMIN PANEL) ---
-app.get("/api/admin/inscricoes/:id", async (req, res) => {
+app.get("/api/admin/inscricoes/:id", requireAdminAuth, async (req, res) => {
   const { id } = req.params;
   try {
     const inscriptionResult = await query("SELECT * FROM inscricoes WHERE id = $1", [id]);
@@ -1455,7 +1465,7 @@ app.get("/api/admin/inscricoes/:id", async (req, res) => {
 });
 
 // --- 13. ROTA PARA OBTER DADOS BRUTOS PARA ANÁLISE (GERAR SLIDES) ---
-app.get("/api/admin/data-for-analysis", async (req, res) => {
+app.get("/api/admin/data-for-analysis", requireAdminAuth, async (req, res) => {
   try {
     const criteria = await getEvaluationCriteria();
     const inscriptionsResult = await query("SELECT * FROM inscricoes ORDER BY criado_em DESC");
@@ -1518,7 +1528,7 @@ app.get("/api/admin/data-for-analysis", async (req, res) => {
 });
 
 // --- 14. ROTA PARA CONSOLIDAR AGENDA ---
-app.post("/api/admin/consolidate", async (req, res) => {
+app.post("/api/admin/consolidate", requireAdminAuth, async (req, res) => {
   try {
     const result = await consolidateSchedule();
     res.json(result);
