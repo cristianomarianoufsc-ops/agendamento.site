@@ -13,34 +13,35 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 import "./index.css";
 
-// --- ✅ COMPONENTE DA PÁGINA INICIAL ATUALIZADO E DINÂMICO ---
+// --- COMPONENTE DA PÁGINA INICIAL ---
 const HomePage = () => {
   const [config, setConfig] = useState({
     enableInternalEdital: false,
     enableExternalEdital: true,
     enableRehearsal: true,
-    buttonExternalEditalText: "Edital Externo", // NOVO CAMPO
-  });  const [loading, setLoading] = useState(true);
+    buttonExternalEditalText: "Edital Externo",
+    disabledMessage: "Inscrições encerradas.",
+  });
+  const [loading, setLoading] = useState(true);
+  const [modalMsg, setModalMsg] = useState(null); // mensagem do modal de botão desativado
+
   useEffect(() => {
-    fetch("/api/config" )
+    fetch("/api/config")
       .then(res => res.json())
-      .then(data => {
-        setConfig(data);        setLoading(false);      })
-      .catch(err => {
-        console.error("Erro ao buscar configurações da página inicial:", err);        setLoading(false);      });  }, []);
-  // Componente de botão reutilizável para evitar repetição
+      .then(data => { setConfig(data); setLoading(false); })
+      .catch(err => { console.error("Erro ao buscar configurações:", err); setLoading(false); });
+  }, []);
+
   const ActionButton = ({ to, label, color, enabled }) => {
     const disabledStyle = {
       background: '#9ca3af',
       boxShadow: '0 4px 14px 0 rgba(156, 163, 175, 0.39)',
-      cursor: 'not-allowed'
+      cursor: 'not-allowed',
     };
-
     const enabledStyle = {
       background: color,
       boxShadow: `0 4px 14px 0 rgba(${color === '#2563eb' ? '0, 118, 255' : '34, 197, 94'}, 0.39)`,
     };
-    
     const finalStyle = {
       padding: '1rem 2rem',
       color: 'white',
@@ -48,17 +49,19 @@ const HomePage = () => {
       borderRadius: '8px',
       fontWeight: 'bold',
       width: '280px',
+      display: 'inline-block',
+      textAlign: 'center',
       transition: 'background-color 0.3s',
-      ...(enabled ? enabledStyle : disabledStyle)
+      ...(enabled ? enabledStyle : disabledStyle),
     };
 
     if (!enabled) {
       return (
-        <a href="#" onClick={(e) => e.preventDefault()} style={finalStyle}>
+        <a href="#" onClick={e => { e.preventDefault(); setModalMsg(config.disabledMessage || "Indisponível no momento."); }} style={finalStyle}>
           {label}
         </a>
-      );    }
-
+      );
+    }
     return <Link to={to} style={finalStyle}>{label}</Link>;
   };
 
@@ -68,56 +71,74 @@ const HomePage = () => {
 
   return (
     <div style={{ fontFamily: 'sans-serif' }}>
-      {/* Botão de Acesso à Área Administrativa no Canto Superior Direito */}
-      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
-        <a 
-          href="/admin" 
-          target="_blank" 
-          style={{ 
-            padding: '0.5rem 1rem', 
-            color: '#2563eb', 
-            textDecoration: 'none', 
-            borderRadius: '4px', 
-            fontWeight: 'bold',
-            border: '1px solid #2563eb',
-            transition: 'background-color 0.3s, color 0.3s'
+      {/* Modal de aviso quando botão está desativado */}
+      {modalMsg && (
+        <div
+          onClick={() => setModalMsg(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
           }}
-          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#2563eb'; e.currentTarget.style.color = 'white'; }}
-          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#2563eb'; }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px',
+              padding: '2rem', maxWidth: '420px', width: '100%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>⚠️</div>
+            <p style={{ fontSize: '1.1rem', color: '#374151', fontWeight: '600', marginBottom: '1.5rem', whiteSpace: 'pre-wrap' }}>
+              {modalMsg}
+            </p>
+            <button
+              onClick={() => setModalMsg(null)}
+              style={{
+                padding: '0.6rem 2rem', background: '#2563eb', color: 'white',
+                border: 'none', borderRadius: '8px', fontWeight: 'bold',
+                fontSize: '1rem', cursor: 'pointer',
+              }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Botão de Acesso à Área Administrativa */}
+      <div style={{ position: 'absolute', top: '1rem', right: '1rem' }}>
+        <a
+          href="/admin"
+          target="_blank"
+          style={{
+            padding: '0.5rem 1rem', color: '#2563eb', textDecoration: 'none',
+            borderRadius: '4px', fontWeight: 'bold', border: '1px solid #2563eb',
+            transition: 'background-color 0.3s, color 0.3s',
+          }}
+          onMouseOver={e => { e.currentTarget.style.backgroundColor = '#2563eb'; e.currentTarget.style.color = 'white'; }}
+          onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#2563eb'; }}
         >
           Área Administrativa
         </a>
       </div>
 
-      {/* Conteúdo Principal Centralizado */}      <div style={{ textAlign: 'center', marginTop: '5rem', padding: '1rem' }}>
+      {/* Conteúdo Principal */}
+      <div style={{ textAlign: 'center', marginTop: '5rem', padding: '1rem' }}>
         <h1 style={{ fontSize: '2.5rem', color: '#333' }}>Sistema de Agendamento DAC</h1>
         <p style={{ fontSize: '1.2rem', color: '#666' }}>O que você gostaria de fazer?</p>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem', marginTop: '2.5rem' }}>
-        
-        <ActionButton
-          to="#" // Rota do edital interno, se existir
-          label="Edital Interno"
-          color="#2563eb"
-          enabled={config.enableInternalEdital}
-        />
-
-        <ActionButton
-          to="/agendamento"
-          label={config.buttonExternalEditalText || "Edital Externo"}
-          color="#2563eb"
-          enabled={config.enableExternalEdital}
-        />
-
-        <ActionButton
-          to="/ensaio"
-          label="Agendar Apenas Ensaio"
-          color="#16a34a"
-          enabled={config.enableRehearsal}
-        />
+          <ActionButton to="#" label="Edital Interno" color="#2563eb" enabled={config.enableInternalEdital} />
+          <ActionButton to="/agendamento" label={config.buttonExternalEditalText || "Edital Externo"} color="#2563eb" enabled={config.enableExternalEdital} />
+          <ActionButton to="/ensaio" label="Agendar Apenas Ensaio" color="#16a34a" enabled={config.enableRehearsal} />
         </div>
       </div>
     </div>
-  );};
+  );
+};
 
 
 

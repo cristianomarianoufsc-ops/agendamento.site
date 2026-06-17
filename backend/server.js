@@ -505,6 +505,7 @@ app.get("/api/config", async (req, res) => {
       enableInternalEdital: false,
       enableExternalEdital: true,
       enableRehearsal: true,
+      disabledMessage: "Inscrições encerradas.",
       requiredAssessments: 3,
     };
 

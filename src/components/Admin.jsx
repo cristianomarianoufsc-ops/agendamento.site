@@ -77,6 +77,7 @@ const Admin = ({ viewOnly = false }) => {
   const [enableInternalEdital, setEnableInternalEdital] = useState(false);
   const [enableExternalEdital, setEnableExternalEdital] = useState(true);
   const [enableRehearsal, setEnableRehearsal] = useState(true);
+  const [disabledMessage, setDisabledMessage] = useState("Inscrições encerradas.");
   const [buttonExternalEditalText, setButtonExternalEditalText] = useState("Edital Externo"); // NOVO ESTADO
 
   // ✅ NOVO ESTADO PARA O NÚMERO DE AVALIAÇÕES
@@ -404,7 +405,8 @@ const Admin = ({ viewOnly = false }) => {
         setEnableInternalEdital(data.enableInternalEdital);
         setEnableExternalEdital(data.enableExternalEdital);
         setEnableRehearsal(data.enableRehearsal);
-        if (data.buttonExternalEditalText) setButtonExternalEditalText(data.buttonExternalEditalText); // NOVO: Carrega o texto do botão
+        if (data.buttonExternalEditalText) setButtonExternalEditalText(data.buttonExternalEditalText);
+        if (data.disabledMessage) setDisabledMessage(data.disabledMessage);
 
         // ✅ ATUALIZA O NOVO ESTADO
         if (data.requiredAssessments) {
@@ -1256,8 +1258,21 @@ const Admin = ({ viewOnly = false }) => {
                       </label>
                     </div>
                   </div>
-                  <div className="mt-6">
-                    <button onClick={() => handleSaveConfig({ enableInternalEdital, enableExternalEdital, enableRehearsal, buttonExternalEditalText })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
+                  <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Mensagem ao clicar em botão desativado
+                    </label>
+                    <p className="text-xs text-gray-500 mb-2">Aparece como aviso quando o proponente clica em qualquer botão desativado.</p>
+                    <textarea
+                      rows={3}
+                      value={disabledMessage}
+                      onChange={e => setDisabledMessage(e.target.value)}
+                      placeholder="Ex: Inscrições encerradas."
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                  <div className="mt-4">
+                    <button onClick={() => handleSaveConfig({ enableInternalEdital, enableExternalEdital, enableRehearsal, buttonExternalEditalText, disabledMessage })} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
                       <Save size={18} /> Salvar Status dos Botões
                     </button>
                   </div>
